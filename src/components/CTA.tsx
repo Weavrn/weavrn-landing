@@ -25,12 +25,12 @@ export default function CTA() {
             <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
           </a>
           <a
-            href={SOCIAL_LINKS.discord || "#"}
+            href={SOCIAL_LINKS.twitter}
             target="_blank"
             rel="noopener noreferrer"
             className="px-8 py-3.5 border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg font-semibold transition-all duration-300 hover:bg-weavrn-surface"
           >
-            Join Discord
+            Follow on X
           </a>
         </div>
 

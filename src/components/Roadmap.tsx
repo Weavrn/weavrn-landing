@@ -2,7 +2,7 @@ import { ROADMAP_PHASES } from "@/lib/constants";
 
 export default function Roadmap() {
   return (
-    <section className="relative py-32 px-6">
+    <section id="roadmap" className="relative py-32 px-6 scroll-mt-16">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-20">
           <p className="text-[#00D4AA] text-sm font-mono font-medium tracking-wider uppercase mb-4">

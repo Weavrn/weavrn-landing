@@ -1,22 +1,20 @@
+import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import Problem from "@/components/Problem";
-import Solution from "@/components/Solution";
-import HowItWorks from "@/components/HowItWorks";
+import WhyWeavrn from "@/components/WhyWeavrn";
+import Mining from "@/components/Mining";
 import Tokenomics from "@/components/Tokenomics";
 import Roadmap from "@/components/Roadmap";
-import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
     <main>
+      <Navbar />
       <Hero />
-      <Problem />
-      <Solution />
-      <HowItWorks />
+      <WhyWeavrn />
+      <Mining />
       <Tokenomics />
       <Roadmap />
-      <CTA />
       <Footer />
     </main>
   );

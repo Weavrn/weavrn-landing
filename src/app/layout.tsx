@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   title: "Weavrn — Financial Infrastructure for AI Agents",
   description:
     "Decentralized identity, wallets, and payments for autonomous AI agents. Register on-chain, hold assets, and pay programmatically.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "Weavrn — Financial Infrastructure for AI Agents",
     description:

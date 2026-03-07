@@ -1,9 +1,11 @@
 export const SOCIAL_LINKS = {
-  twitter: "https://x.com/WeavrnProtocol",
+  twitter: "https://x.com/weavrn",
   discord: "", // TODO: add Discord invite link
   telegram: "", // TODO: add Telegram link
   github: "https://github.com/weavrn",
 } as const;
+
+export const CONTACT_EMAIL = "contact@weavrn.com";
 
 export const BUTTONDOWN_EMBED_URL = ""; // TODO: add Buttondown embed URL
 

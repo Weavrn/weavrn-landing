@@ -41,28 +41,15 @@ export default function Hero() {
             <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
           </a>
           <a
-            href={SOCIAL_LINKS.discord || "#"}
+            href={SOCIAL_LINKS.twitter}
             target="_blank"
             rel="noopener noreferrer"
             className="px-8 py-3.5 border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg font-semibold transition-all duration-300 hover:bg-weavrn-surface"
           >
-            Join Discord
+            Follow on X
           </a>
         </div>
 
-        {/* Stats bar */}
-        <div className="mt-20 grid grid-cols-3 gap-8 max-w-lg mx-auto animate-fade-in" style={{ animationDelay: "0.8s" }}>
-          {[
-            { value: "1B", label: "Total Supply" },
-            { value: "10K", label: "Daily Rewards" },
-            { value: "$0", label: "Presale" },
-          ].map((stat) => (
-            <div key={stat.label}>
-              <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <div className="text-xs text-weavrn-muted mt-1">{stat.label}</div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Bottom fade */}
