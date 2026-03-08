@@ -2,16 +2,16 @@
 
 ## Project
 
-Weavrn landing page and social mining dashboard. Next.js 14 (App Router) + Tailwind CSS + Supabase.
+Weavrn landing page, social mining dashboard, and admin panel. Next.js 14 (App Router) + Tailwind CSS. Static export (no server-side routes). All API calls go to weavrn-api (Fastify backend on Digital Ocean).
 
 ## Stack
 
 - **Framework:** Next.js 14 (App Router), React 18, TypeScript
 - **Styling:** Tailwind CSS with custom `weavrn-*` color tokens
-- **Database:** Supabase (profiles + submissions tables)
-- **APIs:** X/Twitter API Basic for tweet metric fetching
-- **Wallet:** MetaMask direct integration + manual address entry
-- **Deploy:** Vercel
+- **Wallet:** MetaMask via ethers.js v6 (BrowserProvider + JsonRpcSigner)
+- **Chain:** Base Sepolia (testnet) / Base (mainnet)
+- **API:** weavrn-api (Fastify + Postgres, separate repo)
+- **Deploy:** Vercel (static export)
 
 ## Structure
 
@@ -21,15 +21,17 @@ src/
     page.tsx              # Marketing landing page
     layout.tsx            # Root layout, fonts, metadata
     globals.css           # Tailwind + custom glow/grid effects
-    mine/page.tsx         # Social mining dashboard
-    api/
-      submit/route.ts     # Post submission endpoint
-      rewards/route.ts    # Reward/submission query endpoint
-      auth/link/route.ts  # Wallet <-> X handle linking
-  components/             # Landing page sections + mining UI
+    mine/page.tsx         # Social mining dashboard (wallet connect + claim flow)
+    admin/page.tsx        # Admin submission review + approve/reject
+  components/
+    Hero.tsx, WhyWeavrn.tsx, Mining.tsx, Tokenomics.tsx, Roadmap.tsx, Footer.tsx
+    Navbar.tsx, RewardsCalculator.tsx
+    WalletConnect.tsx     # MetaMask connect + chain switching + signer
+    MiningDashboard.tsx   # Submit posts, view submissions, claim rewards
   lib/
-    constants.ts          # Social links, token allocations, roadmap data
-    supabase.ts           # Lazy-init Supabase client + types
+    api.ts                # HTTP client for weavrn-api endpoints
+    contracts.ts          # ethers contract interaction (claimReward, chain switch, add token)
+    constants.ts          # Social links, token allocations, roadmap phases
     twitter.ts            # X API fetching + engagement score calculation
 ```
 
@@ -44,17 +46,20 @@ src/
 ## Environment Variables
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-X_BEARER_TOKEN=
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SOCIAL_MINING_ADDRESS=
+NEXT_PUBLIC_WVRN_TOKEN_ADDRESS=
+NEXT_PUBLIC_CHAIN_ID=84532
+NEXT_PUBLIC_RPC_URL=
 ```
 
 ## Commands
 
 - `npm run dev` — local development
-- `npm run build` — production build
-- `supabase-schema.sql` — run in Supabase SQL editor to set up tables
+- `npm run build` — production build (static export to `out/`)
 
 ## Related Repos
 
-- [Weavrn](https://github.com/Weavrn/Weavrn) — planning repo, smart contracts, docs
+- [weavrn-api](https://github.com/Weavrn/weavrn-api) — Fastify API backend
+- [weavrn-contracts](https://github.com/Weavrn/weavrn-contracts) — Solidity contracts (Foundry)
+- [Weavrn](https://github.com/cfausn/Weavrn) — planning repo, docs
