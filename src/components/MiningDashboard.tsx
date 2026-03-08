@@ -5,6 +5,7 @@ import { JsonRpcSigner } from "ethers";
 import {
   getRewards,
   getProfile,
+  refreshPosts,
   startVerification,
   verifyHandle,
   unlinkHandle,
@@ -55,6 +56,8 @@ export default function MiningDashboard({
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
   const [copied, setCopied] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshCooldown, setRefreshCooldown] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -142,6 +145,31 @@ export default function MiningDashboard({
       setError((err as Error).message);
     }
   };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await refreshPosts(walletAddress);
+      await fetchData();
+      setRefreshCooldown(300);
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      const match = msg.match(/Try again in (\d+)s/);
+      if (match) setRefreshCooldown(parseInt(match[1]));
+      setError(msg);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (refreshCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setRefreshCooldown((c) => (c <= 1 ? 0 : c - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [refreshCooldown]);
 
   const handleCancelVerification = () => {
     setVerificationCode(null);
@@ -348,7 +376,20 @@ export default function MiningDashboard({
 
       {/* Tracked Posts */}
       <div>
-        <h3 className="text-lg font-bold text-white mb-4">Tracked Posts</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || refreshCooldown > 0}
+            className="px-3 py-1.5 text-xs font-mono border border-weavrn-border rounded-lg hover:border-[#00D4AA]/50 hover:text-[#00D4AA] text-weavrn-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {refreshing
+              ? "Scanning..."
+              : refreshCooldown > 0
+                ? `${Math.floor(refreshCooldown / 60)}:${String(refreshCooldown % 60).padStart(2, "0")}`
+                : "Refresh"}
+          </button>
+        </div>
         {trackedPosts.length === 0 ? (
           <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
             No posts discovered yet. Post about Weavrn on X and they&apos;ll

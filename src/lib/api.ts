@@ -118,6 +118,13 @@ export function getRewards(wallet: string) {
   return apiFetch<RewardsResponse>(`/rewards/${wallet.toLowerCase()}`);
 }
 
+export function refreshPosts(wallet: string) {
+  return apiFetch<{ postsDiscovered: number; snapshotsTaken: number }>(
+    `/rewards/${wallet.toLowerCase()}/refresh`,
+    { method: "POST" }
+  );
+}
+
 export function getProfile(wallet: string) {
   return apiFetch<Profile>(`/auth/profile/${wallet.toLowerCase()}`);
 }
