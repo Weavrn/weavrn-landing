@@ -1,7 +1,28 @@
-import { SOCIAL_LINKS } from "@/lib/constants";
+"use client";
+
+import { useState, useCallback } from "react";
+import { JsonRpcSigner } from "ethers";
+import WalletConnect from "@/components/WalletConnect";
+import MiningDashboard from "@/components/MiningDashboard";
 import Footer from "@/components/Footer";
 
 export default function MinePage() {
+  const [address, setAddress] = useState<string | null>(null);
+  const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
+
+  const handleConnect = useCallback(
+    (addr: string, s: JsonRpcSigner) => {
+      setAddress(addr);
+      setSigner(s);
+    },
+    [],
+  );
+
+  const handleDisconnect = useCallback(() => {
+    setAddress(null);
+    setSigner(null);
+  }, []);
+
   return (
     <main className="min-h-screen noise">
       <div className="bg-grid absolute inset-0" />
@@ -13,40 +34,38 @@ export default function MinePage() {
             <img src="/icon.svg" alt="" className="w-7 h-7" />
             <span className="text-xl font-bold gradient-text">weavrn</span>
           </a>
+          <WalletConnect
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            address={address}
+          />
         </div>
       </header>
 
-      {/* Coming Soon */}
-      <div className="relative z-10 px-6 py-32 flex items-center justify-center">
-        <div className="max-w-lg mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full border border-[#00D4AA]/30 bg-[#00D4AA]/5 text-sm text-[#00D4AA] font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00D4AA] animate-pulse" />
-            Coming Soon
+      <div className="relative z-10 px-6 py-16">
+        {!address ? (
+          <div className="max-w-lg mx-auto text-center py-20">
+            <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+              Social <span className="gradient-text">Mining</span>
+            </h1>
+            <p className="text-weavrn-muted max-w-md mx-auto mb-10">
+              Post about AI agents and the Weavrn ecosystem on X. Earn WVRN
+              tokens based on engagement. Connect your wallet to get started.
+            </p>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-            Social <span className="gradient-text">Mining</span>
-          </h1>
-          <p className="text-weavrn-muted max-w-md mx-auto mb-10">
-            Post about AI agents and the Weavrn ecosystem on X. Earn WVRN
-            tokens based on engagement. The mining dashboard is launching soon.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href={SOCIAL_LINKS.twitter}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-3.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
-            >
-              Follow on X
-            </a>
-            <a
-              href="/"
-              className="px-8 py-3.5 border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg font-semibold transition-all duration-300 hover:bg-weavrn-surface"
-            >
-              Back to Home
-            </a>
+        ) : (
+          <div className="pt-4">
+            <div className="text-center mb-12">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
+                Social <span className="gradient-text">Mining</span>
+              </h1>
+              <p className="text-sm text-weavrn-muted">
+                Submit your X posts and earn WVRN tokens
+              </p>
+            </div>
+            <MiningDashboard walletAddress={address} signer={signer} />
           </div>
-        </div>
+        )}
       </div>
 
       <Footer />

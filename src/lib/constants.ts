@@ -25,38 +25,56 @@ export const TOKEN_ALLOCATIONS = [
 export const ROADMAP_PHASES = [
   {
     phase: "Phase 1",
-    title: "Foundation",
+    title: "Token Launch & Social Mining",
     items: [
-      "Token launch & social mining",
-      "Community building",
-      "Landing page & bounty program",
+      "WVRN token launch on Base",
+      "Social mining rewards for community content",
+      "Mining dashboard & claim flow",
     ],
   },
   {
     phase: "Phase 2",
-    title: "Core Protocol",
+    title: "Bounty Program & Community",
     items: [
-      "AgentRegistry & soulbound NFTs",
-      "AgentWallet & WalletFactory",
-      "PaymentRouter deployment",
+      "Activate 50M WVRN bounty reserve",
+      "Developer bounties for contracts, SDK, tooling",
+      "Referral bonuses & engagement campaigns",
     ],
   },
   {
     phase: "Phase 3",
-    title: "SDK & Integrations",
+    title: "Core Protocol",
     items: [
-      "TypeScript SDK release",
-      "Agent framework integrations",
-      "Developer documentation",
+      "AgentRegistry & soulbound identity NFTs",
+      "AgentWallet & WalletFactory deployment",
+      "PaymentRouter for agent-to-agent payments",
     ],
   },
   {
     phase: "Phase 4",
-    title: "Growth",
+    title: "Treasury & DAO Governance",
     items: [
-      "Cross-chain expansion",
-      "Governance launch",
-      "Enterprise partnerships",
+      "On-chain governance with WVRN voting",
+      "DAO-managed treasury (180M WVRN)",
+      "Community proposals & timelocked execution",
+    ],
+  },
+  {
+    phase: "Phase 5",
+    title: "Agent Services & Hedge Fund",
+    items: [
+      "AI-managed treasury fund with DeFi strategies",
+      "Agent-as-a-Service marketplace",
+      "Revenue sharing for community-built agents",
+    ],
+  },
+  {
+    phase: "Phase 6",
+    title: "Growth & Expansion",
+    items: [
+      "Cross-chain expansion via LayerZero",
+      "Enterprise partnerships & white-label infrastructure",
+      "Full DAO transition & formal audits",
     ],
   },
 ] as const;
