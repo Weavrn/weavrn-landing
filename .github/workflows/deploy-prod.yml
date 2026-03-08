@@ -1,7 +1,7 @@
-name: CI & Deploy Dev
+name: CI & Deploy Prod
 on:
   push:
-    branches: [develop]
+    branches: [main]
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -31,5 +31,5 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: out/*
-          target: /opt/dev/weavrn-landing/
+          target: /opt/prod/weavrn-landing/
           overwrite: true
