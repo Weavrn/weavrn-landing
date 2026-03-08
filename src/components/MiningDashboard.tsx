@@ -91,11 +91,19 @@ export default function MiningDashboard({
 
   useEffect(() => {
     if (!data?.current_block) return;
-    const update = () => setCountdown(formatCountdown(data.current_block.end_time));
+    const update = () => {
+      const remaining = data.current_block.end_time - Math.floor(Date.now() / 1000);
+      if (remaining <= 0) {
+        setCountdown("Closing...");
+        fetchData();
+        return;
+      }
+      setCountdown(formatCountdown(data.current_block.end_time));
+    };
     update();
     const interval = setInterval(update, 60000);
     return () => clearInterval(interval);
-  }, [data?.current_block]);
+  }, [data?.current_block, fetchData]);
 
   const handleStartVerification = async (e: React.FormEvent) => {
     e.preventDefault();
