@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 import {
   getRewards,
-  linkXHandle,
+  getProfile,
+  startVerification,
+  verifyHandle,
+  unlinkHandle,
   markClaimed,
   type Submission,
   type RewardsResponse,
@@ -42,19 +45,36 @@ export default function MiningDashboard({
 }: MiningDashboardProps) {
   const [xHandle, setXHandle] = useState<string | null>(null);
   const [handleInput, setHandleInput] = useState("");
+  const [verificationCode, setVerificationCode] = useState<string | null>(null);
+  const [verificationHandle, setVerificationHandle] = useState<string | null>(null);
   const [data, setData] = useState<RewardsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [linking, setLinking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
-
-  const storageKey = `weavrn_xhandle_${walletAddress.toLowerCase()}`;
+  const [copied, setCopied] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await getRewards(walletAddress);
-      setData(res);
+      const [rewards, profile] = await Promise.all([
+        getRewards(walletAddress),
+        getProfile(walletAddress),
+      ]);
+      setData(rewards);
+      if (profile.x_handle) {
+        setXHandle(profile.x_handle);
+        setVerificationCode(null);
+        setVerificationHandle(null);
+      } else if (profile.verification_code && profile.verification_handle) {
+        const expired = profile.verification_expires_at
+          && new Date(profile.verification_expires_at) < new Date();
+        if (!expired) {
+          setVerificationCode(profile.verification_code);
+          setVerificationHandle(profile.verification_handle);
+        }
+      }
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -63,12 +83,9 @@ export default function MiningDashboard({
   }, [walletAddress]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) setXHandle(saved);
     fetchData();
-  }, [walletAddress, storageKey, fetchData]);
+  }, [fetchData]);
 
-  // Update countdown every minute
   useEffect(() => {
     if (!data?.current_block) return;
     const update = () => setCountdown(formatCountdown(data.current_block.end_time));
@@ -77,22 +94,63 @@ export default function MiningDashboard({
     return () => clearInterval(interval);
   }, [data?.current_block]);
 
-  const handleLinkX = async (e: React.FormEvent) => {
+  const handleStartVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = handleInput.replace(/^@/, "").trim();
     if (!cleaned) return;
-    setLinking(true);
+    setSubmitting(true);
     setError(null);
     try {
-      await linkXHandle(walletAddress, cleaned);
-      setXHandle(cleaned);
-      localStorage.setItem(storageKey, cleaned);
+      const res = await startVerification(walletAddress, cleaned);
+      setVerificationCode(res.code);
+      setVerificationHandle(cleaned);
       setHandleInput("");
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
-      setLinking(false);
+      setSubmitting(false);
     }
+  };
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    setError(null);
+    try {
+      const profile = await verifyHandle(walletAddress);
+      setXHandle(profile.x_handle);
+      setVerificationCode(null);
+      setVerificationHandle(null);
+      await fetchData();
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleUnlink = async () => {
+    setError(null);
+    try {
+      await unlinkHandle(walletAddress);
+      setXHandle(null);
+      setVerificationCode(null);
+      setVerificationHandle(null);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    }
+  };
+
+  const handleCancelVerification = () => {
+    setVerificationCode(null);
+    setVerificationHandle(null);
+    setError(null);
+  };
+
+  const handleCopy = async () => {
+    if (!verificationCode) return;
+    await navigator.clipboard.writeText(verificationCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleClaim = async (sub: Submission) => {
@@ -118,7 +176,8 @@ export default function MiningDashboard({
     );
   }
 
-  if (!xHandle) {
+  // State A: No handle, no pending verification — show handle input
+  if (!xHandle && !verificationCode) {
     return (
       <div className="max-w-md mx-auto">
         <div className="glow-card rounded-2xl p-8">
@@ -126,10 +185,10 @@ export default function MiningDashboard({
             Link your X account
           </h3>
           <p className="text-sm text-weavrn-muted mb-6">
-            Connect your X handle to start earning. We&apos;ll automatically
-            discover your qualifying posts.
+            Verify ownership of your X account to start earning.
+            We&apos;ll ask you to add a short code to your bio.
           </p>
-          <form onSubmit={handleLinkX} className="flex gap-2">
+          <form onSubmit={handleStartVerification} className="flex gap-2">
             <input
               type="text"
               value={handleInput}
@@ -139,10 +198,10 @@ export default function MiningDashboard({
             />
             <button
               type="submit"
-              disabled={linking}
+              disabled={submitting}
               className="px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
             >
-              {linking ? "..." : "Link"}
+              {submitting ? "..." : "Continue"}
             </button>
           </form>
           {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
@@ -151,6 +210,54 @@ export default function MiningDashboard({
     );
   }
 
+  // State B: Pending verification — show code and verify button
+  if (!xHandle && verificationCode) {
+    return (
+      <div className="max-w-md mx-auto">
+        <div className="glow-card rounded-2xl p-8">
+          <h3 className="text-lg font-bold text-white mb-2">
+            Verify @{verificationHandle}
+          </h3>
+          <p className="text-sm text-weavrn-muted mb-4">
+            Add this code to your X bio, then click Verify.
+            You can remove it after verification.
+          </p>
+
+          <div className="flex items-center gap-2 mb-6 p-3 bg-weavrn-dark rounded-lg border border-weavrn-border">
+            <code className="flex-1 text-[#00D4AA] font-mono text-lg font-bold tracking-wider">
+              {verificationCode}
+            </code>
+            <button
+              onClick={handleCopy}
+              className="px-3 py-1.5 text-xs text-weavrn-muted hover:text-white border border-weavrn-border rounded transition-colors"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleVerify}
+              disabled={verifying}
+              className="flex-1 px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
+            >
+              {verifying ? "Checking..." : "Verify"}
+            </button>
+            <button
+              onClick={handleCancelVerification}
+              className="px-4 py-2.5 text-sm text-weavrn-muted hover:text-white border border-weavrn-border rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // State C: Verified — main dashboard
   const trackedPosts = data?.tracked_posts ?? [];
   const blockRewards = data?.block_rewards ?? [];
   const submissions = data?.submissions ?? [];
@@ -217,7 +324,13 @@ export default function MiningDashboard({
                 Block {data.current_block.number}
               </h3>
               <p className="text-sm text-weavrn-muted mt-1">
-                @{xHandle} — posts are tracked automatically
+                @{xHandle}
+                <button
+                  onClick={handleUnlink}
+                  className="ml-2 text-xs text-weavrn-muted/50 hover:text-red-400 transition-colors"
+                >
+                  change
+                </button>
               </p>
             </div>
             <div className="text-right">

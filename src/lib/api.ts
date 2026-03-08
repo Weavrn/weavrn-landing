@@ -54,7 +54,15 @@ export interface RewardsResponse {
 export interface Profile {
   wallet_address: string;
   x_handle: string | null;
+  verification_code: string | null;
+  verification_handle: string | null;
+  verification_expires_at: string | null;
   created_at: string;
+}
+
+export interface VerificationResponse {
+  code: string;
+  expires_at: string;
 }
 
 export interface BlockStats {
@@ -101,10 +109,28 @@ export function getRewards(wallet: string) {
   return apiFetch<RewardsResponse>(`/rewards/${wallet.toLowerCase()}`);
 }
 
-export function linkXHandle(wallet: string, xHandle: string) {
-  return apiFetch<Profile>("/auth/link", {
+export function getProfile(wallet: string) {
+  return apiFetch<Profile>(`/auth/profile/${wallet.toLowerCase()}`);
+}
+
+export function startVerification(wallet: string, xHandle: string) {
+  return apiFetch<VerificationResponse>("/auth/start-verification", {
     method: "POST",
     body: JSON.stringify({ wallet_address: wallet.toLowerCase(), x_handle: xHandle }),
+  });
+}
+
+export function verifyHandle(wallet: string) {
+  return apiFetch<Profile>("/auth/verify", {
+    method: "POST",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase() }),
+  });
+}
+
+export function unlinkHandle(wallet: string) {
+  return apiFetch<Profile>("/auth/unlink", {
+    method: "POST",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase() }),
   });
 }
 
