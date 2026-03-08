@@ -23,6 +23,12 @@ export interface TrackedPost {
   discovered_in_block: number;
   first_seen_at: string;
   deactivated: boolean;
+  deleted_at: string | null;
+  likes: number | null;
+  retweets: number | null;
+  replies: number | null;
+  views: number | null;
+  raw_score: number | null;
 }
 
 export interface BlockReward {
