@@ -105,6 +105,15 @@ async function apiFetch<T>(
   return res.json();
 }
 
+import type { JsonRpcSigner } from "ethers";
+
+async function signForWallet(signer: JsonRpcSigner, wallet: string) {
+  const timestamp = Date.now();
+  const message = `weavrn-verify:${wallet.toLowerCase()}:${timestamp}`;
+  const signature = await signer.signMessage(message);
+  return { signature, timestamp };
+}
+
 export function getRewards(wallet: string) {
   return apiFetch<RewardsResponse>(`/rewards/${wallet.toLowerCase()}`);
 }
@@ -113,31 +122,35 @@ export function getProfile(wallet: string) {
   return apiFetch<Profile>(`/auth/profile/${wallet.toLowerCase()}`);
 }
 
-export function startVerification(wallet: string, xHandle: string) {
+export async function startVerification(signer: JsonRpcSigner, wallet: string, xHandle: string) {
+  const { signature, timestamp } = await signForWallet(signer, wallet);
   return apiFetch<VerificationResponse>("/auth/start-verification", {
     method: "POST",
-    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), x_handle: xHandle }),
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), x_handle: xHandle, signature, timestamp }),
   });
 }
 
-export function verifyHandle(wallet: string) {
+export async function verifyHandle(signer: JsonRpcSigner, wallet: string) {
+  const { signature, timestamp } = await signForWallet(signer, wallet);
   return apiFetch<Profile>("/auth/verify", {
     method: "POST",
-    body: JSON.stringify({ wallet_address: wallet.toLowerCase() }),
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
   });
 }
 
-export function unlinkHandle(wallet: string) {
+export async function unlinkHandle(signer: JsonRpcSigner, wallet: string) {
+  const { signature, timestamp } = await signForWallet(signer, wallet);
   return apiFetch<Profile>("/auth/unlink", {
     method: "POST",
-    body: JSON.stringify({ wallet_address: wallet.toLowerCase() }),
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
   });
 }
 
-export function markClaimed(onChainId: number, txHash: string) {
+export async function markClaimed(signer: JsonRpcSigner, wallet: string, onChainId: number, txHash: string) {
+  const { signature, timestamp } = await signForWallet(signer, wallet);
   return apiFetch<Submission>("/claim", {
     method: "POST",
-    body: JSON.stringify({ on_chain_id: onChainId, tx_hash: txHash }),
+    body: JSON.stringify({ on_chain_id: onChainId, tx_hash: txHash, wallet_address: wallet.toLowerCase(), signature, timestamp }),
   });
 }
 

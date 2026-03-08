@@ -101,7 +101,8 @@ export default function MiningDashboard({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await startVerification(walletAddress, cleaned);
+      if (!signer) { setError("Wallet not connected"); return; }
+      const res = await startVerification(signer, walletAddress, cleaned);
       setVerificationCode(res.code);
       setVerificationHandle(cleaned);
       setHandleInput("");
@@ -116,7 +117,8 @@ export default function MiningDashboard({
     setVerifying(true);
     setError(null);
     try {
-      const profile = await verifyHandle(walletAddress);
+      if (!signer) { setError("Wallet not connected"); return; }
+      const profile = await verifyHandle(signer, walletAddress);
       setXHandle(profile.x_handle);
       setVerificationCode(null);
       setVerificationHandle(null);
@@ -131,7 +133,8 @@ export default function MiningDashboard({
   const handleUnlink = async () => {
     setError(null);
     try {
-      await unlinkHandle(walletAddress);
+      if (!signer) { setError("Wallet not connected"); return; }
+      await unlinkHandle(signer, walletAddress);
       setXHandle(null);
       setVerificationCode(null);
       setVerificationHandle(null);
@@ -159,7 +162,7 @@ export default function MiningDashboard({
     setError(null);
     try {
       const txHash = await claimReward(signer, sub.on_chain_id);
-      await markClaimed(sub.on_chain_id, txHash).catch(() => {});
+      await markClaimed(signer, walletAddress, sub.on_chain_id, txHash).catch(() => {});
       await fetchData();
     } catch (err: unknown) {
       setError((err as Error).message);
