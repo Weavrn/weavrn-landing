@@ -13,10 +13,41 @@ export interface Submission {
   updated_at: string;
 }
 
+export interface TrackedPost {
+  id: number;
+  tweet_id: string;
+  wallet_address: string;
+  x_handle: string;
+  post_url: string;
+  text: string | null;
+  discovered_in_block: number;
+  first_seen_at: string;
+  deactivated: boolean;
+}
+
+export interface BlockReward {
+  id: number;
+  block_number: number;
+  wallet_address: string;
+  delta_score: number;
+  post_count: number;
+  submission_id: number | null;
+  created_at: string;
+}
+
+export interface CurrentBlock {
+  number: number;
+  start_time: number;
+  end_time: number;
+}
+
 export interface RewardsResponse {
   wallet: string;
   balance: string;
   total_earned: string;
+  current_block: CurrentBlock;
+  tracked_posts: TrackedPost[];
+  block_rewards: BlockReward[];
   submissions: Submission[];
 }
 
@@ -24,6 +55,27 @@ export interface Profile {
   wallet_address: string;
   x_handle: string | null;
   created_at: string;
+}
+
+export interface BlockStats {
+  current_block: {
+    number: number;
+    start_time: number;
+    end_time: number;
+    emission: string;
+  };
+  settled_blocks: {
+    block_number: number;
+    user_count: number;
+    total_score: number;
+  }[];
+}
+
+export interface BlockDetail {
+  block_number: number;
+  start_time: number;
+  end_time: number;
+  rewards: BlockReward[];
 }
 
 async function apiFetch<T>(
@@ -56,13 +108,6 @@ export function linkXHandle(wallet: string, xHandle: string) {
   });
 }
 
-export function submitPost(wallet: string, postUrl: string) {
-  return apiFetch<Submission>("/submit", {
-    method: "POST",
-    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), post_url: postUrl }),
-  });
-}
-
 export function markClaimed(onChainId: number, txHash: string) {
   return apiFetch<Submission>("/claim", {
     method: "POST",
@@ -76,32 +121,41 @@ function adminHeaders(adminKey: string) {
   return { "x-admin-key": adminKey };
 }
 
-export function getAdminSubmissions(adminKey: string) {
-  return apiFetch<(Submission & { x_handle: string | null })[]>(
-    "/admin/submissions",
-    { headers: adminHeaders(adminKey) },
-  );
-}
-
-export function approveSubmission(
-  adminKey: string,
-  submissionId: number,
-  manualScore?: number,
-) {
-  return apiFetch<Submission>("/admin/approve", {
-    method: "POST",
+export function getAdminBlocks(adminKey: string) {
+  return apiFetch<BlockStats>("/admin/blocks", {
     headers: adminHeaders(adminKey),
-    body: JSON.stringify({
-      submission_id: submissionId,
-      ...(manualScore !== undefined && { manual_score: manualScore }),
-    }),
   });
 }
 
-export function rejectSubmission(adminKey: string, submissionId: number) {
-  return apiFetch<Submission>("/admin/reject", {
+export function getAdminBlockDetail(adminKey: string, blockNumber: number) {
+  return apiFetch<BlockDetail>(`/admin/blocks/${blockNumber}`, {
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export function getAdminPosts(adminKey: string) {
+  return apiFetch<TrackedPost[]>("/admin/posts", {
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export function deactivatePost(adminKey: string, postId: number) {
+  return apiFetch<TrackedPost>(`/admin/posts/${postId}/deactivate`, {
     method: "POST",
     headers: adminHeaders(adminKey),
-    body: JSON.stringify({ submission_id: submissionId }),
+  });
+}
+
+export function activatePost(adminKey: string, postId: number) {
+  return apiFetch<TrackedPost>(`/admin/posts/${postId}/activate`, {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export function settleBlock(adminKey: string, blockNumber: number) {
+  return apiFetch("/admin/blocks/" + blockNumber + "/settle", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
   });
 }

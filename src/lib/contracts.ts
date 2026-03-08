@@ -38,11 +38,10 @@ const SOCIAL_MINING_ABI = [
     name: "submissions",
     outputs: [
       { name: "submitter", type: "address" },
-      { name: "postUrl", type: "string" },
+      { name: "blockNumber", type: "uint256" },
       { name: "engagementScore", type: "uint256" },
       { name: "effectiveScore", type: "uint256" },
       { name: "rewardAmount", type: "uint256" },
-      { name: "approved", type: "bool" },
       { name: "claimed", type: "bool" },
       { name: "timestamp", type: "uint256" },
     ],
@@ -52,6 +51,30 @@ const SOCIAL_MINING_ABI = [
   {
     inputs: [],
     name: "getCurrentEmission",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getCurrentBlockNumber",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "blockNumber", type: "uint256" }],
+    name: "getBlockBounds",
+    outputs: [
+      { name: "startTime", type: "uint256" },
+      { name: "endTime", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getBlockEmission",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",

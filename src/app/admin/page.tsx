@@ -2,31 +2,49 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  getAdminSubmissions,
-  approveSubmission,
-  rejectSubmission,
-  type Submission,
+  getAdminBlocks,
+  getAdminBlockDetail,
+  getAdminPosts,
+  deactivatePost,
+  activatePost,
+  settleBlock,
+  type BlockStats,
+  type BlockDetail,
+  type TrackedPost,
 } from "@/lib/api";
-import { getExplorerTxUrl } from "@/lib/contracts";
 
-type AdminSubmission = Submission & { x_handle: string | null };
+type Tab = "blocks" | "posts";
 
 export default function AdminPage() {
   const [adminKey, setAdminKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
-  const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
-  const [processed, setProcessed] = useState<Submission[]>([]);
+  const [tab, setTab] = useState<Tab>("blocks");
+  const [blockStats, setBlockStats] = useState<BlockStats | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<BlockDetail | null>(null);
+  const [posts, setPosts] = useState<TrackedPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<number | null>(null);
-  const [scores, setScores] = useState<Record<number, string>>({});
+  const [settlingBlock, setSettlingBlock] = useState<number | null>(null);
 
-  const fetchSubmissions = useCallback(async (key: string) => {
+  const fetchBlocks = useCallback(async (key: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAdminSubmissions(key);
-      setSubmissions(data);
+      const data = await getAdminBlocks(key);
+      setBlockStats(data);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchPosts = useCallback(async (key: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAdminPosts(key);
+      setPosts(data);
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -40,48 +58,59 @@ export default function AdminPage() {
     if (key) {
       setAdminKey(key);
       setAuthenticated(true);
-      fetchSubmissions(key);
+      fetchBlocks(key);
       window.history.replaceState({}, "", "/admin");
     }
-  }, [fetchSubmissions]);
+  }, [fetchBlocks]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminKey.trim()) return;
     setAuthenticated(true);
-    fetchSubmissions(adminKey);
+    fetchBlocks(adminKey);
   };
 
-  const handleApprove = async (sub: AdminSubmission) => {
-    const score = parseInt(scores[sub.id] || "");
-    if (!score || score < 10) {
-      setError("Score must be at least 10");
-      return;
-    }
-    setProcessingId(sub.id);
+  const handleTabChange = (t: Tab) => {
+    setTab(t);
+    setSelectedBlock(null);
+    if (t === "blocks") fetchBlocks(adminKey);
+    else fetchPosts(adminKey);
+  };
+
+  const handleViewBlock = async (blockNumber: number) => {
     setError(null);
     try {
-      const result = await approveSubmission(adminKey, sub.id, score);
-      setSubmissions((prev) => prev.filter((s) => s.id !== sub.id));
-      setProcessed((prev) => [result, ...prev]);
+      const detail = await getAdminBlockDetail(adminKey, blockNumber);
+      setSelectedBlock(detail);
     } catch (err: unknown) {
       setError((err as Error).message);
-    } finally {
-      setProcessingId(null);
     }
   };
 
-  const handleReject = async (sub: AdminSubmission) => {
-    setProcessingId(sub.id);
+  const handleSettle = async (blockNumber: number) => {
+    setSettlingBlock(blockNumber);
     setError(null);
     try {
-      const result = await rejectSubmission(adminKey, sub.id);
-      setSubmissions((prev) => prev.filter((s) => s.id !== sub.id));
-      setProcessed((prev) => [result, ...prev]);
+      await settleBlock(adminKey, blockNumber);
+      await fetchBlocks(adminKey);
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
-      setProcessingId(null);
+      setSettlingBlock(null);
+    }
+  };
+
+  const handleTogglePost = async (post: TrackedPost) => {
+    setError(null);
+    try {
+      if (post.deactivated) {
+        await activatePost(adminKey, post.id);
+      } else {
+        await deactivatePost(adminKey, post.id);
+      }
+      await fetchPosts(adminKey);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     }
   };
 
@@ -125,10 +154,20 @@ export default function AdminPage() {
           </a>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => fetchSubmissions(adminKey)}
-              className="text-xs text-weavrn-muted hover:text-white transition-colors font-mono"
+              onClick={() => handleTabChange("blocks")}
+              className={`text-xs font-mono transition-colors ${
+                tab === "blocks" ? "text-[#00D4AA]" : "text-weavrn-muted hover:text-white"
+              }`}
             >
-              Refresh
+              Blocks
+            </button>
+            <button
+              onClick={() => handleTabChange("posts")}
+              className={`text-xs font-mono transition-colors ${
+                tab === "posts" ? "text-[#00D4AA]" : "text-weavrn-muted hover:text-white"
+              }`}
+            >
+              Posts
             </button>
             <span className="text-xs text-weavrn-muted font-mono">Admin</span>
           </div>
@@ -136,10 +175,6 @@ export default function AdminPage() {
       </header>
 
       <div className="relative z-10 px-6 py-12 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-white mb-8">
-          Pending Submissions
-        </h1>
-
         {error && (
           <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-6">
             {error}
@@ -154,121 +189,147 @@ export default function AdminPage() {
 
         {loading ? (
           <p className="text-sm text-weavrn-muted">Loading...</p>
-        ) : submissions.length === 0 ? (
-          <div className="text-center py-16 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No pending submissions
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {submissions.map((s) => (
-              <div
-                key={s.id}
-                className="glow-card rounded-xl p-5 space-y-3"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <a
-                      href={s.post_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#00D4AA] hover:text-[#00F0C0] text-sm font-mono break-all"
-                    >
-                      {s.post_url}
-                    </a>
-                    <div className="flex gap-4 mt-2 text-xs text-weavrn-muted font-mono">
-                      <span>
-                        {s.wallet_address.slice(0, 6)}...
-                        {s.wallet_address.slice(-4)}
-                      </span>
-                      {s.x_handle && <span>@{s.x_handle}</span>}
-                      <span>
-                        {new Date(s.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
+        ) : tab === "blocks" ? (
+          <>
+            {/* Current block info */}
+            {blockStats?.current_block && (
+              <div className="glow-card rounded-2xl p-6 mb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-white">
+                      Current Block: {blockStats.current_block.number}
+                    </h2>
+                    <p className="text-xs text-weavrn-muted font-mono mt-1">
+                      Emission: {parseFloat(blockStats.current_block.emission).toLocaleString()} WVRN
+                    </p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="10"
-                    value={scores[s.id] || ""}
-                    onChange={(e) =>
-                      setScores((prev) => ({
-                        ...prev,
-                        [s.id]: e.target.value,
-                      }))
-                    }
-                    placeholder="Score (min 10)"
-                    className="w-36 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs focus:outline-none focus:border-[#00D4AA]/50 transition-colors font-mono"
-                  />
-                  <button
-                    onClick={() => handleApprove(s)}
-                    disabled={processingId === s.id}
-                    className="px-4 py-1.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
-                  >
-                    {processingId === s.id ? "Processing..." : "Approve"}
-                  </button>
-                  <button
-                    onClick={() => handleReject(s)}
-                    disabled={processingId === s.id}
-                    className="px-4 py-1.5 border border-red-500/30 hover:border-red-500/60 text-red-400 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
+                  {blockStats.current_block.number > 0 && (
+                    <button
+                      onClick={() => handleSettle(blockStats.current_block.number - 1)}
+                      disabled={settlingBlock !== null}
+                      className="px-4 py-2 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+                    >
+                      {settlingBlock !== null
+                        ? "Settling..."
+                        : `Settle Block ${blockStats.current_block.number - 1}`}
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Recently processed */}
-        {processed.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-lg font-bold text-white mb-4">
-              Recently Processed
-            </h2>
-            <div className="space-y-2">
-              {processed.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 text-sm"
-                >
-                  <span className="font-mono text-xs text-weavrn-muted truncate flex-1 mr-4">
-                    {s.post_url}
-                  </span>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {s.reward_amount && (
-                      <span className="text-weavrn-muted font-mono text-xs">
-                        {parseFloat(s.reward_amount).toLocaleString(undefined, {
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        WVRN
-                      </span>
-                    )}
-                    {s.tx_hash && (
+            {/* Block detail overlay */}
+            {selectedBlock && (
+              <div className="glow-card rounded-2xl p-6 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-white">
+                    Block {selectedBlock.block_number}
+                  </h2>
+                  <button
+                    onClick={() => setSelectedBlock(null)}
+                    className="text-xs text-weavrn-muted hover:text-white transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+                {selectedBlock.rewards.length === 0 ? (
+                  <p className="text-sm text-weavrn-muted">No rewards in this block</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedBlock.rewards.map((r) => (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between p-3 rounded-lg border border-weavrn-border/50 bg-weavrn-surface/30 text-xs font-mono"
+                      >
+                        <span className="text-weavrn-muted">
+                          {r.wallet_address.slice(0, 6)}...{r.wallet_address.slice(-4)}
+                        </span>
+                        <span className="text-white">
+                          Score: {r.delta_score} — {r.post_count} post
+                          {r.post_count !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settled blocks */}
+            <h2 className="text-lg font-bold text-white mb-4">Settled Blocks</h2>
+            {!blockStats?.settled_blocks?.length ? (
+              <div className="text-center py-16 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+                No blocks settled yet
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {blockStats.settled_blocks.map((b) => (
+                  <button
+                    key={b.block_number}
+                    onClick={() => handleViewBlock(b.block_number)}
+                    className="w-full flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm text-left"
+                  >
+                    <span className="text-white font-mono text-xs">
+                      Block {b.block_number}
+                    </span>
+                    <span className="text-weavrn-muted font-mono text-xs">
+                      {b.user_count} user{b.user_count !== 1 ? "s" : ""} — total score{" "}
+                      {b.total_score}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Posts tab */
+          <>
+            <h2 className="text-lg font-bold text-white mb-4">Tracked Posts</h2>
+            {posts.length === 0 ? (
+              <div className="text-center py-16 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+                No tracked posts
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {posts.map((p) => (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 text-sm ${
+                      p.deactivated ? "opacity-50" : ""
+                    }`}
+                  >
+                    <div className="flex-1 truncate mr-4">
                       <a
-                        href={getExplorerTxUrl(s.tx_hash)}
+                        href={p.post_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#00D4AA]/60 hover:text-[#00D4AA] font-mono text-[10px]"
+                        className="text-[#00D4AA] hover:text-[#00F0C0] font-mono text-xs"
                       >
-                        tx
+                        {p.post_url}
                       </a>
-                    )}
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                        s.status === "approved"
-                          ? "bg-[#00D4AA]/10 text-[#00D4AA] border-[#00D4AA]/20"
-                          : "bg-red-500/10 text-red-400 border-red-500/20"
+                      <div className="flex gap-3 mt-1 text-xs text-weavrn-muted font-mono">
+                        <span>@{p.x_handle}</span>
+                        <span>
+                          {p.wallet_address.slice(0, 6)}...{p.wallet_address.slice(-4)}
+                        </span>
+                        <span>Block {p.discovered_in_block}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleTogglePost(p)}
+                      className={`px-3 py-1 rounded text-[10px] font-semibold transition-all ${
+                        p.deactivated
+                          ? "border border-[#00D4AA]/30 text-[#00D4AA] hover:border-[#00D4AA]/60"
+                          : "border border-red-500/30 text-red-400 hover:border-red-500/60"
                       }`}
                     >
-                      {s.status}
-                    </span>
+                      {p.deactivated ? "Activate" : "Deactivate"}
+                    </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

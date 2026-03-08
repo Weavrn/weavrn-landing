@@ -5,7 +5,6 @@ import { JsonRpcSigner } from "ethers";
 import {
   getRewards,
   linkXHandle,
-  submitPost,
   markClaimed,
   type Submission,
   type RewardsResponse,
@@ -28,19 +27,27 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
+function formatCountdown(endTimestamp: number): string {
+  const remaining = endTimestamp - Math.floor(Date.now() / 1000);
+  if (remaining <= 0) return "Closing...";
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 export default function MiningDashboard({
   walletAddress,
   signer,
 }: MiningDashboardProps) {
   const [xHandle, setXHandle] = useState<string | null>(null);
   const [handleInput, setHandleInput] = useState("");
-  const [postUrl, setPostUrl] = useState("");
   const [data, setData] = useState<RewardsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [linking, setLinking] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState("");
 
   const storageKey = `weavrn_xhandle_${walletAddress.toLowerCase()}`;
 
@@ -61,6 +68,15 @@ export default function MiningDashboard({
     fetchData();
   }, [walletAddress, storageKey, fetchData]);
 
+  // Update countdown every minute
+  useEffect(() => {
+    if (!data?.current_block) return;
+    const update = () => setCountdown(formatCountdown(data.current_block.end_time));
+    update();
+    const interval = setInterval(update, 60000);
+    return () => clearInterval(interval);
+  }, [data?.current_block]);
+
   const handleLinkX = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = handleInput.replace(/^@/, "").trim();
@@ -76,22 +92,6 @@ export default function MiningDashboard({
       setError((err as Error).message);
     } finally {
       setLinking(false);
-    }
-  };
-
-  const handleSubmitPost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!postUrl.trim()) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await submitPost(walletAddress, postUrl.trim());
-      setPostUrl("");
-      await fetchData();
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -126,7 +126,8 @@ export default function MiningDashboard({
             Link your X account
           </h3>
           <p className="text-sm text-weavrn-muted mb-6">
-            Connect your X handle to start submitting content.
+            Connect your X handle to start earning. We&apos;ll automatically
+            discover your qualifying posts.
           </p>
           <form onSubmit={handleLinkX} className="flex gap-2">
             <input
@@ -150,6 +151,8 @@ export default function MiningDashboard({
     );
   }
 
+  const trackedPosts = data?.tracked_posts ?? [];
+  const blockRewards = data?.block_rewards ?? [];
   const submissions = data?.submissions ?? [];
 
   return (
@@ -170,10 +173,10 @@ export default function MiningDashboard({
       <div className="grid grid-cols-3 gap-4">
         <div className="glow-card rounded-xl p-5 text-center">
           <div className="text-2xl font-bold text-white">
-            {submissions.length}
+            {trackedPosts.length}
           </div>
           <div className="text-xs text-weavrn-muted font-mono mt-1">
-            Submissions
+            Tracked Posts
           </div>
         </div>
         <div className="glow-card rounded-xl p-5 text-center">
@@ -205,101 +208,136 @@ export default function MiningDashboard({
         </div>
       </div>
 
-      {/* Submit post */}
-      <div className="glow-card rounded-2xl p-8">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-bold text-white">Submit a Post</h3>
-          <span className="text-xs text-weavrn-muted font-mono">
-            @{xHandle}
-          </span>
+      {/* Current block banner */}
+      {data?.current_block && (
+        <div className="glow-card rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-white">
+                Block {data.current_block.number}
+              </h3>
+              <p className="text-sm text-weavrn-muted mt-1">
+                @{xHandle} — posts are tracked automatically
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold gradient-text">{countdown}</div>
+              <div className="text-xs text-weavrn-muted font-mono mt-0.5">
+                until close
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="text-sm text-weavrn-muted mb-5">
-          Share content about AI agents, DeFi, or Weavrn on X and paste the URL
-          below. Max 3 per day.
-        </p>
-        <form onSubmit={handleSubmitPost} className="flex gap-2">
-          <input
-            type="url"
-            value={postUrl}
-            onChange={(e) => setPostUrl(e.target.value)}
-            placeholder="https://x.com/yourhandle/status/..."
-            required
-            className="flex-1 px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors font-mono text-xs placeholder:text-weavrn-muted/50"
-          />
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
-          >
-            {submitting ? "..." : "Submit"}
-          </button>
-        </form>
-      </div>
+      )}
 
-      {/* Submissions list */}
+      {/* Tracked Posts */}
       <div>
-        <h3 className="text-lg font-bold text-white mb-4">Your Submissions</h3>
-        {submissions.length === 0 ? (
+        <h3 className="text-lg font-bold text-white mb-4">Tracked Posts</h3>
+        {trackedPosts.length === 0 ? (
           <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No submissions yet. Share something on X to get started.
+            No posts discovered yet. Post about Weavrn on X and they&apos;ll
+            appear here automatically.
           </div>
         ) : (
           <div className="space-y-2">
-            {submissions.map((s) => (
+            {trackedPosts.map((p) => (
               <div
-                key={s.id}
+                key={p.id}
                 className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
               >
                 <div className="flex-1 truncate mr-4">
                   <a
-                    href={s.post_url}
+                    href={p.post_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
                   >
-                    {s.post_url}
+                    {p.post_url}
                   </a>
-                  {s.tx_hash && (
-                    <a
-                      href={getExplorerTxUrl(s.tx_hash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-2 text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
-                    >
-                      tx
-                    </a>
+                  {p.text && (
+                    <p className="text-xs text-weavrn-muted mt-1 truncate">
+                      {p.text}
+                    </p>
                   )}
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {s.reward_amount != null && (
-                    <span className="text-weavrn-muted font-mono text-xs">
-                      {parseFloat(s.reward_amount).toLocaleString(undefined, {
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      WVRN
-                    </span>
-                  )}
-                  {s.status === "approved" &&
-                    s.on_chain_id != null &&
-                    signer && (
-                      <button
-                        onClick={() => handleClaim(s)}
-                        disabled={claimingId === s.id}
-                        className="px-3 py-1 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
-                      >
-                        {claimingId === s.id ? "Claiming..." : "Claim"}
-                      </button>
-                    )}
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                      STATUS_STYLES[s.status] || STATUS_STYLES.pending
-                    }`}
-                  >
-                    {s.status}
-                  </span>
+                <div className="text-xs text-weavrn-muted font-mono flex-shrink-0">
+                  Block {p.discovered_in_block}
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Block History */}
+      <div>
+        <h3 className="text-lg font-bold text-white mb-4">Block Rewards</h3>
+        {blockRewards.length === 0 ? (
+          <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+            No block rewards yet. Rewards are calculated when each block closes.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {blockRewards.map((br) => {
+              const sub = submissions.find((s) => s.id === br.submission_id);
+              return (
+                <div
+                  key={br.id}
+                  className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-white font-mono text-xs">
+                      Block {br.block_number}
+                    </span>
+                    <span className="text-weavrn-muted font-mono text-xs">
+                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} — score{" "}
+                      {br.delta_score}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {sub?.reward_amount != null && (
+                      <span className="text-weavrn-muted font-mono text-xs">
+                        {parseFloat(sub.reward_amount).toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        WVRN
+                      </span>
+                    )}
+                    {sub?.tx_hash && (
+                      <a
+                        href={getExplorerTxUrl(sub.tx_hash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
+                      >
+                        tx
+                      </a>
+                    )}
+                    {sub &&
+                      sub.status === "approved" &&
+                      sub.on_chain_id != null &&
+                      signer && (
+                        <button
+                          onClick={() => handleClaim(sub)}
+                          disabled={claimingId === sub.id}
+                          className="px-3 py-1 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
+                        >
+                          {claimingId === sub.id ? "Claiming..." : "Claim"}
+                        </button>
+                      )}
+                    {sub && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                          STATUS_STYLES[sub.status] || STATUS_STYLES.pending
+                        }`}
+                      >
+                        {sub.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

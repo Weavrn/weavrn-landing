@@ -49,8 +49,8 @@ export default function MinePage() {
               Social <span className="gradient-text">Mining</span>
             </h1>
             <p className="text-weavrn-muted max-w-md mx-auto mb-10">
-              Post about AI agents and the Weavrn ecosystem on X. Earn WVRN
-              tokens based on engagement. Connect your wallet to get started.
+              Link your X account and post about Weavrn. Rewards are calculated
+              automatically every block based on engagement.
             </p>
           </div>
         ) : (
@@ -60,7 +60,7 @@ export default function MinePage() {
                 Social <span className="gradient-text">Mining</span>
               </h1>
               <p className="text-sm text-weavrn-muted">
-                Submit your X posts and earn WVRN tokens
+                Your posts are discovered and scored automatically
               </p>
             </div>
             <MiningDashboard walletAddress={address} signer={signer} />
