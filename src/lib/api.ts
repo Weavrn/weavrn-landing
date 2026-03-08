@@ -121,7 +121,7 @@ export function getRewards(wallet: string) {
 export function refreshPosts(wallet: string) {
   return apiFetch<{ postsDiscovered: number; snapshotsTaken: number }>(
     `/rewards/${wallet.toLowerCase()}/refresh`,
-    { method: "POST" }
+    { method: "POST", body: "{}" }
   );
 }
 
