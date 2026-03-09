@@ -58,6 +58,7 @@ export default function MiningDashboard({
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0);
+  const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -474,68 +475,138 @@ export default function MiningDashboard({
           </div>
         ) : (
           <div className="space-y-3">
-            {trackedPosts.map((p) => (
-              <div
-                key={p.id}
-                className={`p-4 rounded-xl border bg-weavrn-surface/30 text-sm ${
-                  p.deleted_at
-                    ? "border-red-500/20 opacity-60"
-                    : "border-weavrn-border/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-1 truncate mr-4">
-                    <a
-                      href={p.post_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
-                    >
-                      {p.post_url}
-                    </a>
-                    {p.deleted_at && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20 flex-shrink-0">
-                        deleted
-                      </span>
+            {trackedPosts.map((p) => {
+              const isExpanded = expandedPostId === p.id;
+              return (
+                <div
+                  key={p.id}
+                  className={`rounded-xl border bg-weavrn-surface/30 text-sm ${
+                    p.deleted_at
+                      ? "border-red-500/20 opacity-60"
+                      : "border-weavrn-border/50"
+                  }`}
+                >
+                  <div
+                    className="p-4 cursor-pointer hover:bg-weavrn-surface/50 transition-colors rounded-xl"
+                    onClick={() => setExpandedPostId(isExpanded ? null : p.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1 truncate mr-4">
+                        <svg
+                          className={`w-3 h-3 text-weavrn-muted flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                        <a
+                          href={p.post_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {p.post_url}
+                        </a>
+                        {p.deleted_at && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20 flex-shrink-0">
+                            deleted
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-weavrn-muted font-mono flex-shrink-0">
+                        Block {p.discovered_in_block}
+                      </div>
+                    </div>
+                    {p.text && (
+                      <p className="text-xs text-weavrn-muted mt-2 truncate">
+                        {p.text}
+                      </p>
+                    )}
+                    {p.raw_score != null && (
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-weavrn-border/30">
+                        <span className="text-[11px] text-weavrn-muted font-mono">
+                          {p.likes ?? 0} likes
+                        </span>
+                        <span className="text-[11px] text-weavrn-muted font-mono">
+                          {p.retweets ?? 0} retweets
+                        </span>
+                        <span className="text-[11px] text-weavrn-muted font-mono">
+                          {p.replies ?? 0} replies
+                        </span>
+                        <span className="text-[11px] text-weavrn-muted font-mono">
+                          {(p.views ?? 0).toLocaleString()} views
+                        </span>
+                        <span className="ml-auto flex items-center gap-3">
+                          <span className="text-[11px] font-mono text-weavrn-muted">
+                            score: {p.raw_score}
+                          </span>
+                          {p.estimated_wvrn > 0 && (
+                            <span className="text-[11px] font-mono text-[#00D4AA]">
+                              {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
+                            </span>
+                          )}
+                        </span>
+                      </div>
                     )}
                   </div>
-                  <div className="text-xs text-weavrn-muted font-mono flex-shrink-0">
-                    Block {p.discovered_in_block}
-                  </div>
+                  {isExpanded && (
+                    <div className="px-4 pb-4">
+                      <div className="border-t border-weavrn-border/30 pt-3">
+                        {p.block_history.length === 0 ? (
+                          <p className="text-xs text-weavrn-muted text-center py-3">
+                            No block history yet
+                          </p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[11px] font-mono">
+                              <thead>
+                                <tr className="text-weavrn-muted border-b border-weavrn-border/20">
+                                  <th className="text-left py-1.5 pr-3">Block</th>
+                                  <th className="text-right py-1.5 px-2">Likes</th>
+                                  <th className="text-right py-1.5 px-2">RTs</th>
+                                  <th className="text-right py-1.5 px-2">Replies</th>
+                                  <th className="text-right py-1.5 px-2">Views</th>
+                                  <th className="text-right py-1.5 px-2">Score</th>
+                                  <th className="text-right py-1.5 px-2">Delta</th>
+                                  <th className="text-right py-1.5 pl-2">WVRN</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {p.block_history.map((b) => (
+                                  <tr key={b.block_number} className="text-weavrn-muted/80 border-b border-weavrn-border/10">
+                                    <td className="py-1.5 pr-3 text-white">{b.block_number}</td>
+                                    <td className="text-right py-1.5 px-2">{b.likes}</td>
+                                    <td className="text-right py-1.5 px-2">{b.retweets}</td>
+                                    <td className="text-right py-1.5 px-2">{b.replies}</td>
+                                    <td className="text-right py-1.5 px-2">{b.views.toLocaleString()}</td>
+                                    <td className="text-right py-1.5 px-2">{b.raw_score}</td>
+                                    <td className="text-right py-1.5 px-2">{b.delta}</td>
+                                    <td className="text-right py-1.5 pl-2 text-[#00D4AA]">
+                                      {Math.floor(b.earned).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t border-weavrn-border/30 text-white font-medium">
+                                  <td className="py-1.5 pr-3" colSpan={7}>Total</td>
+                                  <td className="text-right py-1.5 pl-2 text-[#00D4AA]">
+                                    {Math.floor(p.estimated_wvrn).toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {p.text && (
-                  <p className="text-xs text-weavrn-muted mt-2 truncate">
-                    {p.text}
-                  </p>
-                )}
-                {p.raw_score != null && (
-                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-weavrn-border/30">
-                    <span className="text-[11px] text-weavrn-muted font-mono">
-                      {p.likes ?? 0} likes
-                    </span>
-                    <span className="text-[11px] text-weavrn-muted font-mono">
-                      {p.retweets ?? 0} retweets
-                    </span>
-                    <span className="text-[11px] text-weavrn-muted font-mono">
-                      {p.replies ?? 0} replies
-                    </span>
-                    <span className="text-[11px] text-weavrn-muted font-mono">
-                      {(p.views ?? 0).toLocaleString()} views
-                    </span>
-                    <span className="ml-auto flex items-center gap-3">
-                      <span className="text-[11px] font-mono text-weavrn-muted">
-                        score: {p.raw_score}
-                      </span>
-                      {p.estimated_wvrn > 0 && (
-                        <span className="text-[11px] font-mono text-[#00D4AA]">
-                          {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

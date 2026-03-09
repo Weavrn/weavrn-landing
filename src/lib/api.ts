@@ -13,6 +13,17 @@ export interface Submission {
   updated_at: string;
 }
 
+export interface PostBlockHistory {
+  block_number: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+  views: number;
+  raw_score: number;
+  delta: number;
+  earned: number;
+}
+
 export interface TrackedPost {
   id: number;
   tweet_id: string;
@@ -30,6 +41,7 @@ export interface TrackedPost {
   views: number | null;
   raw_score: number | null;
   estimated_wvrn: number;
+  block_history: PostBlockHistory[];
 }
 
 export interface BlockReward {
