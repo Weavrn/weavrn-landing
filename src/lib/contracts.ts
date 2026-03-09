@@ -34,6 +34,13 @@ const SOCIAL_MINING_ABI = [
     type: "function",
   },
   {
+    inputs: [{ name: "submissionIds", type: "uint256[]" }],
+    name: "batchClaimRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [{ name: "", type: "uint256" }],
     name: "submissions",
     outputs: [
@@ -143,6 +150,16 @@ export async function claimReward(
 ): Promise<string> {
   const contract = new Contract(SOCIAL_MINING_ADDRESS, SOCIAL_MINING_ABI, signer);
   const tx = await contract.claimReward(onChainId);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function batchClaimRewards(
+  signer: JsonRpcSigner,
+  onChainIds: number[],
+): Promise<string> {
+  const contract = new Contract(SOCIAL_MINING_ADDRESS, SOCIAL_MINING_ABI, signer);
+  const tx = await contract.batchClaimRewards(onChainIds);
   const receipt = await tx.wait();
   return receipt.hash;
 }

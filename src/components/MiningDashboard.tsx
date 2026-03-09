@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { JsonRpcSigner } from "ethers";
 import {
   getRewards,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import {
   claimReward,
+  batchClaimRewards,
   addTokenToWallet,
   getExplorerTxUrl,
 } from "@/lib/contracts";
@@ -31,6 +32,10 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
+type RewardFilter = "claimable" | "all";
+type PostFilter = "active" | "all";
+type PostSort = "newest" | "oldest" | "earned";
+
 function formatCountdown(endTimestamp: number): string {
   const remaining = endTimestamp - Math.floor(Date.now() / 1000);
   if (remaining <= 0) return "Closing...";
@@ -38,6 +43,39 @@ function formatCountdown(endTimestamp: number): string {
   const minutes = Math.floor((remaining % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+function FilterTab<T extends string>({
+  value,
+  current,
+  label,
+  count,
+  onClick,
+}: {
+  value: T;
+  current: T;
+  label: string;
+  count?: number;
+  onClick: (v: T) => void;
+}) {
+  const active = value === current;
+  return (
+    <button
+      onClick={() => onClick(value)}
+      className={`px-3 py-1 text-xs font-mono rounded-lg transition-colors ${
+        active
+          ? "bg-weavrn-surface text-white border border-weavrn-border"
+          : "text-weavrn-muted hover:text-white"
+      }`}
+    >
+      {label}
+      {count != null && count > 0 && (
+        <span className={`ml-1.5 ${active ? "text-[#00D4AA]" : "text-weavrn-muted/50"}`}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
 }
 
 export default function MiningDashboard({
@@ -53,12 +91,16 @@ export default function MiningDashboard({
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
+  const [claimingAll, setClaimingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
+  const [rewardFilter, setRewardFilter] = useState<RewardFilter>("claimable");
+  const [postFilter, setPostFilter] = useState<PostFilter>("active");
+  const [postSort, setPostSort] = useState<PostSort>("newest");
 
   const fetchData = useCallback(async () => {
     try {
@@ -208,6 +250,73 @@ export default function MiningDashboard({
     }
   };
 
+  // Derived data
+  const submissions = data?.submissions ?? [];
+  const blockRewards = data?.block_rewards ?? [];
+  const trackedPosts = data?.tracked_posts ?? [];
+
+  const claimableSubs = useMemo(
+    () => submissions.filter((s) => s.status === "approved" && s.on_chain_id != null),
+    [submissions],
+  );
+
+  const unclaimedAmount = useMemo(
+    () => claimableSubs.reduce((sum, s) => sum + parseFloat(s.reward_amount || "0"), 0),
+    [claimableSubs],
+  );
+
+  const filteredRewards = useMemo(() => {
+    if (rewardFilter === "claimable") {
+      return blockRewards.filter((br) => {
+        const sub = submissions.find((s) => s.id === br.submission_id);
+        return sub?.status !== "claimed";
+      });
+    }
+    return blockRewards;
+  }, [blockRewards, submissions, rewardFilter]);
+
+  const claimedCount = useMemo(
+    () => blockRewards.filter((br) => {
+      const sub = submissions.find((s) => s.id === br.submission_id);
+      return sub?.status === "claimed";
+    }).length,
+    [blockRewards, submissions],
+  );
+
+  const filteredPosts = useMemo(() => {
+    let posts = trackedPosts;
+    if (postFilter === "active") {
+      posts = posts.filter((p) => !p.deleted_at);
+    }
+    if (postSort === "oldest") {
+      return [...posts].reverse();
+    }
+    if (postSort === "earned") {
+      return [...posts].sort((a, b) => b.estimated_wvrn - a.estimated_wvrn);
+    }
+    return posts;
+  }, [trackedPosts, postFilter, postSort]);
+
+  const deletedCount = trackedPosts.filter((p) => p.deleted_at).length;
+
+  const handleClaimAll = async () => {
+    if (!signer || claimableSubs.length === 0) return;
+    setClaimingAll(true);
+    setError(null);
+    try {
+      const onChainIds = claimableSubs.map((s) => s.on_chain_id!);
+      const txHash = await batchClaimRewards(signer, onChainIds);
+      for (const sub of claimableSubs) {
+        await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {});
+      }
+      await fetchData();
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setClaimingAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-20 text-weavrn-muted text-sm">
@@ -216,7 +325,7 @@ export default function MiningDashboard({
     );
   }
 
-  // State A: No handle, no pending verification — show handle input
+  // State A: No handle, no pending verification
   if (!xHandle && !verificationCode) {
     return (
       <div className="max-w-md mx-auto">
@@ -250,7 +359,7 @@ export default function MiningDashboard({
     );
   }
 
-  // State B: Pending verification — show code and verify button
+  // State B: Pending verification
   if (!xHandle && verificationCode) {
     return (
       <div className="max-w-md mx-auto">
@@ -298,10 +407,6 @@ export default function MiningDashboard({
   }
 
   // State C: Verified — main dashboard
-  const trackedPosts = data?.tracked_posts ?? [];
-  const blockRewards = data?.block_rewards ?? [];
-  const submissions = data?.submissions ?? [];
-
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       {error && (
@@ -317,34 +422,42 @@ export default function MiningDashboard({
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="glow-card rounded-xl p-5 text-center">
-          <div className="text-2xl font-bold text-white">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="glow-card rounded-xl p-4 text-center">
+          <div className="text-xl font-bold text-white">
             {trackedPosts.length}
           </div>
-          <div className="text-xs text-weavrn-muted font-mono mt-1">
+          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
             Tracked Posts
           </div>
         </div>
-        <div className="glow-card rounded-xl p-5 text-center">
-          <div className="text-2xl font-bold gradient-text">
+        <div className="glow-card rounded-xl p-4 text-center">
+          <div className="text-xl font-bold gradient-text">
             {Math.floor(parseFloat(data?.total_earned || "0")).toLocaleString()}
           </div>
-          <div className="text-xs text-weavrn-muted font-mono mt-1">
-            WVRN Earned
+          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
+            Total Earned
           </div>
         </div>
-        <div className="glow-card rounded-xl p-5 text-center">
-          <div className="text-2xl font-bold text-white">
+        <div className="glow-card rounded-xl p-4 text-center">
+          <div className={`text-xl font-bold ${unclaimedAmount > 0 ? "text-[#00D4AA]" : "text-white"}`}>
+            {Math.floor(unclaimedAmount).toLocaleString()}
+          </div>
+          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
+            Unclaimed
+          </div>
+        </div>
+        <div className="glow-card rounded-xl p-4 text-center">
+          <div className="text-xl font-bold text-white">
             {parseFloat(data?.balance || "0").toLocaleString(undefined, {
               maximumFractionDigits: 0,
             })}
           </div>
-          <div className="text-xs text-weavrn-muted font-mono mt-1">
+          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
             Balance
             <button
               onClick={addTokenToWallet}
-              className="ml-1.5 text-[#00D4AA]/60 hover:text-[#00D4AA] transition-colors"
+              className="ml-1 text-[#00D4AA]/60 hover:text-[#00D4AA] transition-colors"
               title="Add WVRN to wallet"
             >
               +
@@ -383,14 +496,49 @@ export default function MiningDashboard({
 
       {/* Block Rewards */}
       <div>
-        <h3 className="text-lg font-bold text-white mb-4">Block Rewards</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-white">Block Rewards</h3>
+            <div className="flex items-center gap-1">
+              <FilterTab
+                value="claimable"
+                current={rewardFilter}
+                label="Unclaimed"
+                count={blockRewards.length - claimedCount}
+                onClick={setRewardFilter}
+              />
+              <FilterTab
+                value="all"
+                current={rewardFilter}
+                label="All"
+                count={blockRewards.length}
+                onClick={setRewardFilter}
+              />
+            </div>
+          </div>
+          {claimableSubs.length > 1 && signer && (
+            <button
+              onClick={handleClaimAll}
+              disabled={claimingAll || claimingId != null}
+              className="px-4 py-1.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+            >
+              {claimingAll
+                ? "Claiming..."
+                : `Claim All (${Math.floor(unclaimedAmount).toLocaleString()} WVRN)`}
+            </button>
+          )}
+        </div>
         {blockRewards.length === 0 ? (
           <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
             No block rewards yet. Rewards are calculated when each block closes.
           </div>
+        ) : filteredRewards.length === 0 ? (
+          <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+            All rewards claimed. Switch to &quot;All&quot; to view history.
+          </div>
         ) : (
           <div className="space-y-2">
-            {blockRewards.map((br) => {
+            {filteredRewards.map((br) => {
               const sub = submissions.find((s) => s.id === br.submission_id);
               return (
                 <div
@@ -402,7 +550,7 @@ export default function MiningDashboard({
                       Block {br.block_number}
                     </span>
                     <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} — score{" "}
+                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; score{" "}
                       {br.delta_score}
                     </span>
                   </div>
@@ -429,7 +577,7 @@ export default function MiningDashboard({
                       signer && (
                         <button
                           onClick={() => handleClaim(sub)}
-                          disabled={claimingId === sub.id}
+                          disabled={claimingId === sub.id || claimingAll}
                           className="px-3 py-1 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
                         >
                           {claimingId === sub.id ? "Claiming..." : "Claim"}
@@ -455,27 +603,62 @@ export default function MiningDashboard({
       {/* Tracked Posts */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing || refreshCooldown > 0}
-            className="px-3 py-1.5 text-xs font-mono border border-weavrn-border rounded-lg hover:border-[#00D4AA]/50 hover:text-[#00D4AA] text-weavrn-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {refreshing
-              ? "Scanning..."
-              : refreshCooldown > 0
-                ? `${Math.floor(refreshCooldown / 60)}:${String(refreshCooldown % 60).padStart(2, "0")}`
-                : "Refresh"}
-          </button>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
+            <div className="flex items-center gap-1">
+              <FilterTab
+                value="active"
+                current={postFilter}
+                label="Active"
+                count={trackedPosts.length - deletedCount}
+                onClick={setPostFilter}
+              />
+              {deletedCount > 0 && (
+                <FilterTab
+                  value="all"
+                  current={postFilter}
+                  label="All"
+                  count={trackedPosts.length}
+                  onClick={setPostFilter}
+                />
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={postSort}
+              onChange={(e) => setPostSort(e.target.value as PostSort)}
+              className="px-2 py-1 text-xs font-mono bg-transparent border border-weavrn-border rounded-lg text-weavrn-muted focus:outline-none focus:border-[#00D4AA]/50 cursor-pointer"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="earned">Top Earned</option>
+            </select>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing || refreshCooldown > 0}
+              className="px-3 py-1.5 text-xs font-mono border border-weavrn-border rounded-lg hover:border-[#00D4AA]/50 hover:text-[#00D4AA] text-weavrn-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {refreshing
+                ? "Scanning..."
+                : refreshCooldown > 0
+                  ? `${Math.floor(refreshCooldown / 60)}:${String(refreshCooldown % 60).padStart(2, "0")}`
+                  : "Refresh"}
+            </button>
+          </div>
         </div>
         {trackedPosts.length === 0 ? (
           <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
             No posts discovered yet. Post about Weavrn on X and they&apos;ll
             appear here automatically.
           </div>
+        ) : filteredPosts.length === 0 ? (
+          <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+            No active posts. Switch to &quot;All&quot; to view deleted posts.
+          </div>
         ) : (
           <div className="space-y-3">
-            {trackedPosts.map((p) => {
+            {filteredPosts.map((p) => {
               const isExpanded = expandedPostId === p.id;
               return (
                 <div
@@ -490,10 +673,10 @@ export default function MiningDashboard({
                     className="p-4 cursor-pointer hover:bg-weavrn-surface/50 transition-colors rounded-xl"
                     onClick={() => setExpandedPostId(isExpanded ? null : p.id)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1 truncate mr-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
                         <svg
-                          className={`w-3 h-3 text-weavrn-muted flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                          className={`w-3 h-3 text-weavrn-muted flex-shrink-0 mt-0.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -501,37 +684,60 @@ export default function MiningDashboard({
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
-                        <a
-                          href={p.post_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {p.post_url}
-                        </a>
-                        {p.deleted_at && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20 flex-shrink-0">
-                            deleted
+                        <div className="min-w-0 flex-1">
+                          {p.text ? (
+                            <p className="text-sm text-white/90 leading-snug line-clamp-2">
+                              {p.text}
+                            </p>
+                          ) : (
+                            <a
+                              href={p.post_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {p.post_url}
+                            </a>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            {p.text && (
+                              <a
+                                href={p.post_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#00D4AA]/60 hover:text-[#00D4AA] transition-colors font-mono text-[10px]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                view post
+                              </a>
+                            )}
+                            {p.deleted_at && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">
+                                deleted
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {p.estimated_wvrn > 0 && (
+                          <span className="text-xs font-mono text-[#00D4AA] font-medium">
+                            {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
                           </span>
                         )}
-                      </div>
-                      <div className="text-xs text-weavrn-muted font-mono flex-shrink-0">
-                        Block {p.discovered_in_block}
+                        <span className="text-[10px] text-weavrn-muted font-mono">
+                          Block {p.discovered_in_block}
+                        </span>
                       </div>
                     </div>
-                    {p.text && (
-                      <p className="text-xs text-weavrn-muted mt-2 truncate">
-                        {p.text}
-                      </p>
-                    )}
                     {p.raw_score != null && (
                       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-weavrn-border/30">
                         <span className="text-[11px] text-weavrn-muted font-mono">
                           {p.likes ?? 0} likes
                         </span>
                         <span className="text-[11px] text-weavrn-muted font-mono">
-                          {p.retweets ?? 0} retweets
+                          {p.retweets ?? 0} RTs
                         </span>
                         <span className="text-[11px] text-weavrn-muted font-mono">
                           {p.replies ?? 0} replies
@@ -539,15 +745,8 @@ export default function MiningDashboard({
                         <span className="text-[11px] text-weavrn-muted font-mono">
                           {(p.views ?? 0).toLocaleString()} views
                         </span>
-                        <span className="ml-auto flex items-center gap-3">
-                          <span className="text-[11px] font-mono text-weavrn-muted">
-                            score: {p.raw_score}
-                          </span>
-                          {p.estimated_wvrn > 0 && (
-                            <span className="text-[11px] font-mono text-[#00D4AA]">
-                              {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
-                            </span>
-                          )}
+                        <span className="ml-auto text-[11px] font-mono text-weavrn-muted">
+                          score {p.raw_score}
                         </span>
                       </div>
                     )}
