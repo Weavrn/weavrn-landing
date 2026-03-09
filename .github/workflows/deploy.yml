@@ -1,11 +1,11 @@
-name: CI & Deploy Dev
+name: CI & Deploy
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]
 jobs:
   ci:
     runs-on: ubuntu-latest
-    environment: development
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,5 +37,5 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: out/*
-          target: /opt/dev/weavrn-landing/
+          target: /opt/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/weavrn-landing/
           overwrite: true
