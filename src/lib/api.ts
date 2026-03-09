@@ -29,6 +29,7 @@ export interface TrackedPost {
   replies: number | null;
   views: number | null;
   raw_score: number | null;
+  estimated_wvrn: number;
 }
 
 export interface BlockReward {

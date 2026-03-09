@@ -453,8 +453,15 @@ export default function MiningDashboard({
                     <span className="text-[11px] text-weavrn-muted font-mono">
                       {(p.views ?? 0).toLocaleString()} views
                     </span>
-                    <span className="ml-auto text-[11px] font-mono text-[#00D4AA]">
-                      score: {p.raw_score}
+                    <span className="ml-auto flex items-center gap-3">
+                      <span className="text-[11px] font-mono text-weavrn-muted">
+                        score: {p.raw_score}
+                      </span>
+                      {p.estimated_wvrn > 0 && (
+                        <span className="text-[11px] font-mono text-[#00D4AA]">
+                          {p.estimated_wvrn.toLocaleString(undefined, { maximumFractionDigits: 2 })} WVRN
+                        </span>
+                      )}
                     </span>
                   </div>
                 )}
