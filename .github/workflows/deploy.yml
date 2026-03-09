@@ -15,6 +15,9 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_API_URL: ${{ vars.API_URL }}
+          NEXT_PUBLIC_SOCIAL_MINING_ADDRESS: ${{ vars.SOCIAL_MINING_ADDRESS }}
+          NEXT_PUBLIC_WVRN_TOKEN_ADDRESS: ${{ vars.WVRN_TOKEN_ADDRESS }}
+          NEXT_PUBLIC_CHAIN_ID: ${{ vars.CHAIN_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
