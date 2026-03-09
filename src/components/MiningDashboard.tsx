@@ -327,9 +327,7 @@ export default function MiningDashboard({
         </div>
         <div className="glow-card rounded-xl p-5 text-center">
           <div className="text-2xl font-bold gradient-text">
-            {parseFloat(data?.total_earned || "0").toLocaleString(undefined, {
-              maximumFractionDigits: 0,
-            })}
+            {Math.floor(parseFloat(data?.total_earned || "0")).toLocaleString()}
           </div>
           <div className="text-xs text-weavrn-muted font-mono mt-1">
             WVRN Earned
@@ -381,6 +379,77 @@ export default function MiningDashboard({
           </div>
         </div>
       )}
+
+      {/* Block Rewards */}
+      <div>
+        <h3 className="text-lg font-bold text-white mb-4">Block Rewards</h3>
+        {blockRewards.length === 0 ? (
+          <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+            No block rewards yet. Rewards are calculated when each block closes.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {blockRewards.map((br) => {
+              const sub = submissions.find((s) => s.id === br.submission_id);
+              return (
+                <div
+                  key={br.id}
+                  className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-white font-mono text-xs">
+                      Block {br.block_number}
+                    </span>
+                    <span className="text-weavrn-muted font-mono text-xs">
+                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} — score{" "}
+                      {br.delta_score}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {sub?.reward_amount != null && (
+                      <span className="text-weavrn-muted font-mono text-xs">
+                        {Math.floor(parseFloat(sub.reward_amount)).toLocaleString()}{" "}
+                        WVRN
+                      </span>
+                    )}
+                    {sub?.tx_hash && (
+                      <a
+                        href={getExplorerTxUrl(sub.tx_hash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
+                      >
+                        tx
+                      </a>
+                    )}
+                    {sub &&
+                      sub.status === "approved" &&
+                      sub.on_chain_id != null &&
+                      signer && (
+                        <button
+                          onClick={() => handleClaim(sub)}
+                          disabled={claimingId === sub.id}
+                          className="px-3 py-1 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
+                        >
+                          {claimingId === sub.id ? "Claiming..." : "Claim"}
+                        </button>
+                      )}
+                    {sub && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                          STATUS_STYLES[sub.status] || STATUS_STYLES.pending
+                        }`}
+                      >
+                        {sub.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Tracked Posts */}
       <div>
@@ -459,7 +528,7 @@ export default function MiningDashboard({
                       </span>
                       {p.estimated_wvrn > 0 && (
                         <span className="text-[11px] font-mono text-[#00D4AA]">
-                          {p.estimated_wvrn.toLocaleString(undefined, { maximumFractionDigits: 2 })} WVRN
+                          {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
                         </span>
                       )}
                     </span>
@@ -467,79 +536,6 @@ export default function MiningDashboard({
                 )}
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* Block History */}
-      <div>
-        <h3 className="text-lg font-bold text-white mb-4">Block Rewards</h3>
-        {blockRewards.length === 0 ? (
-          <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No block rewards yet. Rewards are calculated when each block closes.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {blockRewards.map((br) => {
-              const sub = submissions.find((s) => s.id === br.submission_id);
-              return (
-                <div
-                  key={br.id}
-                  className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-white font-mono text-xs">
-                      Block {br.block_number}
-                    </span>
-                    <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} — score{" "}
-                      {br.delta_score}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {sub?.reward_amount != null && (
-                      <span className="text-weavrn-muted font-mono text-xs">
-                        {parseFloat(sub.reward_amount).toLocaleString(undefined, {
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        WVRN
-                      </span>
-                    )}
-                    {sub?.tx_hash && (
-                      <a
-                        href={getExplorerTxUrl(sub.tx_hash)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
-                      >
-                        tx
-                      </a>
-                    )}
-                    {sub &&
-                      sub.status === "approved" &&
-                      sub.on_chain_id != null &&
-                      signer && (
-                        <button
-                          onClick={() => handleClaim(sub)}
-                          disabled={claimingId === sub.id}
-                          className="px-3 py-1 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
-                        >
-                          {claimingId === sub.id ? "Claiming..." : "Claim"}
-                        </button>
-                      )}
-                    {sub && (
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                          STATUS_STYLES[sub.status] || STATUS_STYLES.pending
-                        }`}
-                      >
-                        {sub.status}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
       </div>
