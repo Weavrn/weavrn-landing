@@ -241,7 +241,9 @@ export default function MiningDashboard({
     setError(null);
     try {
       const txHash = await claimReward(signer, sub.on_chain_id);
-      await markClaimed(signer, walletAddress, sub.on_chain_id, txHash).catch(() => {});
+      await markClaimed(signer, walletAddress, sub.on_chain_id, txHash).catch(() => {
+        setError("Claimed on-chain but failed to update dashboard. Please refresh.");
+      });
       await fetchData();
     } catch (err: unknown) {
       setError((err as Error).message);
@@ -307,7 +309,9 @@ export default function MiningDashboard({
       const onChainIds = claimableSubs.map((s) => s.on_chain_id!);
       const txHash = await batchClaimRewards(signer, onChainIds);
       for (const sub of claimableSubs) {
-        await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {});
+        await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {
+          setError("Claimed on-chain but failed to update dashboard. Please refresh.");
+        });
       }
       await fetchData();
     } catch (err: unknown) {

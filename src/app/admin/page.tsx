@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   getAdminBlocks,
   getAdminBlockDetail,
@@ -51,17 +51,6 @@ export default function AdminPage() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const key = params.get("key");
-    if (key) {
-      setAdminKey(key);
-      setAuthenticated(true);
-      fetchBlocks(key);
-      window.history.replaceState({}, "", "/admin");
-    }
-  }, [fetchBlocks]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

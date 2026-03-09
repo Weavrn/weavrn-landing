@@ -126,9 +126,9 @@ async function apiFetch<T>(
 
 import type { JsonRpcSigner } from "ethers";
 
-async function signForWallet(signer: JsonRpcSigner, wallet: string) {
+async function signForWallet(signer: JsonRpcSigner, wallet: string, action: string) {
   const timestamp = Date.now();
-  const message = `weavrn-verify:${wallet.toLowerCase()}:${timestamp}`;
+  const message = `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
   return { signature, timestamp };
 }
@@ -149,7 +149,7 @@ export function getProfile(wallet: string) {
 }
 
 export async function startVerification(signer: JsonRpcSigner, wallet: string, xHandle: string) {
-  const { signature, timestamp } = await signForWallet(signer, wallet);
+  const { signature, timestamp } = await signForWallet(signer, wallet, "start-verification");
   return apiFetch<VerificationResponse>("/auth/start-verification", {
     method: "POST",
     body: JSON.stringify({ wallet_address: wallet.toLowerCase(), x_handle: xHandle, signature, timestamp }),
@@ -157,7 +157,7 @@ export async function startVerification(signer: JsonRpcSigner, wallet: string, x
 }
 
 export async function verifyHandle(signer: JsonRpcSigner, wallet: string) {
-  const { signature, timestamp } = await signForWallet(signer, wallet);
+  const { signature, timestamp } = await signForWallet(signer, wallet, "verify");
   return apiFetch<Profile>("/auth/verify", {
     method: "POST",
     body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
@@ -165,7 +165,7 @@ export async function verifyHandle(signer: JsonRpcSigner, wallet: string) {
 }
 
 export async function unlinkHandle(signer: JsonRpcSigner, wallet: string) {
-  const { signature, timestamp } = await signForWallet(signer, wallet);
+  const { signature, timestamp } = await signForWallet(signer, wallet, "unlink");
   return apiFetch<Profile>("/auth/unlink", {
     method: "POST",
     body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
@@ -173,7 +173,7 @@ export async function unlinkHandle(signer: JsonRpcSigner, wallet: string) {
 }
 
 export async function markClaimed(signer: JsonRpcSigner, wallet: string, onChainId: number, txHash: string) {
-  const { signature, timestamp } = await signForWallet(signer, wallet);
+  const { signature, timestamp } = await signForWallet(signer, wallet, "claim");
   return apiFetch<Submission>("/claim", {
     method: "POST",
     body: JSON.stringify({ on_chain_id: onChainId, tx_hash: txHash, wallet_address: wallet.toLowerCase(), signature, timestamp }),
