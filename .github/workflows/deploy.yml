@@ -1,10 +1,11 @@
-name: CI & Deploy Dev
+name: CI & Deploy
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]
 jobs:
   ci:
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -12,6 +13,13 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.API_URL }}
+          NEXT_PUBLIC_SOCIAL_MINING_ADDRESS: ${{ vars.SOCIAL_MINING_ADDRESS }}
+          NEXT_PUBLIC_WVRN_TOKEN_ADDRESS: ${{ vars.WVRN_TOKEN_ADDRESS }}
+          NEXT_PUBLIC_CHAIN_ID: ${{ vars.CHAIN_ID }}
+          NEXT_PUBLIC_UMAMI_URL: ${{ vars.UMAMI_URL }}
+          NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${{ vars.UMAMI_WEBSITE_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
@@ -31,5 +39,5 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: out/*
-          target: /opt/dev/weavrn-landing/
+          target: /opt/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/weavrn-landing/
           overwrite: true
