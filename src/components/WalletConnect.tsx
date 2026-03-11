@@ -47,7 +47,7 @@ export default function WalletConnect({
     return (
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-weavrn-surface border border-weavrn-border text-sm">
-          <div className="w-2 h-2 rounded-full bg-[#00D4AA]" />
+          <div className="w-2 h-2 rounded-full bg-weavrn-accent" />
           <span className="text-weavrn-muted font-mono text-xs">
             {address.slice(0, 6)}...{address.slice(-4)}
           </span>
@@ -70,7 +70,7 @@ export default function WalletConnect({
       <button
         onClick={connect}
         disabled={connecting}
-        className="px-5 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
+        className="px-5 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
       >
         {connecting ? "Connecting..." : "Connect Wallet"}
       </button>

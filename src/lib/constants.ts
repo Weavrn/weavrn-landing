@@ -7,7 +7,6 @@ export const SOCIAL_LINKS = {
 
 export const CONTACT_EMAIL = "contact@weavrn.com";
 
-export const BUTTONDOWN_EMBED_URL = ""; // TODO: add Buttondown embed URL
 
 export const TOKEN_ALLOCATIONS = [
   { label: "Usage Incentives", pct: 25, amount: "250M", color: "#8B5CF6" },

@@ -3,7 +3,7 @@ export default function WhyWeavrn() {
     <section id="why" className="relative py-32 px-6 scroll-mt-16">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-20">
-          <p className="text-[#00D4AA] text-sm font-mono font-medium tracking-wider uppercase mb-4">
+          <p className="text-weavrn-accent text-sm font-mono font-medium tracking-wider uppercase mb-4">
             Why Weavrn
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
@@ -29,7 +29,7 @@ export default function WhyWeavrn() {
               they&apos;ve never encountered before.
             </p>
             <p className="text-lg md:text-xl leading-relaxed">
-              <span className="text-[#00D4AA] font-medium">Weavrn provides that layer.</span>{" "}
+              <span className="text-weavrn-accent font-medium">Weavrn provides that layer.</span>{" "}
               <span className="text-weavrn-muted">
                 Soulbound identity, programmable smart wallets, and atomic payment
                 routing — the protocol foundation for agents to operate as a
@@ -62,7 +62,7 @@ export default function WhyWeavrn() {
             },
           ].map((p) => (
             <div key={p.label} className="glow-card rounded-2xl p-8">
-              <div className="text-xs text-[#00D4AA] font-mono tracking-wider mb-4">
+              <div className="text-xs text-weavrn-accent font-mono tracking-wider mb-4">
                 {p.label}
               </div>
               <h3 className="text-xl font-bold mb-3 text-white">{p.title}</h3>

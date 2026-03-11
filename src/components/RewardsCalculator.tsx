@@ -63,7 +63,7 @@ export default function RewardsCalculator() {
 
   return (
     <div className="glow-card rounded-2xl p-8 md:p-10 max-w-2xl mx-auto mt-16">
-      <h3 className="text-sm font-mono text-[#00D4AA] tracking-wider uppercase mb-8 text-center">
+      <h3 className="text-sm font-mono text-weavrn-accent tracking-wider uppercase mb-8 text-center">
         Rewards Calculator
       </h3>
 
@@ -81,7 +81,7 @@ export default function RewardsCalculator() {
                   const v = Math.max(s.min, Math.min(s.max, Number(e.target.value) || 0));
                   setValues((prev) => ({ ...prev, [s.key]: v }));
                 }}
-                className="w-20 text-right text-sm font-mono text-white bg-weavrn-surface border border-weavrn-border/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#00D4AA]/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-20 text-right text-sm font-mono text-white bg-weavrn-surface border border-weavrn-border/30 rounded px-2 py-0.5 focus:outline-none focus:border-weavrn-accent/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <input
@@ -95,7 +95,7 @@ export default function RewardsCalculator() {
                   [s.key]: Number(e.target.value),
                 }))
               }
-              className="w-full accent-[#00D4AA] h-1.5 bg-weavrn-border/30 rounded-full appearance-none cursor-pointer"
+              className="w-full accent-weavrn-accent h-1.5 bg-weavrn-border/30 rounded-full appearance-none cursor-pointer"
             />
           </div>
         ))}
@@ -139,7 +139,7 @@ export default function RewardsCalculator() {
       </div>
 
       {/* Halving schedule */}
-      <h4 className="text-sm font-mono text-[#00D4AA] tracking-wider uppercase mb-4 text-center">
+      <h4 className="text-sm font-mono text-weavrn-accent tracking-wider uppercase mb-4 text-center">
         Halving Schedule
       </h4>
       <div className="overflow-x-auto">

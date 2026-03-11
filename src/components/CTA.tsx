@@ -5,7 +5,7 @@ export default function CTA() {
     <section className="relative py-32 px-6">
       {/* Background glow */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-[600px] h-[300px] rounded-full bg-[#00D4AA]/5 blur-[120px]" />
+        <div className="w-[600px] h-[300px] rounded-full bg-weavrn-accent/5 blur-[120px]" />
       </div>
 
       <div className="relative z-10 max-w-3xl mx-auto text-center">
@@ -19,7 +19,7 @@ export default function CTA() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
           <a
             href="/mine"
-            className="group px-8 py-3.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
+            className="group px-8 py-3.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
           >
             Start Mining
             <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
@@ -28,7 +28,7 @@ export default function CTA() {
             href={SOCIAL_LINKS.twitter}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-8 py-3.5 border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg font-semibold transition-all duration-300 hover:bg-weavrn-surface"
+            className="px-8 py-3.5 border border-weavrn-border hover:border-weavrn-accent/50 rounded-lg font-semibold transition-all duration-300 hover:bg-weavrn-surface"
           >
             Follow on X
           </a>
@@ -50,11 +50,11 @@ export default function CTA() {
               name="email"
               placeholder="you@example.com"
               required
-              className="flex-1 px-4 py-3 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors placeholder:text-weavrn-muted/50"
+              className="flex-1 px-4 py-3 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50 transition-colors placeholder:text-weavrn-muted/50"
             />
             <button
               type="submit"
-              className="px-6 py-3 bg-weavrn-surface border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-weavrn-surface-light"
+              className="px-6 py-3 bg-weavrn-surface border border-weavrn-border hover:border-weavrn-accent/50 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-weavrn-surface-light"
             >
               Subscribe
             </button>

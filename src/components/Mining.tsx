@@ -32,7 +32,7 @@ export default function Mining() {
     <section id="mining" className="relative py-32 px-6 scroll-mt-16">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-20">
-          <p className="text-[#00D4AA] text-sm font-mono font-medium tracking-wider uppercase mb-4">
+          <p className="text-weavrn-accent text-sm font-mono font-medium tracking-wider uppercase mb-4">
             Social Mining
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
@@ -48,11 +48,11 @@ export default function Mining() {
           {steps.map((s, i) => (
             <div key={s.step} className="relative text-center md:text-left">
               <div className="relative flex items-center mb-6 md:justify-start justify-center">
-                <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full border border-[#00D4AA]/30 bg-weavrn-surface">
-                  <span className="text-[#00D4AA] font-mono text-sm font-bold">{s.step}</span>
+                <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full border border-weavrn-accent/30 bg-weavrn-surface">
+                  <span className="text-weavrn-accent font-mono text-sm font-bold">{s.step}</span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className="hidden md:block absolute left-12 right-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-[#00D4AA]/30 to-transparent" />
+                  <div className="hidden md:block absolute left-12 right-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-weavrn-accent/30 to-transparent" />
                 )}
               </div>
               <h3 className="text-xl font-bold text-white mb-3">{s.title}</h3>

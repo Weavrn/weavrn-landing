@@ -26,7 +26,7 @@ export default function UseCases() {
     <section id="use-cases" className="relative py-32 px-6 section-fade scroll-mt-16">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-20">
-          <p className="text-[#00D4AA] text-sm font-mono font-medium tracking-wider uppercase mb-4">
+          <p className="text-weavrn-accent text-sm font-mono font-medium tracking-wider uppercase mb-4">
             Use Cases
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">

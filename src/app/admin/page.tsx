@@ -116,11 +116,11 @@ export default function AdminPage() {
                 value={adminKey}
                 onChange={(e) => setAdminKey(e.target.value)}
                 placeholder="Admin key"
-                className="w-full px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors mb-4 font-mono"
+                className="w-full px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50 transition-colors mb-4 font-mono"
               />
               <button
                 type="submit"
-                className="w-full px-4 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300"
+                className="w-full px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300"
               >
                 Login
               </button>
@@ -145,7 +145,7 @@ export default function AdminPage() {
             <button
               onClick={() => handleTabChange("blocks")}
               className={`text-xs font-mono transition-colors ${
-                tab === "blocks" ? "text-[#00D4AA]" : "text-weavrn-muted hover:text-white"
+                tab === "blocks" ? "text-weavrn-accent" : "text-weavrn-muted hover:text-white"
               }`}
             >
               Blocks
@@ -153,7 +153,7 @@ export default function AdminPage() {
             <button
               onClick={() => handleTabChange("posts")}
               className={`text-xs font-mono transition-colors ${
-                tab === "posts" ? "text-[#00D4AA]" : "text-weavrn-muted hover:text-white"
+                tab === "posts" ? "text-weavrn-accent" : "text-weavrn-muted hover:text-white"
               }`}
             >
               Posts
@@ -196,7 +196,7 @@ export default function AdminPage() {
                     <button
                       onClick={() => handleSettle(blockStats.current_block.number - 1)}
                       disabled={settlingBlock !== null}
-                      className="px-4 py-2 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+                      className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
                     >
                       {settlingBlock !== null
                         ? "Settling..."
@@ -292,7 +292,7 @@ export default function AdminPage() {
                         href={p.post_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#00D4AA] hover:text-[#00F0C0] font-mono text-xs"
+                        className="text-weavrn-accent hover:text-weavrn-accent-hover font-mono text-xs"
                       >
                         {p.post_url}
                       </a>
@@ -308,7 +308,7 @@ export default function AdminPage() {
                       onClick={() => handleTogglePost(p)}
                       className={`px-3 py-1 rounded text-[10px] font-semibold transition-all ${
                         p.deactivated
-                          ? "border border-[#00D4AA]/30 text-[#00D4AA] hover:border-[#00D4AA]/60"
+                          ? "border border-weavrn-accent/30 text-weavrn-accent hover:border-weavrn-accent/60"
                           : "border border-red-500/30 text-red-400 hover:border-red-500/60"
                       }`}
                     >

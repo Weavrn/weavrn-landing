@@ -20,11 +20,11 @@ html {
 
 @layer utilities {
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#00D4AA] to-[#00A3FF];
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-weavrn-accent to-[#00A3FF];
   }
 
   .gradient-text-warm {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#00D4AA] via-[#00E5BB] to-[#00A3FF];
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-weavrn-accent via-[#00E5BB] to-[#00A3FF];
   }
 }
 

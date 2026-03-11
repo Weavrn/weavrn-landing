@@ -48,7 +48,7 @@ export default function Navbar() {
           ))}
           <a
             href="/mine"
-            className="px-4 py-2 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300"
+            className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300"
           >
             Start Mining
           </a>
@@ -58,7 +58,7 @@ export default function Navbar() {
         <div className="flex md:hidden items-center gap-3">
           <a
             href="/mine"
-            className="px-3 py-1.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-xs font-semibold transition-all duration-300"
+            className="px-3 py-1.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold transition-all duration-300"
           >
             Start Mining
           </a>

@@ -26,7 +26,7 @@ interface MiningDashboardProps {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  approved: "bg-[#00D4AA]/10 text-[#00D4AA] border-[#00D4AA]/20",
+  approved: "bg-weavrn-accent/10 text-weavrn-accent border-weavrn-accent/20",
   claimed: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   rejected: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -70,7 +70,7 @@ function FilterTab<T extends string>({
     >
       {label}
       {count != null && count > 0 && (
-        <span className={`ml-1.5 ${active ? "text-[#00D4AA]" : "text-weavrn-muted/50"}`}>
+        <span className={`ml-1.5 ${active ? "text-weavrn-accent" : "text-weavrn-muted/50"}`}>
           {count}
         </span>
       )}
@@ -347,12 +347,12 @@ export default function MiningDashboard({
               value={handleInput}
               onChange={(e) => setHandleInput(e.target.value)}
               placeholder="@yourhandle"
-              className="flex-1 px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors placeholder:text-weavrn-muted/50"
+              className="flex-1 px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50 transition-colors placeholder:text-weavrn-muted/50"
             />
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
+              className="px-6 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
             >
               {submitting ? "..." : "Continue"}
             </button>
@@ -377,7 +377,7 @@ export default function MiningDashboard({
           </p>
 
           <div className="flex items-center gap-2 mb-6 p-3 bg-weavrn-dark rounded-lg border border-weavrn-border">
-            <code className="flex-1 text-[#00D4AA] font-mono text-lg font-bold tracking-wider">
+            <code className="flex-1 text-weavrn-accent font-mono text-lg font-bold tracking-wider">
               {verificationCode}
             </code>
             <button
@@ -392,7 +392,7 @@ export default function MiningDashboard({
             <button
               onClick={handleVerify}
               disabled={verifying}
-              className="flex-1 px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
+              className="flex-1 px-6 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
             >
               {verifying ? "Checking..." : "Verify"}
             </button>
@@ -444,7 +444,7 @@ export default function MiningDashboard({
           </div>
         </div>
         <div className="glow-card rounded-xl p-4 text-center">
-          <div className={`text-xl font-bold ${unclaimedAmount > 0 ? "text-[#00D4AA]" : "text-white"}`}>
+          <div className={`text-xl font-bold ${unclaimedAmount > 0 ? "text-weavrn-accent" : "text-white"}`}>
             {Math.floor(unclaimedAmount).toLocaleString()}
           </div>
           <div className="text-[10px] text-weavrn-muted font-mono mt-1">
@@ -461,7 +461,7 @@ export default function MiningDashboard({
             Balance
             <button
               onClick={addTokenToWallet}
-              className="ml-1 text-[#00D4AA]/60 hover:text-[#00D4AA] transition-colors"
+              className="ml-1 text-weavrn-accent/60 hover:text-weavrn-accent transition-colors"
               title="Add WVRN to wallet"
             >
               +
@@ -524,7 +524,7 @@ export default function MiningDashboard({
             <button
               onClick={handleClaimAll}
               disabled={claimingAll || claimingId != null}
-              className="px-4 py-1.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+              className="px-4 py-1.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
             >
               {claimingAll
                 ? "Claiming..."
@@ -582,7 +582,7 @@ export default function MiningDashboard({
                         <button
                           onClick={() => handleClaim(sub)}
                           disabled={claimingId === sub.id || claimingAll}
-                          className="px-3 py-1 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
+                          className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
                         >
                           {claimingId === sub.id ? "Claiming..." : "Claim"}
                         </button>
@@ -632,7 +632,7 @@ export default function MiningDashboard({
             <select
               value={postSort}
               onChange={(e) => setPostSort(e.target.value as PostSort)}
-              className="px-2 py-1 text-xs font-mono bg-transparent border border-weavrn-border rounded-lg text-weavrn-muted focus:outline-none focus:border-[#00D4AA]/50 cursor-pointer"
+              className="px-2 py-1 text-xs font-mono bg-transparent border border-weavrn-border rounded-lg text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 cursor-pointer"
             >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
@@ -641,7 +641,7 @@ export default function MiningDashboard({
             <button
               onClick={handleRefresh}
               disabled={refreshing || refreshCooldown > 0}
-              className="px-3 py-1.5 text-xs font-mono border border-weavrn-border rounded-lg hover:border-[#00D4AA]/50 hover:text-[#00D4AA] text-weavrn-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-xs font-mono border border-weavrn-border rounded-lg hover:border-weavrn-accent/50 hover:text-weavrn-accent text-weavrn-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {refreshing
                 ? "Scanning..."
@@ -698,7 +698,7 @@ export default function MiningDashboard({
                               href={p.post_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
+                              className="text-weavrn-accent hover:text-weavrn-accent-hover transition-colors font-mono text-xs"
                               onClick={(e) => e.stopPropagation()}
                             >
                               {p.post_url}
@@ -710,7 +710,7 @@ export default function MiningDashboard({
                                 href={p.post_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[#00D4AA]/60 hover:text-[#00D4AA] transition-colors font-mono text-[10px]"
+                                className="text-weavrn-accent/60 hover:text-weavrn-accent transition-colors font-mono text-[10px]"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 view post
@@ -726,7 +726,7 @@ export default function MiningDashboard({
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         {p.estimated_wvrn > 0 && (
-                          <span className="text-xs font-mono text-[#00D4AA] font-medium">
+                          <span className="text-xs font-mono text-weavrn-accent font-medium">
                             {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
                           </span>
                         )}
@@ -787,7 +787,7 @@ export default function MiningDashboard({
                                     <td className="text-right py-1.5 px-2">{b.views.toLocaleString()}</td>
                                     <td className="text-right py-1.5 px-2">{b.raw_score}</td>
                                     <td className="text-right py-1.5 px-2">{b.delta}</td>
-                                    <td className="text-right py-1.5 pl-2 text-[#00D4AA]">
+                                    <td className="text-right py-1.5 pl-2 text-weavrn-accent">
                                       {Math.floor(b.earned).toLocaleString()}
                                     </td>
                                   </tr>
@@ -796,7 +796,7 @@ export default function MiningDashboard({
                               <tfoot>
                                 <tr className="border-t border-weavrn-border/30 text-white font-medium">
                                   <td className="py-1.5 pr-3" colSpan={7}>Total</td>
-                                  <td className="text-right py-1.5 pl-2 text-[#00D4AA]">
+                                  <td className="text-right py-1.5 pl-2 text-weavrn-accent">
                                     {Math.floor(p.estimated_wvrn).toLocaleString()}
                                   </td>
                                 </tr>

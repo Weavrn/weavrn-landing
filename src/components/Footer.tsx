@@ -20,11 +20,11 @@ export default function Footer() {
               name="email"
               placeholder="you@example.com"
               required
-              className="flex-1 px-4 py-3 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors placeholder:text-weavrn-muted/50"
+              className="flex-1 px-4 py-3 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50 transition-colors placeholder:text-weavrn-muted/50"
             />
             <button
               type="submit"
-              className="px-6 py-3 bg-weavrn-surface border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-weavrn-surface-light"
+              className="px-6 py-3 bg-weavrn-surface border border-weavrn-border hover:border-weavrn-accent/50 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-weavrn-surface-light"
             >
               Subscribe
             </button>
@@ -44,7 +44,7 @@ export default function Footer() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-weavrn-muted hover:text-[#00D4AA] transition-colors font-mono lowercase"
+                    className="text-sm text-weavrn-muted hover:text-weavrn-accent transition-colors font-mono lowercase"
                   >
                     {name}
                   </a>
@@ -52,27 +52,11 @@ export default function Footer() {
             )}
             <a
               href={`mailto:${CONTACT_EMAIL}`}
-              className="text-sm text-weavrn-muted hover:text-[#00D4AA] transition-colors font-mono lowercase"
+              className="text-sm text-weavrn-muted hover:text-weavrn-accent transition-colors font-mono lowercase"
             >
               contact
             </a>
           </div>
-        </div>
-        <div className="mt-6 pt-6 border-t border-weavrn-border/30 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="flex gap-6">
-            {["Terms", "Privacy", "Disclaimer"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="text-xs text-weavrn-muted/60 hover:text-weavrn-muted transition-colors font-mono"
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-          <p className="text-xs text-weavrn-muted/40 text-center sm:text-right max-w-md">
-            WVRN is a utility token. Nothing on this site constitutes financial advice.
-          </p>
         </div>
       </div>
     </footer>
