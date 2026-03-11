@@ -33,11 +33,13 @@ jobs:
           name: build-output
           path: out/
       - name: Deploy to droplet
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DROPLET_IP }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: out/*
-          target: /opt/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/weavrn-landing/
-          overwrite: true
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.DROPLET_IP }}
+          TARGET: /opt/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/weavrn-landing/out/
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -rlgoDzvc --delete -e "ssh -i ~/.ssh/deploy_key" out/ "root@${HOST}:${TARGET}"
