@@ -10,7 +10,8 @@ export const CONTACT_EMAIL = "contact@weavrn.com";
 export const BUTTONDOWN_EMBED_URL = ""; // TODO: add Buttondown embed URL
 
 export const TOKEN_ALLOCATIONS = [
-  { label: "Agent Rewards", pct: 40, amount: "400M", color: "#00D4AA" },
+  { label: "Usage Incentives", pct: 25, amount: "250M", color: "#8B5CF6" },
+  { label: "Social Mining", pct: 15, amount: "150M", color: "#00D4AA" },
   { label: "Treasury", pct: 18, amount: "180M", color: "#00A3FF" },
   { label: "Liquidity/MM", pct: 17, amount: "170M", color: "#00E5BB" },
   { label: "Development", pct: 10, amount: "100M", color: "#0088CC" },
