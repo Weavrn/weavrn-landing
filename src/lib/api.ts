@@ -224,3 +224,116 @@ export function settleBlock(adminKey: string, blockNumber: number) {
     headers: adminHeaders(adminKey),
   });
 }
+
+// ── Agent Directory & Dashboard ──
+
+export interface AgentListItem {
+  id: number;
+  agent_id: number;
+  wallet_address: string;
+  name: string;
+  metadata_uri: string | null;
+  active: boolean;
+  registered_at: string;
+  payment_count: number;
+  total_volume: number;
+}
+
+export interface AgentDetail {
+  id?: number;
+  agent_id?: number;
+  wallet_address?: string;
+  name?: string;
+  metadata_uri?: string | null;
+  active?: boolean;
+  registered_at?: string;
+  on_chain: {
+    agentId: number;
+    name: string;
+    metadataURI: string;
+    active: boolean;
+  } | null;
+  stats: {
+    volumeETH: string;
+    paymentCount: number;
+  } | null;
+  escrow_stats: {
+    escrowCount: number;
+    releasedCount: number;
+  } | null;
+  escrow_counts: {
+    open: number;
+    released: number;
+    refunded: number;
+  };
+}
+
+export interface EscrowRecord {
+  id: number;
+  escrow_id: number;
+  tx_hash: string;
+  sender: string;
+  recipient: string;
+  token_address: string | null;
+  amount: string;
+  deadline: number;
+  status: "open" | "released" | "refunded";
+  fee: string | null;
+  memo: string | null;
+  block_number: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentRecord {
+  id: number;
+  tx_hash: string;
+  from_address: string;
+  to_address: string;
+  token_address: string | null;
+  amount: string;
+  fee: string;
+  memo: string | null;
+  block_number: number;
+  created_at: string;
+}
+
+export interface IncentiveClaim {
+  id: number;
+  wallet_address: string;
+  claim_type: "first_use" | "rebate";
+  rebate_id: number | null;
+  amount: string;
+  tx_hash: string | null;
+  created_at: string;
+}
+
+export function getAgents(page = 1, limit = 50, sort = "newest", search?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit), sort });
+  if (search) params.set("search", search);
+  return apiFetch<{ agents: AgentListItem[]; total: number; page: number; limit: number }>(
+    `/agents?${params}`,
+  );
+}
+
+export function getAgent(wallet: string) {
+  return apiFetch<AgentDetail>(`/agents/${wallet.toLowerCase()}`);
+}
+
+export function getAgentPayments(wallet: string, page = 1, limit = 50) {
+  return apiFetch<{ payments: PaymentRecord[]; total: number; page: number; limit: number }>(
+    `/agents/${wallet.toLowerCase()}/payments?page=${page}&limit=${limit}`,
+  );
+}
+
+export function getAgentEscrows(wallet: string, page = 1, limit = 50, status?: string, role = "all") {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit), role });
+  if (status) params.set("status", status);
+  return apiFetch<{ escrows: EscrowRecord[]; total: number; page: number; limit: number }>(
+    `/agents/${wallet.toLowerCase()}/escrows?${params}`,
+  );
+}
+
+export function getAgentIncentives(wallet: string) {
+  return apiFetch<IncentiveClaim[]>(`/agents/${wallet.toLowerCase()}/incentives`);
+}

@@ -6,6 +6,8 @@ const NAV_LINKS = [
   { label: "Why Weavrn", href: "#why" },
   { label: "Mining", href: "#mining" },
   { label: "Tokenomics", href: "#tokenomics" },
+  { label: "Agents", href: "/agents" },
+  { label: "Dashboard", href: "/dashboard" },
 ];
 
 export default function Navbar() {
