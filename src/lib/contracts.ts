@@ -298,14 +298,21 @@ const ESCROW_ROUTER_ABI = [
   },
   {
     inputs: [{ name: "escrowId", type: "uint256" }],
-    name: "releaseEscrow",
+    name: "release",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [{ name: "escrowId", type: "uint256" }],
-    name: "refundEscrow",
+    name: "claimStream",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "escrowId", type: "uint256" }],
+    name: "refund",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -447,14 +454,21 @@ export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number
 
 export async function releaseEscrow(signer: JsonRpcSigner, escrowId: number): Promise<string> {
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
-  const tx = await contract.releaseEscrow(escrowId);
+  const tx = await contract.release(escrowId);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function claimStream(signer: JsonRpcSigner, escrowId: number): Promise<string> {
+  const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
+  const tx = await contract.claimStream(escrowId);
   const receipt = await tx.wait();
   return receipt.hash;
 }
 
 export async function refundEscrow(signer: JsonRpcSigner, escrowId: number): Promise<string> {
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
-  const tx = await contract.refundEscrow(escrowId);
+  const tx = await contract.refund(escrowId);
   const receipt = await tx.wait();
   return receipt.hash;
 }

@@ -277,7 +277,8 @@ export interface EscrowRecord {
   token_address: string | null;
   amount: string;
   deadline: number;
-  status: "open" | "released" | "refunded";
+  strategy: string | null;
+  status: "open" | "active" | "completed" | "refunded";
   fee: string | null;
   memo: string | null;
   block_number: number;
@@ -474,7 +475,6 @@ export interface Job {
   description: string | null;
   status: "pending" | "accepted" | "in_progress" | "delivered" | "completed" | "cancelled" | "disputed";
   escrow_id: number | null;
-  escrow_version: number | null;
   deliverable_type: "text" | "url" | "ipfs" | null;
   deliverable_data: unknown;
   created_at: string;
@@ -527,12 +527,11 @@ export async function linkJobEscrow(
   wallet: string,
   jobId: number,
   escrowId: number,
-  escrowVersion: number,
 ) {
   const { signature, timestamp } = await signForWallet(signer, wallet, "link-escrow");
   return apiFetch<Job>(`/jobs/${jobId}/escrow`, {
     method: "PUT",
-    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, escrow_id: escrowId, escrow_version: escrowVersion }),
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, escrow_id: escrowId }),
   });
 }
 

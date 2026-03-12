@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { JsonRpcSigner } from "ethers";
-import { releaseEscrow, refundEscrow, getExplorerTxUrl } from "@/lib/contracts";
+import { releaseEscrow, claimStream, refundEscrow, getExplorerTxUrl } from "@/lib/contracts";
 import type { EscrowRecord } from "@/lib/api";
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
   onAction: () => void;
 }
 
-type StatusTab = "all" | "open" | "released" | "refunded";
+type StatusTab = "all" | "open" | "active" | "completed" | "refunded";
 
 function truncAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -25,7 +25,8 @@ function truncAddr(addr: string) {
 
 const STATUS_COLORS: Record<string, string> = {
   open: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  released: "bg-weavrn-accent/10 text-weavrn-accent border-weavrn-accent/30",
+  active: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  completed: "bg-weavrn-accent/10 text-weavrn-accent border-weavrn-accent/30",
   refunded: "bg-weavrn-muted/10 text-weavrn-muted border-weavrn-border",
 };
 
@@ -60,6 +61,21 @@ export default function EscrowList({
     }
   };
 
+  const handleClaimStream = async (escrowId: number) => {
+    if (!signer) return;
+    setActing(escrowId);
+    setError(null);
+    try {
+      await claimStream(signer, escrowId);
+      onAction();
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || "Claim failed");
+    } finally {
+      setActing(null);
+    }
+  };
+
   const handleRefund = async (escrowId: number) => {
     if (!signer) return;
     setActing(escrowId);
@@ -82,7 +98,7 @@ export default function EscrowList({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Escrows</h2>
         <div className="flex gap-1">
-          {(["all", "open", "released", "refunded"] as StatusTab[]).map((t) => (
+          {(["all", "open", "active", "completed", "refunded"] as StatusTab[]).map((t) => (
             <button
               key={t}
               onClick={() => onStatusChange(t === "all" ? undefined : t)}
@@ -148,16 +164,27 @@ export default function EscrowList({
                       {e.tx_hash.slice(0, 10)}...
                     </a>
                   </div>
-                  {e.status === "open" && isSender && (
+                  {(e.status === "open" || e.status === "active") && (
                     <div className="flex gap-1">
-                      <button
-                        onClick={() => handleRelease(e.escrow_id)}
-                        disabled={acting === e.escrow_id}
-                        className="px-2 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-xs font-semibold disabled:opacity-50"
-                      >
-                        Release
-                      </button>
-                      {pastDeadline && (
+                      {isSender && (
+                        <button
+                          onClick={() => handleRelease(e.escrow_id)}
+                          disabled={acting === e.escrow_id}
+                          className="px-2 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-xs font-semibold disabled:opacity-50"
+                        >
+                          Release
+                        </button>
+                      )}
+                      {!isSender && e.status === "active" && (
+                        <button
+                          onClick={() => handleClaimStream(e.escrow_id)}
+                          disabled={acting === e.escrow_id}
+                          className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                        >
+                          Claim
+                        </button>
+                      )}
+                      {isSender && pastDeadline && (
                         <button
                           onClick={() => handleRefund(e.escrow_id)}
                           disabled={acting === e.escrow_id}
