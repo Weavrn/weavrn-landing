@@ -18,8 +18,7 @@ jobs:
           NEXT_PUBLIC_SOCIAL_MINING_ADDRESS: ${{ vars.SOCIAL_MINING_ADDRESS }}
           NEXT_PUBLIC_WVRN_TOKEN_ADDRESS: ${{ vars.WVRN_TOKEN_ADDRESS }}
           NEXT_PUBLIC_CHAIN_ID: ${{ vars.CHAIN_ID }}
-          NEXT_PUBLIC_UMAMI_URL: ${{ vars.UMAMI_URL }}
-          NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${{ vars.UMAMI_WEBSITE_ID }}
+          NEXT_PUBLIC_GOATCOUNTER_URL: ${{ vars.GOATCOUNTER_URL }}
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
