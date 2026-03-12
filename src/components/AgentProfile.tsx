@@ -145,7 +145,7 @@ export default function AgentProfile({ wallet }: Props) {
             <div className="glow-card rounded-xl p-4">
               <p className="text-xs text-weavrn-muted mb-1">Escrows</p>
               <p className="text-lg font-bold font-mono">
-                {agent.escrow_counts.open + agent.escrow_counts.released + agent.escrow_counts.refunded}
+                {agent.escrow_counts.open + agent.escrow_counts.active + agent.escrow_counts.completed + agent.escrow_counts.refunded}
               </p>
             </div>
           )}

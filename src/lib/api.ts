@@ -263,7 +263,8 @@ export interface AgentDetail {
   } | null;
   escrow_counts: {
     open: number;
-    released: number;
+    active: number;
+    completed: number;
     refunded: number;
   };
 }
