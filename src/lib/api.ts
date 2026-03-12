@@ -337,3 +337,268 @@ export function getAgentEscrows(wallet: string, page = 1, limit = 50, status?: s
 export function getAgentIncentives(wallet: string) {
   return apiFetch<IncentiveClaim[]>(`/agents/${wallet.toLowerCase()}/incentives`);
 }
+
+// ── Agent Profiles ──
+
+export interface AgentProfile {
+  id: number;
+  wallet_address: string;
+  bio: string | null;
+  avatar_url: string | null;
+  tags: string[];
+  specializations: string[];
+  preferred_tokens: string[];
+  min_amount: string | null;
+  website: string | null;
+  github_url: string | null;
+  x_handle: string | null;
+  availability: "available" | "busy" | "offline";
+  updated_at: string;
+}
+
+export function getAgentProfile(wallet: string) {
+  return apiFetch<AgentProfile>(`/agents/${wallet.toLowerCase()}/profile`);
+}
+
+export async function updateAgentProfile(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  fields: Partial<Omit<AgentProfile, "id" | "wallet_address" | "updated_at">>,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "update-profile");
+  return apiFetch<AgentProfile>(`/agents/${wallet.toLowerCase()}/profile`, {
+    method: "PUT",
+    body: JSON.stringify({ ...fields, signature, timestamp }),
+  });
+}
+
+// ── Service Listings ──
+
+export interface ServiceListing {
+  id: number;
+  wallet_address: string;
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];
+  pricing_type: "fixed" | "hourly" | "custom";
+  price_amount: string | null;
+  price_token: string;
+  escrow_strategy: "all_or_nothing" | "milestone" | "trickle";
+  milestone_config: unknown;
+  trickle_duration: number | null;
+  estimated_duration: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  agent_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  avg_rating?: number;
+  review_count?: number;
+}
+
+export function getListings(page = 1, limit = 50, category?: string, tags?: string, search?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (category) params.set("category", category);
+  if (tags) params.set("tags", tags);
+  if (search) params.set("search", search);
+  return apiFetch<{ listings: ServiceListing[]; total: number; page: number; limit: number }>(
+    `/listings?${params}`,
+  );
+}
+
+export function getListing(id: number) {
+  return apiFetch<ServiceListing>(`/listings/${id}`);
+}
+
+export function getAgentListings(wallet: string, page = 1, limit = 50) {
+  return apiFetch<{ listings: ServiceListing[]; total: number; page: number; limit: number }>(
+    `/agents/${wallet.toLowerCase()}/listings?page=${page}&limit=${limit}`,
+  );
+}
+
+export async function createListing(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  data: {
+    title: string;
+    description: string;
+    category: string;
+    tags?: string[];
+    pricing_type: string;
+    price_amount?: string;
+    price_token?: string;
+    escrow_strategy?: string;
+    milestone_config?: unknown;
+    trickle_duration?: number;
+    estimated_duration?: string;
+  },
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "create-listing");
+  return apiFetch<ServiceListing>("/listings", {
+    method: "POST",
+    body: JSON.stringify({ ...data, wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+export async function updateListing(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  id: number,
+  data: Partial<ServiceListing>,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "update-listing");
+  return apiFetch<ServiceListing>(`/listings/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...data, wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+export async function deactivateListing(signer: import("ethers").JsonRpcSigner, wallet: string, id: number) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "delete-listing");
+  return apiFetch(`/listings/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+// ── Jobs ──
+
+export interface Job {
+  id: number;
+  listing_id: number | null;
+  requester_wallet: string;
+  provider_wallet: string;
+  title: string;
+  description: string | null;
+  status: "pending" | "accepted" | "in_progress" | "delivered" | "completed" | "cancelled" | "disputed";
+  escrow_id: number | null;
+  escrow_version: number | null;
+  deliverable_type: "text" | "url" | "ipfs" | null;
+  deliverable_data: unknown;
+  created_at: string;
+  updated_at: string;
+  queue_position?: number;
+}
+
+export function getJob(id: number) {
+  return apiFetch<Job>(`/jobs/${id}`);
+}
+
+export function getAgentJobs(wallet: string, page = 1, limit = 50, status?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (status) params.set("status", status);
+  return apiFetch<{ jobs: Job[]; total: number; page: number; limit: number }>(
+    `/agents/${wallet.toLowerCase()}/jobs?${params}`,
+  );
+}
+
+export function getAgentRequests(wallet: string, page = 1, limit = 50, status?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (status) params.set("status", status);
+  return apiFetch<{ jobs: Job[]; total: number; page: number; limit: number }>(
+    `/agents/${wallet.toLowerCase()}/requests?${params}`,
+  );
+}
+
+export async function createJob(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  data: { listing_id?: number; provider_wallet: string; title: string; description?: string },
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "create-job");
+  return apiFetch<Job>("/jobs", {
+    method: "POST",
+    body: JSON.stringify({ ...data, wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+export async function acceptJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "accept-job");
+  return apiFetch<Job>(`/jobs/${jobId}/accept`, {
+    method: "PUT",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+export async function linkJobEscrow(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+  escrowId: number,
+  escrowVersion: number,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "link-escrow");
+  return apiFetch<Job>(`/jobs/${jobId}/escrow`, {
+    method: "PUT",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, escrow_id: escrowId, escrow_version: escrowVersion }),
+  });
+}
+
+export async function deliverJob(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+  deliverableType: string,
+  deliverableData: unknown,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "deliver-job");
+  return apiFetch<Job>(`/jobs/${jobId}/deliver`, {
+    method: "PUT",
+    body: JSON.stringify({
+      wallet_address: wallet.toLowerCase(), signature, timestamp,
+      deliverable_type: deliverableType, deliverable_data: deliverableData,
+    }),
+  });
+}
+
+export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "complete-job");
+  return apiFetch<Job>(`/jobs/${jobId}/complete`, {
+    method: "PUT",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+export async function cancelJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "cancel-job");
+  return apiFetch<Job>(`/jobs/${jobId}/cancel`, {
+    method: "PUT",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp }),
+  });
+}
+
+// ── Reviews ──
+
+export interface Review {
+  id: number;
+  job_id: number;
+  reviewer_wallet: string;
+  reviewed_wallet: string;
+  rating: number;
+  comment: string | null;
+  role: "requester" | "provider";
+  created_at: string;
+  job_title?: string;
+}
+
+export function getAgentReviews(wallet: string, page = 1, limit = 50) {
+  return apiFetch<{ reviews: Review[]; total: number; page: number; limit: number; avg_rating: number; review_count: number }>(
+    `/agents/${wallet.toLowerCase()}/reviews?page=${page}&limit=${limit}`,
+  );
+}
+
+export async function submitReview(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+  rating: number,
+  comment?: string,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "submit-review");
+  return apiFetch<Review>(`/jobs/${jobId}/review`, {
+    method: "POST",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, rating, comment }),
+  });
+}

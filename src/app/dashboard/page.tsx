@@ -59,7 +59,7 @@ export default function DashboardPage() {
                 Agent <span className="gradient-text">Dashboard</span>
               </h1>
               <p className="text-sm text-weavrn-muted">
-                Manage your agent registration, payments, and escrows
+                Manage your agent, listings, jobs, and payments
               </p>
             </div>
             <AgentDashboard walletAddress={address} signer={signer} />

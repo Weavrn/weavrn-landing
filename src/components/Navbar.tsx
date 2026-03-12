@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { label: "Why Weavrn", href: "#why" },
   { label: "Mining", href: "#mining" },
   { label: "Tokenomics", href: "#tokenomics" },
+  { label: "Marketplace", href: "/marketplace" },
   { label: "Agents", href: "/agents" },
   { label: "Dashboard", href: "/dashboard" },
 ];

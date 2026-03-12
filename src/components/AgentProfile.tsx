@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getAgent, getAgentPayments } from "@/lib/api";
-import type { AgentDetail, PaymentRecord } from "@/lib/api";
+import { getAgent, getAgentPayments, getAgentProfile, getAgentListings } from "@/lib/api";
+import type { AgentDetail, PaymentRecord, AgentProfile as AgentProfileType, ServiceListing } from "@/lib/api";
+import ReviewList from "./ReviewList";
 
 interface Props {
   wallet: string;
@@ -14,7 +15,9 @@ function truncAddr(addr: string) {
 
 export default function AgentProfile({ wallet }: Props) {
   const [agent, setAgent] = useState<AgentDetail | null>(null);
+  const [profile, setProfile] = useState<AgentProfileType | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [listings, setListings] = useState<ServiceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,12 +25,16 @@ export default function AgentProfile({ wallet }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const [agentData, payData] = await Promise.all([
+      const [agentData, payData, profileData, listingData] = await Promise.all([
         getAgent(wallet),
         getAgentPayments(wallet, 1, 10).catch(() => ({ payments: [], total: 0, page: 1, limit: 10 })),
+        getAgentProfile(wallet).catch(() => null),
+        getAgentListings(wallet, 1, 6).catch(() => ({ listings: [], total: 0, page: 1, limit: 6 })),
       ]);
       setAgent(agentData);
       setPayments(payData.payments);
+      setProfile(profileData);
+      setListings(listingData.listings);
     } catch (err: unknown) {
       const e = err as { message?: string };
       setError(e.message || "Agent not found");
@@ -91,6 +98,36 @@ export default function AgentProfile({ wallet }: Props) {
             )}
           </div>
         </div>
+
+        {profile && (
+          <div className="mt-4 pt-4 border-t border-weavrn-border/50">
+            {profile.bio && <p className="text-sm text-weavrn-muted mb-3">{profile.bio}</p>}
+            <div className="flex items-center gap-2 flex-wrap">
+              {profile.availability && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  profile.availability === "available" ? "bg-green-500/10 text-green-400" :
+                  profile.availability === "busy" ? "bg-yellow-500/10 text-yellow-400" :
+                  "bg-weavrn-muted/10 text-weavrn-muted"
+                }`}>
+                  {profile.availability}
+                </span>
+              )}
+              {profile.tags.map((tag) => (
+                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-weavrn-accent/10 text-weavrn-accent">{tag}</span>
+              ))}
+              {profile.specializations.map((s) => (
+                <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">{s}</span>
+              ))}
+            </div>
+            {(profile.website || profile.x_handle || profile.github_url) && (
+              <div className="flex items-center gap-3 mt-2">
+                {profile.website && <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">Website</a>}
+                {profile.github_url && <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">GitHub</a>}
+                {profile.x_handle && <span className="text-xs text-weavrn-muted">{profile.x_handle}</span>}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -144,6 +181,29 @@ export default function AgentProfile({ wallet }: Props) {
           </div>
         </div>
       )}
+
+      {listings.length > 0 && (
+        <div className="glow-card rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4">Services</h3>
+          <div className="space-y-2">
+            {listings.map((l) => (
+              <a
+                key={l.id}
+                href={`/marketplace?id=${l.id}`}
+                className="flex items-center justify-between p-3 rounded-lg bg-weavrn-dark border border-weavrn-border hover:border-weavrn-accent/30 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{l.title}</p>
+                  <p className="text-xs text-weavrn-muted">{l.category} · {l.pricing_type}{l.price_amount ? ` · ${l.price_amount} ${l.price_token}` : ""}</p>
+                </div>
+                <span className="text-xs text-weavrn-muted ml-3 shrink-0">{l.escrow_strategy.replace(/_/g, " ")}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ReviewList wallet={wallet} />
 
       <div className="text-center">
         <a href="/agents" className="text-sm text-weavrn-muted hover:text-weavrn-accent transition-colors">

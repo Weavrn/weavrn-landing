@@ -10,6 +10,9 @@ import AgentStatsGrid from "./AgentStatsGrid";
 import AgentIncentives from "./AgentIncentives";
 import PaymentHistory from "./PaymentHistory";
 import EscrowList from "./EscrowList";
+import ProfileEditor from "./ProfileEditor";
+import JobQueue from "./JobQueue";
+import MyListings from "./MyListings";
 
 interface Props {
   walletAddress: string;
@@ -161,6 +164,22 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
             onPageChange={(p) => fetchEscrows(p, escrowStatus)}
             onStatusChange={(s) => fetchEscrows(1, s)}
             onAction={fetchData}
+          />
+
+          <MyListings
+            walletAddress={walletAddress}
+            signer={signer}
+          />
+
+          <JobQueue
+            walletAddress={walletAddress}
+            signer={signer}
+            onAction={fetchData}
+          />
+
+          <ProfileEditor
+            walletAddress={walletAddress}
+            signer={signer}
           />
         </>
       )}
