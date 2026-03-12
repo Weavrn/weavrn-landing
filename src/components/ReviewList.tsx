@@ -34,7 +34,7 @@ export default function ReviewList({ wallet }: Props) {
       const res = await getAgentReviews(wallet, p, 20);
       setReviews(res.reviews);
       setTotal(res.total);
-      setAvgRating(res.avg_rating);
+      setAvgRating(Number(res.avg_rating));
       setReviewCount(res.review_count);
       setPage(p);
     } catch {

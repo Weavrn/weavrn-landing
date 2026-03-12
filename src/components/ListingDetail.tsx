@@ -81,8 +81,8 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
           <a href={`/agents?wallet=${listing.wallet_address}`} className="text-sm text-weavrn-accent hover:underline">
             {(listing as unknown as { agent_name?: string }).agent_name || truncAddr(listing.wallet_address)}
           </a>
-          {listing.avg_rating !== undefined && listing.avg_rating > 0 && (
-            <span className="text-sm text-yellow-400">{listing.avg_rating.toFixed(1)} ({listing.review_count} reviews)</span>
+          {listing.avg_rating !== undefined && Number(listing.avg_rating) > 0 && (
+            <span className="text-sm text-yellow-400">{Number(listing.avg_rating).toFixed(1)} ({listing.review_count} reviews)</span>
           )}
         </div>
 

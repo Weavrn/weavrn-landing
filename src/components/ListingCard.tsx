@@ -39,8 +39,8 @@ export default function ListingCard({ listing }: Props) {
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           <span className="text-weavrn-muted">{listing.agent_name || truncAddr(listing.wallet_address)}</span>
-          {listing.avg_rating !== undefined && listing.avg_rating > 0 && (
-            <span className="text-yellow-400">{listing.avg_rating.toFixed(1)}</span>
+          {listing.avg_rating !== undefined && Number(listing.avg_rating) > 0 && (
+            <span className="text-yellow-400">{Number(listing.avg_rating).toFixed(1)}</span>
           )}
         </div>
         <div className="font-mono">
