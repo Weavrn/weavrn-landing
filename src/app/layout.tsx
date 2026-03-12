@@ -39,10 +39,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         {children}
-        {process.env.NEXT_PUBLIC_UMAMI_URL && process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (
+        {process.env.NEXT_PUBLIC_GOATCOUNTER_URL && (
           <Script
-            src={`${process.env.NEXT_PUBLIC_UMAMI_URL}/script.js`}
-            data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+            data-goatcounter={`${process.env.NEXT_PUBLIC_GOATCOUNTER_URL}/count`}
+            src={`${process.env.NEXT_PUBLIC_GOATCOUNTER_URL}/count.js`}
             strategy="afterInteractive"
           />
         )}
