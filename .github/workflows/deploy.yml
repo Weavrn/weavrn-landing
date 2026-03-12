@@ -19,6 +19,10 @@ jobs:
           NEXT_PUBLIC_WVRN_TOKEN_ADDRESS: ${{ vars.WVRN_TOKEN_ADDRESS }}
           NEXT_PUBLIC_CHAIN_ID: ${{ vars.CHAIN_ID }}
           NEXT_PUBLIC_GOATCOUNTER_URL: ${{ vars.GOATCOUNTER_URL }}
+          NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS: ${{ vars.AGENT_REGISTRY_ADDRESS }}
+          NEXT_PUBLIC_PAYMENT_ROUTER_ADDRESS: ${{ vars.PAYMENT_ROUTER_ADDRESS }}
+          NEXT_PUBLIC_ESCROW_ROUTER_ADDRESS: ${{ vars.ESCROW_ROUTER_ADDRESS }}
+          NEXT_PUBLIC_USAGE_INCENTIVES_ADDRESS: ${{ vars.USAGE_INCENTIVES_ADDRESS }}
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
