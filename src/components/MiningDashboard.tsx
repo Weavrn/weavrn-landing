@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { JsonRpcSigner } from "ethers";
+
+const fmtWvrn = (n: number) => Number(n.toFixed(2)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 import {
   getRewards,
   getProfile,
@@ -528,7 +530,7 @@ export default function MiningDashboard({
             >
               {claimingAll
                 ? "Claiming..."
-                : `Claim All (${Math.floor(unclaimedAmount).toLocaleString()} WVRN)`}
+                : `Claim All (${fmtWvrn(unclaimedAmount)} WVRN)`}
             </button>
           )}
         </div>
@@ -561,8 +563,7 @@ export default function MiningDashboard({
                   <div className="flex items-center gap-3 flex-shrink-0">
                     {sub?.reward_amount != null && (
                       <span className="text-weavrn-muted font-mono text-xs">
-                        {Math.floor(parseFloat(sub.reward_amount)).toLocaleString()}{" "}
-                        WVRN
+                        {fmtWvrn(parseFloat(sub.reward_amount))} WVRN
                       </span>
                     )}
                     {sub?.tx_hash && (
@@ -727,7 +728,7 @@ export default function MiningDashboard({
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         {p.estimated_wvrn > 0 && (
                           <span className="text-xs font-mono text-weavrn-accent font-medium">
-                            {Math.floor(p.estimated_wvrn).toLocaleString()} WVRN
+                            {fmtWvrn(p.estimated_wvrn)} WVRN
                           </span>
                         )}
                         <span className="text-[10px] text-weavrn-muted font-mono">
@@ -788,7 +789,7 @@ export default function MiningDashboard({
                                     <td className="text-right py-1.5 px-2">{b.raw_score}</td>
                                     <td className="text-right py-1.5 px-2">{b.delta}</td>
                                     <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                      {Math.floor(b.earned).toLocaleString()}
+                                      {fmtWvrn(b.earned)}
                                     </td>
                                   </tr>
                                 ))}
@@ -797,7 +798,7 @@ export default function MiningDashboard({
                                 <tr className="border-t border-weavrn-border/30 text-white font-medium">
                                   <td className="py-1.5 pr-3" colSpan={7}>Total</td>
                                   <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                    {Math.floor(p.estimated_wvrn).toLocaleString()}
+                                    {fmtWvrn(p.estimated_wvrn)}
                                   </td>
                                 </tr>
                               </tfoot>
