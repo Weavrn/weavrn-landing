@@ -8,12 +8,15 @@ import {
   deactivatePost,
   activatePost,
   settleBlock,
+  getAdminDisputes,
+  resolveDispute,
   type BlockStats,
   type BlockDetail,
   type TrackedPost,
+  type Dispute,
 } from "@/lib/api";
 
-type Tab = "blocks" | "posts";
+type Tab = "blocks" | "posts" | "disputes";
 
 export default function AdminPage() {
   const [adminKey, setAdminKey] = useState("");
@@ -25,6 +28,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settlingBlock, setSettlingBlock] = useState<number | null>(null);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [resolveNotes, setResolveNotes] = useState("");
 
   const fetchBlocks = useCallback(async (key: string) => {
     setLoading(true);
@@ -52,6 +58,31 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchDisputes = useCallback(async (key: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAdminDisputes(key);
+      setDisputes(data);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleResolve = async (disputeId: number, resolution: "completed" | "cancelled") => {
+    setError(null);
+    try {
+      await resolveDispute(adminKey, disputeId, resolution, resolveNotes || undefined);
+      setResolvingId(null);
+      setResolveNotes("");
+      fetchDisputes(adminKey);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    }
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminKey.trim()) return;
@@ -63,7 +94,8 @@ export default function AdminPage() {
     setTab(t);
     setSelectedBlock(null);
     if (t === "blocks") fetchBlocks(adminKey);
-    else fetchPosts(adminKey);
+    else if (t === "posts") fetchPosts(adminKey);
+    else fetchDisputes(adminKey);
   };
 
   const handleViewBlock = async (blockNumber: number) => {
@@ -157,6 +189,14 @@ export default function AdminPage() {
               }`}
             >
               Posts
+            </button>
+            <button
+              onClick={() => handleTabChange("disputes")}
+              className={`text-xs font-mono transition-colors ${
+                tab === "disputes" ? "text-weavrn-accent" : "text-weavrn-muted hover:text-white"
+              }`}
+            >
+              Disputes
             </button>
             <span className="text-xs text-weavrn-muted font-mono">Admin</span>
           </div>
@@ -270,7 +310,7 @@ export default function AdminPage() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === "posts" ? (
           /* Posts tab */
           <>
             <h2 className="text-lg font-bold text-white mb-4">Tracked Posts</h2>
@@ -314,6 +354,84 @@ export default function AdminPage() {
                     >
                       {p.deactivated ? "Activate" : "Deactivate"}
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Disputes tab */
+          <>
+            <h2 className="text-lg font-bold text-white mb-4">Open Disputes</h2>
+            {disputes.length === 0 ? (
+              <div className="text-center py-16 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+                No open disputes
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {disputes.map((d) => (
+                  <div key={d.id} className="p-4 rounded-xl border border-red-500/20 bg-red-500/5">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {d.job_title || `Job #${d.job_id}`}
+                        </p>
+                        <p className="text-xs text-weavrn-muted font-mono mt-0.5">
+                          Reporter: {d.reporter_wallet?.slice(0, 6)}...{d.reporter_wallet?.slice(-4)}
+                          {" · "}
+                          {new Date(d.created_at).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-weavrn-muted font-mono">
+                          Requester: {d.requester_wallet?.slice(0, 6)}...{d.requester_wallet?.slice(-4)}
+                          {" · "}
+                          Provider: {d.provider_wallet?.slice(0, 6)}...{d.provider_wallet?.slice(-4)}
+                        </p>
+                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30">
+                        {d.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white/80 mb-3 bg-weavrn-dark/50 p-2 rounded">
+                      {d.reason}
+                    </p>
+                    {resolvingId === d.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={resolveNotes}
+                          onChange={(e) => setResolveNotes(e.target.value)}
+                          placeholder="Admin notes (optional)"
+                          rows={2}
+                          className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-2 text-xs text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleResolve(d.id, "completed")}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                          >
+                            Mark Completed
+                          </button>
+                          <button
+                            onClick={() => handleResolve(d.id, "cancelled")}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                          >
+                            Cancel Job
+                          </button>
+                          <button
+                            onClick={() => { setResolvingId(null); setResolveNotes(""); }}
+                            className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setResolvingId(d.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20"
+                      >
+                        Resolve
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

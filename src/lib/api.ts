@@ -589,6 +589,49 @@ export function getAgentReviews(wallet: string, page = 1, limit = 50) {
   );
 }
 
+export async function disputeJob(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+  reason: string,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "dispute-job");
+  return apiFetch(`/jobs/${jobId}/dispute`, {
+    method: "PUT",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, reason }),
+  });
+}
+
+// Admin disputes
+export interface Dispute {
+  id: number;
+  job_id: number;
+  reporter_wallet: string;
+  reason: string;
+  status: "open" | "resolved" | "dismissed";
+  admin_notes: string | null;
+  resolution: "completed" | "cancelled" | null;
+  created_at: string;
+  resolved_at: string | null;
+  job_title?: string;
+  requester_wallet?: string;
+  provider_wallet?: string;
+}
+
+export function getAdminDisputes(adminKey: string, status = "open") {
+  return apiFetch<Dispute[]>(`/admin/disputes?status=${status}`, {
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export function resolveDispute(adminKey: string, disputeId: number, resolution: "completed" | "cancelled", adminNotes?: string) {
+  return apiFetch<Dispute>(`/admin/disputes/${disputeId}/resolve`, {
+    method: "PUT",
+    headers: { ...adminHeaders(adminKey), "Content-Type": "application/json" },
+    body: JSON.stringify({ resolution, admin_notes: adminNotes }),
+  });
+}
+
 export async function submitReview(
   signer: import("ethers").JsonRpcSigner,
   wallet: string,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
-import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob } from "@/lib/api";
+import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob } from "@/lib/api";
 import type { Job } from "@/lib/api";
 import ReviewForm from "./ReviewForm";
 
@@ -35,6 +35,8 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [acting, setActing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reviewingJobId, setReviewingJobId] = useState<number | null>(null);
+  const [disputingJobId, setDisputingJobId] = useState<number | null>(null);
+  const [disputeReason, setDisputeReason] = useState("");
 
   const fetchJobs = useCallback(async (p: number) => {
     setLoading(true);
@@ -68,6 +70,23 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       onAction?.();
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Action failed");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleDispute = async (jobId: number) => {
+    if (!signer || !disputeReason.trim()) return;
+    setActing(`dispute-${jobId}`);
+    setError(null);
+    try {
+      await disputeJob(signer, walletAddress, jobId, disputeReason.trim());
+      setDisputingJobId(null);
+      setDisputeReason("");
+      fetchJobs(page);
+      onAction?.();
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Dispute failed");
     } finally {
       setActing(null);
     }
@@ -148,6 +167,18 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                     {acting === `cancel-${j.id}` ? "..." : "Cancel"}
                   </button>
                 )}
+                {["in_progress", "delivered"].includes(j.status) && (
+                  <button
+                    onClick={() => {
+                      setDisputingJobId(disputingJobId === j.id ? null : j.id);
+                      setDisputeReason("");
+                    }}
+                    disabled={acting === `dispute-${j.id}`}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    {acting === `dispute-${j.id}` ? "..." : "Dispute"}
+                  </button>
+                )}
                 {j.status === "completed" && (
                   <button
                     onClick={() => setReviewingJobId(reviewingJobId === j.id ? null : j.id)}
@@ -168,6 +199,33 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   fetchJobs(page);
                 }}
               />
+            )}
+            {disputingJobId === j.id && (
+              <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                <p className="text-xs text-red-400 mb-2">Describe the issue:</p>
+                <textarea
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  placeholder="What went wrong?"
+                  rows={2}
+                  className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-2 text-xs text-white placeholder:text-weavrn-muted focus:border-red-500/50 focus:outline-none resize-none"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => handleDispute(j.id)}
+                    disabled={!disputeReason.trim() || acting === `dispute-${j.id}`}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+                  >
+                    Submit Dispute
+                  </button>
+                  <button
+                    onClick={() => { setDisputingJobId(null); setDisputeReason(""); }}
+                    className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
           </React.Fragment>))}
         </div>

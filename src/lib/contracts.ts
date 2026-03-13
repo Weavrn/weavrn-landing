@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcSigner } from "ethers";
+import { BrowserProvider, Contract, JsonRpcSigner, JsonRpcProvider } from "ethers";
 
 declare global {
   interface Window {
@@ -318,6 +318,126 @@ const ESCROW_ROUTER_ABI = [
     type: "function",
   },
 ];
+
+// ── Strategy ABIs ──
+
+const MILESTONE_STRATEGY_ABI = [
+  {
+    inputs: [{ name: "escrowId", type: "uint256" }],
+    name: "getMilestones",
+    outputs: [{ name: "", type: "uint16[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "escrowId", type: "uint256" }],
+    name: "getCurrentMilestone",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+];
+
+const TRICKLE_STRATEGY_ABI = [
+  {
+    inputs: [
+      { name: "escrowId", type: "uint256" },
+      { name: "totalAmount", type: "uint256" },
+      { name: "alreadyReleased", type: "uint256" },
+    ],
+    name: "getClaimable",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "escrowId", type: "uint256" }],
+    name: "getConfig",
+    outputs: [
+      { name: "startTime", type: "uint256" },
+      { name: "duration", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+];
+
+const ESCROW_ROUTER_GETESCROW_ABI = [
+  {
+    inputs: [{ name: "escrowId", type: "uint256" }],
+    name: "getEscrow",
+    outputs: [
+      { name: "sender", type: "address" },
+      { name: "recipient", type: "address" },
+      { name: "token", type: "address" },
+      { name: "strategy", type: "address" },
+      { name: "totalAmount", type: "uint256" },
+      { name: "released", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+      { name: "status", type: "uint8" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+];
+
+// Known strategy addresses (Base Sepolia)
+const STRATEGY_ADDRESSES: Record<string, string> = {
+  "0xe0a77e8dd41945991a2f1454517b86e30b04be56": "all_or_nothing",
+  "0x8f744571abd15d53cbb373fb973fd060775d62e9": "milestone",
+  "0x31c8fdd969e70a2a4afe1f15d187a702b9d0465e": "trickle",
+};
+
+export function getStrategyType(strategyAddress: string | null): "all_or_nothing" | "milestone" | "trickle" | "unknown" {
+  if (!strategyAddress) return "unknown";
+  return (STRATEGY_ADDRESSES[strategyAddress.toLowerCase()] || "unknown") as "all_or_nothing" | "milestone" | "trickle" | "unknown";
+}
+
+function getReadProvider() {
+  const config = getChainConfig();
+  return new JsonRpcProvider(config.rpc);
+}
+
+export interface MilestoneInfo {
+  milestones: number[];
+  currentMilestone: number;
+}
+
+export async function getMilestoneInfo(escrowId: number, strategyAddress: string): Promise<MilestoneInfo> {
+  const provider = getReadProvider();
+  const contract = new Contract(strategyAddress, MILESTONE_STRATEGY_ABI, provider);
+  const [milestones, currentMilestone] = await Promise.all([
+    contract.getMilestones(escrowId),
+    contract.getCurrentMilestone(escrowId),
+  ]);
+  return {
+    milestones: milestones.map((m: bigint) => Number(m)),
+    currentMilestone: Number(currentMilestone),
+  };
+}
+
+export interface TrickleInfo {
+  startTime: number;
+  duration: number;
+  claimable: string;
+}
+
+export async function getTrickleInfo(escrowId: number, strategyAddress: string): Promise<TrickleInfo> {
+  const { formatEther } = await import("ethers");
+  const provider = getReadProvider();
+  const strategy = new Contract(strategyAddress, TRICKLE_STRATEGY_ABI, provider);
+  const escrowContract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_GETESCROW_ABI, provider);
+  const [, , , , totalAmount, released] = await escrowContract.getEscrow(escrowId);
+  const [config, claimable] = await Promise.all([
+    strategy.getConfig(escrowId),
+    strategy.getClaimable(escrowId, totalAmount, released),
+  ]);
+  return {
+    startTime: Number(config.startTime),
+    duration: Number(config.duration),
+    claimable: formatEther(claimable),
+  };
+}
 
 // ── Usage Incentives ──
 

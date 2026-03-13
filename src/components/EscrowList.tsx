@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
-import { releaseEscrow, claimStream, refundEscrow, getExplorerTxUrl } from "@/lib/contracts";
+import {
+  releaseEscrow, claimStream, refundEscrow, getExplorerTxUrl,
+  getStrategyType, getMilestoneInfo, getTrickleInfo,
+  type MilestoneInfo, type TrickleInfo,
+} from "@/lib/contracts";
 import type { EscrowRecord } from "@/lib/api";
 
 interface Props {
@@ -30,6 +34,13 @@ const STATUS_COLORS: Record<string, string> = {
   refunded: "bg-weavrn-muted/10 text-weavrn-muted border-weavrn-border",
 };
 
+const STRATEGY_LABELS: Record<string, string> = {
+  all_or_nothing: "All or Nothing",
+  milestone: "Milestone",
+  trickle: "Trickle",
+  unknown: "Standard",
+};
+
 export default function EscrowList({
   escrows,
   total,
@@ -43,8 +54,32 @@ export default function EscrowList({
 }: Props) {
   const [acting, setActing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [milestoneCache, setMilestoneCache] = useState<Record<number, MilestoneInfo>>({});
+  const [trickleCache, setTrickleCache] = useState<Record<number, TrickleInfo>>({});
   const wallet = walletAddress.toLowerCase();
   const totalPages = Math.ceil(total / 50);
+
+  const loadStrategyInfo = useCallback(async () => {
+    for (const e of escrows) {
+      const strategyType = getStrategyType(e.strategy);
+      if (strategyType === "milestone" && !milestoneCache[e.escrow_id] && e.strategy) {
+        try {
+          const info = await getMilestoneInfo(e.escrow_id, e.strategy);
+          setMilestoneCache((prev) => ({ ...prev, [e.escrow_id]: info }));
+        } catch { /* skip */ }
+      }
+      if (strategyType === "trickle" && !trickleCache[e.escrow_id] && e.strategy) {
+        try {
+          const info = await getTrickleInfo(e.escrow_id, e.strategy);
+          setTrickleCache((prev) => ({ ...prev, [e.escrow_id]: info }));
+        } catch { /* skip */ }
+      }
+    }
+  }, [escrows, milestoneCache, trickleCache]);
+
+  useEffect(() => {
+    loadStrategyInfo();
+  }, [escrows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRelease = async (escrowId: number) => {
     if (!signer) return;
@@ -52,6 +87,12 @@ export default function EscrowList({
     setError(null);
     try {
       await releaseEscrow(signer, escrowId);
+      // Refresh milestone info after release
+      setMilestoneCache((prev) => {
+        const next = { ...prev };
+        delete next[escrowId];
+        return next;
+      });
       onAction();
     } catch (err: unknown) {
       const e = err as { message?: string };
@@ -67,6 +108,11 @@ export default function EscrowList({
     setError(null);
     try {
       await claimStream(signer, escrowId);
+      setTrickleCache((prev) => {
+        const next = { ...prev };
+        delete next[escrowId];
+        return next;
+      });
       onAction();
     } catch (err: unknown) {
       const e = err as { message?: string };
@@ -130,72 +176,127 @@ export default function EscrowList({
             const now = Date.now() / 1000;
             const pastDeadline = now > e.deadline;
             const deadlineDate = new Date(e.deadline * 1000);
+            const strategyType = getStrategyType(e.strategy);
+            const msInfo = milestoneCache[e.escrow_id];
+            const trInfo = trickleCache[e.escrow_id];
 
             return (
               <div
                 key={e.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-weavrn-dark border border-weavrn-border"
+                className="p-3 rounded-lg bg-weavrn-dark border border-weavrn-border"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`text-xs px-1.5 py-0.5 rounded border ${STATUS_COLORS[e.status]}`}>
-                    {e.status}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-mono">
-                      {isSender ? `To ${truncAddr(e.recipient)}` : `From ${truncAddr(e.sender)}`}
-                    </p>
-                    <p className="text-xs text-weavrn-muted">
-                      Deadline: {deadlineDate.toLocaleDateString()} {deadlineDate.toLocaleTimeString()}
-                      {e.memo && ` — ${e.memo}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="text-right">
-                    <p className="text-sm font-mono">
-                      {parseFloat(e.amount).toFixed(4)} {e.token_address ? "ERC20" : "ETH"}
-                    </p>
-                    <a
-                      href={getExplorerTxUrl(e.tx_hash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-weavrn-muted hover:text-weavrn-accent"
-                    >
-                      {e.tx_hash.slice(0, 10)}...
-                    </a>
-                  </div>
-                  {(e.status === "open" || e.status === "active") && (
-                    <div className="flex gap-1">
-                      {isSender && (
-                        <button
-                          onClick={() => handleRelease(e.escrow_id)}
-                          disabled={acting === e.escrow_id}
-                          className="px-2 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-xs font-semibold disabled:opacity-50"
-                        >
-                          Release
-                        </button>
-                      )}
-                      {!isSender && e.status === "active" && (
-                        <button
-                          onClick={() => handleClaimStream(e.escrow_id)}
-                          disabled={acting === e.escrow_id}
-                          className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-semibold disabled:opacity-50"
-                        >
-                          Claim
-                        </button>
-                      )}
-                      {isSender && pastDeadline && (
-                        <button
-                          onClick={() => handleRefund(e.escrow_id)}
-                          disabled={acting === e.escrow_id}
-                          className="px-2 py-1 border border-weavrn-border rounded text-xs text-weavrn-muted hover:text-white disabled:opacity-50"
-                        >
-                          Refund
-                        </button>
-                      )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`text-xs px-1.5 py-0.5 rounded border ${STATUS_COLORS[e.status]}`}>
+                      {e.status}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-mono">
+                        {isSender ? `To ${truncAddr(e.recipient)}` : `From ${truncAddr(e.sender)}`}
+                      </p>
+                      <p className="text-xs text-weavrn-muted">
+                        {STRATEGY_LABELS[strategyType]} · Deadline: {deadlineDate.toLocaleDateString()} {deadlineDate.toLocaleTimeString()}
+                        {e.memo && ` — ${e.memo}`}
+                      </p>
                     </div>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-mono">
+                        {parseFloat(e.amount).toFixed(4)} {e.token_address ? "ERC20" : "ETH"}
+                      </p>
+                      <a
+                        href={getExplorerTxUrl(e.tx_hash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-weavrn-muted hover:text-weavrn-accent"
+                      >
+                        {e.tx_hash.slice(0, 10)}...
+                      </a>
+                    </div>
+                    {(e.status === "open" || e.status === "active") && (
+                      <div className="flex gap-1">
+                        {isSender && strategyType === "milestone" && msInfo && (
+                          <button
+                            onClick={() => handleRelease(e.escrow_id)}
+                            disabled={acting === e.escrow_id || msInfo.currentMilestone >= msInfo.milestones.length}
+                            className="px-2 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-xs font-semibold disabled:opacity-50"
+                          >
+                            Release M{msInfo.currentMilestone + 1}
+                          </button>
+                        )}
+                        {isSender && strategyType !== "milestone" && strategyType !== "trickle" && (
+                          <button
+                            onClick={() => handleRelease(e.escrow_id)}
+                            disabled={acting === e.escrow_id}
+                            className="px-2 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-xs font-semibold disabled:opacity-50"
+                          >
+                            Release
+                          </button>
+                        )}
+                        {!isSender && strategyType === "trickle" && e.status === "active" && (
+                          <button
+                            onClick={() => handleClaimStream(e.escrow_id)}
+                            disabled={acting === e.escrow_id}
+                            className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                          >
+                            Claim{trInfo ? ` ${parseFloat(trInfo.claimable).toFixed(4)}` : ""}
+                          </button>
+                        )}
+                        {!isSender && strategyType !== "trickle" && e.status === "active" && (
+                          <button
+                            onClick={() => handleClaimStream(e.escrow_id)}
+                            disabled={acting === e.escrow_id}
+                            className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                          >
+                            Claim
+                          </button>
+                        )}
+                        {isSender && pastDeadline && (
+                          <button
+                            onClick={() => handleRefund(e.escrow_id)}
+                            disabled={acting === e.escrow_id}
+                            className="px-2 py-1 border border-weavrn-border rounded text-xs text-weavrn-muted hover:text-white disabled:opacity-50"
+                          >
+                            Refund
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Milestone progress */}
+                {strategyType === "milestone" && msInfo && (
+                  <div className="mt-2 pt-2 border-t border-weavrn-border">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-weavrn-muted">
+                        Milestone {Math.min(msInfo.currentMilestone, msInfo.milestones.length)}/{msInfo.milestones.length}
+                      </span>
+                      <span className="text-xs text-weavrn-muted">
+                        {msInfo.milestones.slice(0, msInfo.currentMilestone).reduce((a, b) => a + b, 0) / 100}% released
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-weavrn-border rounded-full overflow-hidden flex">
+                      {msInfo.milestones.map((bp, i) => (
+                        <div
+                          key={i}
+                          className={`h-full ${i < msInfo.currentMilestone ? "bg-weavrn-accent" : "bg-weavrn-border"} ${i > 0 ? "border-l border-weavrn-dark" : ""}`}
+                          style={{ width: `${bp / 100}%` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Trickle progress */}
+                {strategyType === "trickle" && trInfo && (e.status === "open" || e.status === "active") && (
+                  <TrickleProgress
+                    startTime={trInfo.startTime}
+                    duration={trInfo.duration}
+                    amount={parseFloat(e.amount)}
+                  />
+                )}
               </div>
             );
           })}
@@ -223,6 +324,41 @@ export default function EscrowList({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function TrickleProgress({ startTime, duration, amount }: { startTime: number; duration: number; amount: number }) {
+  const [now, setNow] = useState(Date.now() / 1000);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now() / 1000), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const elapsed = Math.max(0, now - startTime);
+  const progress = Math.min(elapsed / duration, 1);
+  const vested = amount * progress;
+  const remaining = Math.max(0, startTime + duration - now);
+  const hours = Math.floor(remaining / 3600);
+  const mins = Math.floor((remaining % 3600) / 60);
+
+  return (
+    <div className="mt-2 pt-2 border-t border-weavrn-border">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-weavrn-muted">
+          Streaming: {vested.toFixed(4)} / {amount.toFixed(4)} vested
+        </span>
+        <span className="text-xs text-weavrn-muted">
+          {remaining > 0 ? `${hours}h ${mins}m remaining` : "Fully vested"}
+        </span>
+      </div>
+      <div className="h-1.5 bg-weavrn-border rounded-full overflow-hidden">
+        <div
+          className="h-full bg-blue-500 transition-all duration-1000"
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
     </div>
   );
 }
