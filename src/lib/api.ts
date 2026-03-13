@@ -236,7 +236,7 @@ export interface AgentListItem {
   active: boolean;
   registered_at: string;
   payment_count: number;
-  total_volume: number;
+  unique_recipients: number;
 }
 
 export interface AgentDetail {

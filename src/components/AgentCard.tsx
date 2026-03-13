@@ -34,7 +34,7 @@ export default function AgentCard({ agent }: Props) {
       </div>
       <div className="flex gap-4 text-xs text-weavrn-muted">
         <span>{agent.payment_count} payments</span>
-        <span>{agent.total_volume} recipients</span>
+        <span>{agent.unique_recipients} recipients</span>
       </div>
     </a>
   );
