@@ -1,6 +1,7 @@
 "use client";
 
 import type { DeliverableData, DeliverableProof } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
 
 interface Props {
   type: string;
@@ -108,9 +109,29 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
         <div className="border-t border-weavrn-border/50 pt-3">
           {type === "code" ? (
             <>
-              {/* For code deliverables, show the report but emphasize the archive download */}
-              <div className="text-xs text-weavrn-muted whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto mb-3">
-                {data.content}
+              {/* For code deliverables, show the report with markdown rendering */}
+              <div className="text-xs text-weavrn-muted leading-relaxed max-h-64 overflow-y-auto mb-3 deliverable-markdown">
+                <ReactMarkdown
+                  components={{
+                    code({ className, children, ...props }) {
+                      const isBlock = className?.includes("language-");
+                      if (isBlock) {
+                        return <pre className="bg-black/40 rounded p-2 my-1 overflow-x-auto"><code className="text-[10px] font-mono text-green-300" {...props}>{children}</code></pre>;
+                      }
+                      return <code className="bg-black/30 px-1 rounded text-[10px] font-mono text-weavrn-accent" {...props}>{children}</code>;
+                    },
+                    p({ children }) { return <p className="mb-1.5">{children}</p>; },
+                    ul({ children }) { return <ul className="list-disc pl-4 mb-1.5 space-y-0.5">{children}</ul>; },
+                    ol({ children }) { return <ol className="list-decimal pl-4 mb-1.5 space-y-0.5">{children}</ol>; },
+                    h1({ children }) { return <p className="font-bold text-white mb-1 text-sm">{children}</p>; },
+                    h2({ children }) { return <p className="font-bold text-white mb-1">{children}</p>; },
+                    h3({ children }) { return <p className="font-semibold text-white mb-1">{children}</p>; },
+                    strong({ children }) { return <strong className="text-white font-semibold">{children}</strong>; },
+                    hr() { return <hr className="border-weavrn-border/30 my-2" />; },
+                  }}
+                >
+                  {data.content || ""}
+                </ReactMarkdown>
               </div>
               {(data as DeliverableData & { has_archive?: boolean }).has_archive && jobId && signer && walletAddress ? (
                 <button
@@ -157,8 +178,28 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
             </>
           ) : (
             <>
-              <div className="text-xs text-weavrn-muted whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
-                {data.content}
+              <div className="text-xs text-weavrn-muted leading-relaxed max-h-96 overflow-y-auto deliverable-markdown">
+                <ReactMarkdown
+                  components={{
+                    code({ className, children, ...props }) {
+                      const isBlock = className?.includes("language-");
+                      if (isBlock) {
+                        return <pre className="bg-black/40 rounded p-2 my-1 overflow-x-auto"><code className="text-[10px] font-mono text-green-300" {...props}>{children}</code></pre>;
+                      }
+                      return <code className="bg-black/30 px-1 rounded text-[10px] font-mono text-weavrn-accent" {...props}>{children}</code>;
+                    },
+                    p({ children }) { return <p className="mb-1.5">{children}</p>; },
+                    ul({ children }) { return <ul className="list-disc pl-4 mb-1.5 space-y-0.5">{children}</ul>; },
+                    ol({ children }) { return <ol className="list-decimal pl-4 mb-1.5 space-y-0.5">{children}</ol>; },
+                    h1({ children }) { return <p className="font-bold text-white mb-1 text-sm">{children}</p>; },
+                    h2({ children }) { return <p className="font-bold text-white mb-1">{children}</p>; },
+                    h3({ children }) { return <p className="font-semibold text-white mb-1">{children}</p>; },
+                    strong({ children }) { return <strong className="text-white font-semibold">{children}</strong>; },
+                    hr() { return <hr className="border-weavrn-border/30 my-2" />; },
+                  }}
+                >
+                  {data.content || ""}
+                </ReactMarkdown>
               </div>
               <button
                 onClick={() => {
