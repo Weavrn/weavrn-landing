@@ -266,7 +266,15 @@ export interface AgentDetail {
     active: number;
     completed: number;
     refunded: number;
+    total_volume?: string;
+    released_volume?: string;
   };
+  job_counts?: {
+    total: number;
+    completed: number;
+  };
+  avg_rating?: number;
+  review_count?: number;
 }
 
 export interface EscrowRecord {

@@ -2,13 +2,12 @@
 
 interface Props {
   stats: {
-    volumeETH: string;
-    paymentCount: number;
-    receivedETH: string;
-    receivedCount: number;
-    uniqueRecipients: number;
-    escrowCount: number;
-    releasedCount: number;
+    escrowVolume: string;
+    releasedVolume: string;
+    totalEscrows: number;
+    activeEscrows: number;
+    jobsCompleted: number;
+    avgRating: number;
   };
 }
 
@@ -28,16 +27,14 @@ export default function AgentStatsGrid({ stats }: Props) {
     return num.toFixed(6);
   };
 
-  const active = Math.max(0, stats.escrowCount - stats.releasedCount);
-
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      <StatCard label="ETH Sent" value={`${formatETH(stats.volumeETH)} ETH`} />
-      <StatCard label="ETH Received" value={`${formatETH(stats.receivedETH)} ETH`} />
-      <StatCard label="Payments Made" value={stats.paymentCount} />
-      <StatCard label="Payments Received" value={stats.receivedCount} />
-      <StatCard label="Total Escrows" value={stats.escrowCount} />
-      <StatCard label="Active Escrows" value={active} />
+      <StatCard label="Escrow Volume" value={`${formatETH(stats.escrowVolume)} ETH`} />
+      <StatCard label="ETH Released" value={`${formatETH(stats.releasedVolume)} ETH`} />
+      <StatCard label="Jobs Completed" value={stats.jobsCompleted} />
+      <StatCard label="Total Escrows" value={stats.totalEscrows} />
+      <StatCard label="Active Escrows" value={stats.activeEscrows} />
+      <StatCard label="Avg Rating" value={stats.avgRating > 0 ? stats.avgRating.toFixed(1) : "—"} />
     </div>
   );
 }
