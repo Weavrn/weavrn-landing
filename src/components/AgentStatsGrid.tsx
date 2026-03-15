@@ -25,9 +25,10 @@ export default function AgentStatsGrid({ stats }: Props) {
   const formatETH = (val: string) => {
     const num = parseFloat(val);
     if (num === 0) return "0";
-    if (num < 0.001) return "<0.001";
-    return num.toFixed(4);
+    return num.toFixed(6);
   };
+
+  const active = Math.max(0, stats.escrowCount - stats.releasedCount);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -35,8 +36,8 @@ export default function AgentStatsGrid({ stats }: Props) {
       <StatCard label="ETH Received" value={`${formatETH(stats.receivedETH)} ETH`} />
       <StatCard label="Payments Made" value={stats.paymentCount} />
       <StatCard label="Payments Received" value={stats.receivedCount} />
-      <StatCard label="Unique Recipients" value={stats.uniqueRecipients} />
-      <StatCard label="Active Escrows" value={stats.escrowCount - stats.releasedCount} />
+      <StatCard label="Total Escrows" value={stats.escrowCount} />
+      <StatCard label="Active Escrows" value={active} />
     </div>
   );
 }
