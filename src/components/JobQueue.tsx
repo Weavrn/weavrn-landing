@@ -5,6 +5,8 @@ import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob } from "@/lib/api";
 import type { Job } from "@/lib/api";
 import ReviewForm from "./ReviewForm";
+import DeliverableView from "./DeliverableView";
+import JobChat from "./JobChat";
 
 interface Props {
   walletAddress: string;
@@ -37,6 +39,8 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [reviewingJobId, setReviewingJobId] = useState<number | null>(null);
   const [disputingJobId, setDisputingJobId] = useState<number | null>(null);
   const [disputeReason, setDisputeReason] = useState("");
+  const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
+  const [chatJobId, setChatJobId] = useState<number | null>(null);
 
   const fetchJobs = useCallback(async (p: number) => {
     setLoading(true);
@@ -140,6 +144,24 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 </p>
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
+                {/* Chat button for active jobs */}
+                {["in_progress", "delivered"].includes(j.status) && (
+                  <button
+                    onClick={() => setChatJobId(chatJobId === j.id ? null : j.id)}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-surface border border-weavrn-border text-weavrn-muted hover:text-white"
+                  >
+                    {chatJobId === j.id ? "Close" : "Chat"}
+                  </button>
+                )}
+                {/* Deliverable preview toggle */}
+                {j.deliverable_data && ["delivered", "completed"].includes(j.status) && (
+                  <button
+                    onClick={() => setExpandedJobId(expandedJobId === j.id ? null : j.id)}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20"
+                  >
+                    {expandedJobId === j.id ? "Hide" : "View"}
+                  </button>
+                )}
                 {tab === "provider" && j.status === "pending" && (
                   <button
                     onClick={() => handleAction("accept", j.id)}
@@ -189,6 +211,14 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 )}
               </div>
             </div>
+            {/* Deliverable preview */}
+            {expandedJobId === j.id && j.deliverable_data && j.deliverable_type && (
+              <DeliverableView type={j.deliverable_type} data={j.deliverable_data} />
+            )}
+            {/* Chat */}
+            {chatJobId === j.id && (
+              <JobChat jobId={j.id} walletAddress={walletAddress} signer={signer} />
+            )}
             {reviewingJobId === j.id && (
               <ReviewForm
                 jobId={j.id}

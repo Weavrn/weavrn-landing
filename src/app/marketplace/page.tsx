@@ -11,6 +11,7 @@ import ListingDetail from "@/components/ListingDetail";
 import Footer from "@/components/Footer";
 
 const CATEGORIES = ["all", "data", "code", "research", "automation", "creative", "trading", "other"];
+const INPUT_TYPES = ["text", "code", "images", "files", "urls"];
 
 function MarketplaceContent({ walletAddress, signer }: { walletAddress: string | null; signer: JsonRpcSigner | null }) {
   const searchParams = useSearchParams();
@@ -22,12 +23,13 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [inputFilter, setInputFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchListings = useCallback(async (p: number, cat: string, q: string) => {
+  const fetchListings = useCallback(async (p: number, cat: string, q: string, accepts?: string | null) => {
     setLoading(true);
     try {
-      const res = await getListings(p, 24, cat === "all" ? undefined : cat, undefined, q || undefined);
+      const res = await getListings(p, 24, cat === "all" ? undefined : cat, undefined, q || undefined, accepts || undefined);
       setListings(res.listings);
       setTotal(res.total);
       setPage(p);
@@ -40,9 +42,9 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
 
   useEffect(() => {
     if (!listingId) {
-      fetchListings(1, category, search);
+      fetchListings(1, category, search, inputFilter);
     }
-  }, [listingId, category, search, fetchListings]);
+  }, [listingId, category, search, inputFilter, fetchListings]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +80,7 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
         </form>
       </div>
 
-      <div className="flex gap-2 mb-6 flex-wrap">
+      <div className="flex gap-2 mb-3 flex-wrap">
         {CATEGORIES.map((cat) => (
           <button
             key={cat}
@@ -90,6 +92,22 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
             }`}
           >
             {cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2 mb-6 flex-wrap">
+        <span className="text-xs text-weavrn-muted py-1.5">Accepts:</span>
+        {INPUT_TYPES.map((inp) => (
+          <button
+            key={inp}
+            onClick={() => setInputFilter(inputFilter === inp ? null : inp)}
+            className={`px-2 py-1 rounded text-[10px] border transition-colors ${
+              inputFilter === inp
+                ? "border-blue-400 text-blue-400 bg-blue-500/10"
+                : "border-weavrn-border text-weavrn-muted hover:text-white"
+            }`}
+          >
+            {inp}
           </button>
         ))}
       </div>
@@ -109,7 +127,7 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
               <button
-                onClick={() => fetchListings(page - 1, category, search)}
+                onClick={() => fetchListings(page - 1, category, search, inputFilter)}
                 disabled={page <= 1}
                 className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white disabled:opacity-30"
               >
@@ -117,7 +135,7 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
               </button>
               <span className="text-xs text-weavrn-muted">{page} / {totalPages}</span>
               <button
-                onClick={() => fetchListings(page + 1, category, search)}
+                onClick={() => fetchListings(page + 1, category, search, inputFilter)}
                 disabled={page >= totalPages}
                 className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white disabled:opacity-30"
               >

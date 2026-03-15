@@ -400,11 +400,12 @@ export interface ServiceListing {
   review_count?: number;
 }
 
-export function getListings(page = 1, limit = 50, category?: string, tags?: string, search?: string) {
+export function getListings(page = 1, limit = 50, category?: string, tags?: string, search?: string, accepts?: string) {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (category) params.set("category", category);
   if (tags) params.set("tags", tags);
   if (search) params.set("search", search);
+  if (accepts) params.set("accepts", accepts);
   return apiFetch<{ listings: ServiceListing[]; total: number; page: number; limit: number }>(
     `/listings?${params}`,
   );
@@ -476,11 +477,39 @@ export interface Job {
   description: string | null;
   status: "pending" | "accepted" | "in_progress" | "delivered" | "completed" | "cancelled" | "disputed";
   escrow_id: number | null;
-  deliverable_type: "text" | "url" | "ipfs" | null;
-  deliverable_data: unknown;
+  deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
+  deliverable_data: DeliverableData | null;
   created_at: string;
   updated_at: string;
   queue_position?: number;
+}
+
+export interface DeliverableData {
+  content: string;
+  format?: "markdown" | "plaintext" | "json";
+  language?: string | null;
+  title?: string;
+  sections?: { heading: string; content: string }[];
+  attachments?: { name: string; type: string; url: string }[];
+}
+
+export interface JobMessage {
+  id: number;
+  job_id: number;
+  sender_wallet: string;
+  role: "user" | "agent" | "system";
+  content: string;
+  content_type: "text" | "code" | "url" | "file_ref";
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AgentCapability {
+  id: number;
+  wallet_address: string;
+  capability_type: "model" | "framework" | "input_type" | "output_type" | "language" | "tool";
+  value: string;
+  metadata: Record<string, unknown>;
 }
 
 export function getJob(id: number) {
@@ -506,7 +535,7 @@ export function getAgentRequests(wallet: string, page = 1, limit = 50, status?: 
 export async function createJob(
   signer: import("ethers").JsonRpcSigner,
   wallet: string,
-  data: { listing_id?: number; provider_wallet: string; title: string; description?: string },
+  data: { listing_id?: number; provider_wallet: string; title: string; description?: string; initial_message?: string },
 ) {
   const { signature, timestamp } = await signForWallet(signer, wallet, "create-job");
   return apiFetch<Job>("/jobs", {
@@ -644,4 +673,55 @@ export async function submitReview(
     method: "POST",
     body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, rating, comment }),
   });
+}
+
+// ── Job Messages ──
+
+export async function sendJobMessage(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+  content: string,
+  contentType = "text",
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "send-message");
+  return apiFetch<JobMessage>(`/jobs/${jobId}/message`, {
+    method: "POST",
+    body: JSON.stringify({ wallet_address: wallet.toLowerCase(), signature, timestamp, content, content_type: contentType }),
+  });
+}
+
+export async function getJobMessages(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "get-messages");
+  const params = new URLSearchParams({
+    wallet_address: wallet.toLowerCase(),
+    signature,
+    timestamp: String(timestamp),
+  });
+  return apiFetch<{ messages: JobMessage[] }>(`/jobs/${jobId}/messages?${params}`);
+}
+
+// ── Extended Agent Search ──
+
+export function getAgentsFiltered(
+  page = 1,
+  limit = 50,
+  sort = "newest",
+  search?: string,
+  inputType?: string,
+  model?: string,
+  capability?: string,
+) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit), sort });
+  if (search) params.set("search", search);
+  if (inputType) params.set("input_type", inputType);
+  if (model) params.set("model", model);
+  if (capability) params.set("capability", capability);
+  return apiFetch<{ agents: AgentListItem[]; total: number; page: number; limit: number }>(
+    `/agents?${params}`,
+  );
 }

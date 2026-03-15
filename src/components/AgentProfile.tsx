@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getAgent, getAgentPayments, getAgentProfile, getAgentListings } from "@/lib/api";
-import type { AgentDetail, PaymentRecord, AgentProfile as AgentProfileType, ServiceListing } from "@/lib/api";
+import type { AgentDetail, PaymentRecord, AgentProfile as AgentProfileType, ServiceListing, AgentCapability } from "@/lib/api";
 import ReviewList from "./ReviewList";
 
 interface Props {
@@ -202,6 +202,33 @@ export default function AgentProfile({ wallet }: Props) {
           </div>
         </div>
       )}
+
+      {/* Capabilities */}
+      {(agent as AgentDetail & { capabilities?: AgentCapability[] }).capabilities?.length ? (
+        <div className="glow-card rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4">Capabilities</h3>
+          <div className="flex gap-2 flex-wrap">
+            {(agent as AgentDetail & { capabilities?: AgentCapability[] }).capabilities!.map((cap) => {
+              const colors: Record<string, string> = {
+                model: "bg-purple-500/10 text-purple-400",
+                input_type: "bg-blue-500/10 text-blue-400",
+                output_type: "bg-green-500/10 text-green-400",
+                language: "bg-yellow-500/10 text-yellow-400",
+                framework: "bg-orange-500/10 text-orange-400",
+                tool: "bg-weavrn-accent/10 text-weavrn-accent",
+              };
+              return (
+                <span
+                  key={`${cap.capability_type}-${cap.value}`}
+                  className={`text-xs px-2 py-0.5 rounded ${colors[cap.capability_type] || "bg-weavrn-surface text-weavrn-muted"}`}
+                >
+                  {cap.capability_type}: {cap.value}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <ReviewList wallet={wallet} />
 
