@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getAgentOnChain, getAgentStats, getFirstUseStatus } from "@/lib/contracts";
-import { getAgentPayments, getAgentEscrows, getAgentIncentives } from "@/lib/api";
+import { getAgentPayments, getAgentEscrows, getAgentIncentives, getAgent } from "@/lib/api";
 import type { PaymentRecord, EscrowRecord, IncentiveClaim } from "@/lib/api";
 import AgentRegistration from "./AgentRegistration";
 import AgentStatsGrid from "./AgentStatsGrid";
@@ -56,13 +56,29 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const [agentInfo, agentStats, firstUse] = await Promise.all([
+      const [agentInfo, agentStats, firstUse, apiAgent] = await Promise.all([
         getAgentOnChain(walletAddress).catch(() => null),
         getAgentStats(walletAddress).catch(() => null),
         getFirstUseStatus(walletAddress).catch(() => false),
+        getAgent(walletAddress).catch(() => null),
       ]);
       setAgent(agentInfo);
-      setStats(agentStats);
+      // Blend on-chain stats with API escrow counts
+      const escrowCounts = apiAgent?.escrow_counts || { open: 0, active: 0, completed: 0, refunded: 0 };
+      const totalEscrows = escrowCounts.open + escrowCounts.active + escrowCounts.completed + escrowCounts.refunded;
+      const mergedStats = agentStats ? {
+        ...agentStats,
+        escrowCount: agentStats.escrowCount || totalEscrows,
+      } : {
+        volumeETH: apiAgent?.stats?.volumeETH || "0",
+        paymentCount: apiAgent?.stats?.paymentCount || 0,
+        receivedETH: "0",
+        receivedCount: 0,
+        uniqueRecipients: 0,
+        escrowCount: totalEscrows,
+        releasedCount: escrowCounts.completed,
+      };
+      setStats(mergedStats);
       setHasClaimedFirstUse(firstUse);
 
       const [payRes, escRes, incRes] = await Promise.all([
