@@ -119,7 +119,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
         {walletAddress && walletAddress.toLowerCase() !== listing.wallet_address.toLowerCase() && (
           <div className="pt-4 border-t border-weavrn-border/50">
             {requested ? (
-              <p className="text-sm text-weavrn-accent">Service requested — check your dashboard for updates.</p>
+              <p className="text-sm text-weavrn-accent">Service requested — <a href="/dashboard" className="underline hover:text-weavrn-accent-hover">check your dashboard</a> for updates.</p>
             ) : !showForm ? (
               <button
                 onClick={() => setShowForm(true)}
