@@ -60,7 +60,9 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
 
   useEffect(() => {
     fetchJobs(1);
-  }, [fetchJobs]);
+    const interval = setInterval(() => fetchJobs(page), 5000);
+    return () => clearInterval(interval);
+  }, [fetchJobs, page]);
 
   const handleAction = async (action: string, jobId: number) => {
     if (!signer) return;
