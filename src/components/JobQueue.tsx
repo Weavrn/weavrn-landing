@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
-import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob } from "@/lib/api";
+import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
+import { createEscrowETH, releaseEscrow } from "@/lib/contracts";
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
@@ -77,12 +78,51 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     setError(null);
     try {
       if (action === "accept") await acceptJob(signer, walletAddress, jobId);
-      else if (action === "complete") await completeJob(signer, walletAddress, jobId);
+      else if (action === "complete") {
+        // Find the job to get escrow_id
+        const job = jobs.find(j => j.id === jobId);
+        if (job?.escrow_id) {
+          // Release escrow on-chain first
+          await releaseEscrow(signer, job.escrow_id);
+        }
+        await completeJob(signer, walletAddress, jobId);
+      }
       else if (action === "cancel") await cancelJob(signer, walletAddress, jobId);
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Action failed");
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleFundJob = async (job: Job) => {
+    if (!signer || !job.listing_id) return;
+    setActing(`fund-${job.id}`);
+    setError(null);
+    try {
+      // Get listing details for price and escrow strategy
+      const listing = await getListing(job.listing_id);
+      const amount = listing.price_amount || "0.001";
+      const strategy = listing.escrow_strategy || "all_or_nothing";
+
+      // Create escrow on-chain (7 day deadline)
+      const { escrowId } = await createEscrowETH(
+        signer,
+        job.provider_wallet,
+        amount,
+        7 * 24 * 60 * 60,
+        strategy,
+        `Job #${job.id}: ${job.title}`,
+      );
+
+      // Link escrow to job via API
+      await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+      fetchJobs(page);
+      onAction?.();
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Funding failed");
     } finally {
       setActing(null);
     }
@@ -150,9 +190,28 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 <p className="text-sm font-semibold truncate">{j.title}</p>
                 <p className="text-xs text-weavrn-muted">
                   {tab === "provider" ? `From ${truncAddr(j.requester_wallet)}` : `To ${truncAddr(j.provider_wallet)}`}
+                  {!j.escrow_id && j.status === "in_progress" && tab === "requester" && (
+                    <span className="text-yellow-400 ml-2">Unfunded</span>
+                  )}
                 </p>
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
+                {/* Fund button for unfunded in_progress jobs */}
+                {tab === "requester" && j.status === "in_progress" && !j.escrow_id && j.listing_id && (
+                  <button
+                    onClick={() => handleFundJob(j)}
+                    disabled={acting === `fund-${j.id}`}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover disabled:opacity-50 transition-all"
+                  >
+                    {acting === `fund-${j.id}` ? "Funding..." : "Fund"}
+                  </button>
+                )}
+                {/* Funded indicator */}
+                {j.escrow_id && ["in_progress", "delivered"].includes(j.status) && (
+                  <span className="px-2 py-1.5 rounded-lg text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">
+                    Escrow #{j.escrow_id}
+                  </span>
+                )}
                 {/* Chat button for active jobs */}
                 {["in_progress", "delivered"].includes(j.status) && (
                   <button

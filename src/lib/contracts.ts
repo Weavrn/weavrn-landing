@@ -297,6 +297,19 @@ const ESCROW_ROUTER_ABI = [
     type: "function",
   },
   {
+    inputs: [
+      { name: "recipient", type: "address" },
+      { name: "deadline", type: "uint256" },
+      { name: "strategy", type: "address" },
+      { name: "strategyData", type: "bytes" },
+      { name: "memo", type: "string" },
+    ],
+    name: "createEscrowETH",
+    outputs: [{ name: "escrowId", type: "uint256" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
     inputs: [{ name: "escrowId", type: "uint256" }],
     name: "release",
     outputs: [],
@@ -316,6 +329,21 @@ const ESCROW_ROUTER_ABI = [
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "escrowId", type: "uint256" },
+      { indexed: true, name: "sender", type: "address" },
+      { indexed: true, name: "recipient", type: "address" },
+      { indexed: false, name: "token", type: "address" },
+      { indexed: false, name: "amount", type: "uint256" },
+      { indexed: false, name: "deadline", type: "uint256" },
+      { indexed: false, name: "strategy", type: "address" },
+      { indexed: false, name: "memo", type: "string" },
+    ],
+    name: "EscrowCreated",
+    type: "event",
   },
 ];
 
@@ -570,6 +598,54 @@ export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number
   const tx = await contract.claimRebate(rebateId);
   const receipt = await tx.wait();
   return receipt.hash;
+}
+
+// Reverse lookup: strategy name → contract address
+const STRATEGY_NAME_TO_ADDRESS: Record<string, string> = {
+  all_or_nothing: "0xe0A77E8dD41945991a2F1454517B86E30B04bE56",
+  milestone: "0x8F744571abD15D53cbb373fb973fd060775d62e9",
+  trickle: "0x31C8fdd969e70A2a4AFE1F15D187a702b9D0465e",
+};
+
+export function getStrategyAddress(name: string): string {
+  return STRATEGY_NAME_TO_ADDRESS[name] || STRATEGY_NAME_TO_ADDRESS["all_or_nothing"];
+}
+
+export async function createEscrowETH(
+  signer: JsonRpcSigner,
+  recipient: string,
+  amountEth: string,
+  deadlineSeconds: number,
+  strategyName: string,
+  memo: string,
+): Promise<{ escrowId: number; txHash: string }> {
+  const { parseEther, AbiCoder } = await import("ethers");
+  const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
+  const strategyAddr = getStrategyAddress(strategyName);
+  const deadline = Math.floor(Date.now() / 1000) + deadlineSeconds;
+  const strategyData = new AbiCoder().encode([], []);
+
+  const tx = await contract.createEscrowETH(
+    recipient,
+    deadline,
+    strategyAddr,
+    strategyData,
+    memo,
+    { value: parseEther(amountEth) },
+  );
+  const receipt = await tx.wait();
+
+  // Parse EscrowCreated event to get escrowId
+  const iface = contract.interface;
+  for (const log of receipt.logs) {
+    try {
+      const parsed = iface.parseLog(log);
+      if (parsed?.name === "EscrowCreated") {
+        return { escrowId: Number(parsed.args.escrowId), txHash: receipt.hash };
+      }
+    } catch { /* skip */ }
+  }
+  return { escrowId: 0, txHash: receipt.hash };
 }
 
 export async function releaseEscrow(signer: JsonRpcSigner, escrowId: number): Promise<string> {
