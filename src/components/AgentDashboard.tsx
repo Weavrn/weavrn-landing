@@ -137,6 +137,12 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
         <>
           <AgentStatsGrid stats={stats || { volumeETH: "0", paymentCount: 0, receivedETH: "0", receivedCount: 0, uniqueRecipients: 0, escrowCount: 0, releasedCount: 0 }} />
 
+          <JobQueue
+            walletAddress={walletAddress}
+            signer={signer}
+            onAction={fetchData}
+          />
+
           <AgentIncentives
             signer={signer}
             walletAddress={walletAddress}
@@ -169,12 +175,6 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
           <MyListings
             walletAddress={walletAddress}
             signer={signer}
-          />
-
-          <JobQueue
-            walletAddress={walletAddress}
-            signer={signer}
-            onAction={fetchData}
           />
 
           <ProfileEditor

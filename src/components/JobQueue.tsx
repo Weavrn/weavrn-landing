@@ -29,7 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function JobQueue({ walletAddress, signer, onAction }: Props) {
-  const [tab, setTab] = useState<"provider" | "requester">("provider");
+  const [tab, setTab] = useState<"provider" | "requester">("requester");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
