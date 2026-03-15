@@ -456,19 +456,36 @@ export default function AdminPage() {
                               {disputeJobDetail.escrow_id && (
                                 <p className="text-xs text-weavrn-muted font-mono">Escrow #{disputeJobDetail.escrow_id}</p>
                               )}
-                              {disputeJobDetail.deliverable_type && (
-                                <div className="mt-2">
-                                  <p className="text-[10px] text-weavrn-muted uppercase mb-1">Deliverable ({disputeJobDetail.deliverable_type})</p>
-                                  <pre className="text-xs text-white/70 bg-black/30 rounded p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                                    {typeof disputeJobDetail.deliverable_data === "string"
-                                      ? JSON.parse(disputeJobDetail.deliverable_data)?.content?.substring(0, 500)
-                                      : (disputeJobDetail.deliverable_data as { content?: string })?.content?.substring(0, 500)}
-                                    {((typeof disputeJobDetail.deliverable_data === "string"
-                                      ? JSON.parse(disputeJobDetail.deliverable_data)?.content?.length
-                                      : (disputeJobDetail.deliverable_data as { content?: string })?.content?.length) || 0) > 500 && "..."}
-                                  </pre>
-                                </div>
-                              )}
+                              {disputeJobDetail.deliverable_type && (() => {
+                                const parsed = typeof disputeJobDetail.deliverable_data === "string"
+                                  ? JSON.parse(disputeJobDetail.deliverable_data)
+                                  : disputeJobDetail.deliverable_data as { content?: string };
+                                const content = parsed?.content || "";
+                                return (
+                                  <div className="mt-2">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <p className="text-[10px] text-weavrn-muted uppercase">Deliverable ({disputeJobDetail.deliverable_type})</p>
+                                      <button
+                                        onClick={() => {
+                                          const blob = new Blob([content], { type: "text/markdown" });
+                                          const url = URL.createObjectURL(blob);
+                                          const a = document.createElement("a");
+                                          a.href = url;
+                                          a.download = `job-${disputeJobDetail.id}-deliverable.md`;
+                                          a.click();
+                                          URL.revokeObjectURL(url);
+                                        }}
+                                        className="text-[10px] text-weavrn-accent hover:underline"
+                                      >
+                                        Download full
+                                      </button>
+                                    </div>
+                                    <pre className="text-xs text-white/70 bg-black/30 rounded p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                                      {content.substring(0, 500)}{content.length > 500 && "..."}
+                                    </pre>
+                                  </div>
+                                );
+                              })()}
                               <p className="text-[10px] text-weavrn-muted">
                                 Created {new Date(disputeJobDetail.created_at).toLocaleString()}
                                 {" · "}
