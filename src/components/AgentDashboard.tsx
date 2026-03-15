@@ -133,15 +133,15 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
         onRegistered={fetchData}
       />
 
-      {agent && stats && (
+      {agent && (
         <>
-          <AgentStatsGrid stats={stats} />
+          <AgentStatsGrid stats={stats || { volumeETH: "0", paymentCount: 0, receivedETH: "0", receivedCount: 0, uniqueRecipients: 0, escrowCount: 0, releasedCount: 0 }} />
 
           <AgentIncentives
             signer={signer}
             walletAddress={walletAddress}
             hasClaimedFirstUse={hasClaimedFirstUse}
-            paymentCount={stats.paymentCount}
+            paymentCount={stats?.paymentCount ?? 0}
             incentives={incentives}
             onClaimed={fetchData}
           />
