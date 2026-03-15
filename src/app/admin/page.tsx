@@ -10,10 +10,12 @@ import {
   settleBlock,
   getAdminDisputes,
   resolveDispute,
+  getJob,
   type BlockStats,
   type BlockDetail,
   type TrackedPost,
   type Dispute,
+  type Job,
 } from "@/lib/api";
 
 type Tab = "blocks" | "posts" | "disputes";
@@ -31,6 +33,9 @@ export default function AdminPage() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [resolveNotes, setResolveNotes] = useState("");
+  const [expandedDisputeId, setExpandedDisputeId] = useState<number | null>(null);
+  const [disputeJobDetail, setDisputeJobDetail] = useState<Job | null>(null);
+  const [loadingJob, setLoadingJob] = useState(false);
 
   const fetchBlocks = useCallback(async (key: string) => {
     setLoading(true);
@@ -368,70 +373,154 @@ export default function AdminPage() {
                 No open disputes
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {disputes.map((d) => (
-                  <div key={d.id} className="p-4 rounded-xl border border-red-500/20 bg-red-500/5">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {d.job_title || `Job #${d.job_id}`}
-                        </p>
-                        <p className="text-xs text-weavrn-muted font-mono mt-0.5">
-                          Reporter: {d.reporter_wallet?.slice(0, 6)}...{d.reporter_wallet?.slice(-4)}
-                          {" · "}
-                          {new Date(d.created_at).toLocaleDateString()}
-                        </p>
-                        <p className="text-xs text-weavrn-muted font-mono">
-                          Requester: {d.requester_wallet?.slice(0, 6)}...{d.requester_wallet?.slice(-4)}
-                          {" · "}
-                          Provider: {d.provider_wallet?.slice(0, 6)}...{d.provider_wallet?.slice(-4)}
-                        </p>
+                  <div key={d.id} className="rounded-xl border border-red-500/20 bg-red-500/5 overflow-hidden">
+                    {/* Header */}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">
+                            {d.job_title || `Job #${d.job_id}`}
+                          </p>
+                          <p className="text-xs text-weavrn-muted font-mono mt-0.5">
+                            Reported by {d.reporter_wallet?.slice(0, 6)}...{d.reporter_wallet?.slice(-4)}
+                            {" · "}
+                            {new Date(d.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30">
+                          {d.status}
+                        </span>
                       </div>
-                      <span className="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30">
-                        {d.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-white/80 mb-3 bg-weavrn-dark/50 p-2 rounded">
-                      {d.reason}
-                    </p>
-                    {resolvingId === d.id ? (
-                      <div className="space-y-2">
-                        <textarea
-                          value={resolveNotes}
-                          onChange={(e) => setResolveNotes(e.target.value)}
-                          placeholder="Admin notes (optional)"
-                          rows={2}
-                          className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-2 text-xs text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleResolve(d.id, "completed")}
-                            className="px-3 py-1.5 rounded-lg text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20"
-                          >
-                            Mark Completed
-                          </button>
-                          <button
-                            onClick={() => handleResolve(d.id, "cancelled")}
-                            className="px-3 py-1.5 rounded-lg text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                          >
-                            Cancel Job
-                          </button>
-                          <button
-                            onClick={() => { setResolvingId(null); setResolveNotes(""); }}
-                            className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white"
-                          >
-                            Back
-                          </button>
+
+                      {/* Parties */}
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="bg-weavrn-dark/50 rounded-lg p-2.5">
+                          <p className="text-[10px] text-weavrn-muted uppercase mb-1">Requester</p>
+                          <a href={`/agents?wallet=${d.requester_wallet}`} className="text-xs font-mono text-weavrn-accent hover:underline">
+                            {d.requester_wallet?.slice(0, 10)}...{d.requester_wallet?.slice(-6)}
+                          </a>
+                        </div>
+                        <div className="bg-weavrn-dark/50 rounded-lg p-2.5">
+                          <p className="text-[10px] text-weavrn-muted uppercase mb-1">Provider</p>
+                          <a href={`/agents?wallet=${d.provider_wallet}`} className="text-xs font-mono text-weavrn-accent hover:underline">
+                            {d.provider_wallet?.slice(0, 10)}...{d.provider_wallet?.slice(-6)}
+                          </a>
                         </div>
                       </div>
-                    ) : (
+
+                      {/* Dispute reason */}
+                      <div className="mb-3">
+                        <p className="text-[10px] text-weavrn-muted uppercase mb-1">Dispute Reason</p>
+                        <p className="text-sm text-white/90 bg-weavrn-dark/50 p-3 rounded-lg whitespace-pre-wrap">
+                          {d.reason}
+                        </p>
+                      </div>
+
+                      {/* View job detail toggle */}
                       <button
-                        onClick={() => setResolvingId(d.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20"
+                        onClick={async () => {
+                          if (expandedDisputeId === d.id) {
+                            setExpandedDisputeId(null);
+                            setDisputeJobDetail(null);
+                          } else {
+                            setExpandedDisputeId(d.id);
+                            setLoadingJob(true);
+                            try {
+                              const job = await getJob(d.job_id);
+                              setDisputeJobDetail(job);
+                            } catch { /* ignore */ }
+                            setLoadingJob(false);
+                          }
+                        }}
+                        className="text-xs text-weavrn-accent hover:underline mb-3"
                       >
-                        Resolve
+                        {expandedDisputeId === d.id ? "Hide job details" : "View job details"}
                       </button>
-                    )}
+
+                      {/* Expanded job detail */}
+                      {expandedDisputeId === d.id && (
+                        <div className="bg-weavrn-dark/50 rounded-lg p-3 mb-3 space-y-2">
+                          {loadingJob ? (
+                            <p className="text-xs text-weavrn-muted">Loading...</p>
+                          ) : disputeJobDetail ? (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">{disputeJobDetail.status}</span>
+                                <span className="text-xs text-white font-semibold">{disputeJobDetail.title}</span>
+                              </div>
+                              {disputeJobDetail.description && (
+                                <p className="text-xs text-weavrn-muted">{disputeJobDetail.description}</p>
+                              )}
+                              {disputeJobDetail.escrow_id && (
+                                <p className="text-xs text-weavrn-muted font-mono">Escrow #{disputeJobDetail.escrow_id}</p>
+                              )}
+                              {disputeJobDetail.deliverable_type && (
+                                <div className="mt-2">
+                                  <p className="text-[10px] text-weavrn-muted uppercase mb-1">Deliverable ({disputeJobDetail.deliverable_type})</p>
+                                  <pre className="text-xs text-white/70 bg-black/30 rounded p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                                    {typeof disputeJobDetail.deliverable_data === "string"
+                                      ? JSON.parse(disputeJobDetail.deliverable_data)?.content?.substring(0, 500)
+                                      : (disputeJobDetail.deliverable_data as { content?: string })?.content?.substring(0, 500)}
+                                    {((typeof disputeJobDetail.deliverable_data === "string"
+                                      ? JSON.parse(disputeJobDetail.deliverable_data)?.content?.length
+                                      : (disputeJobDetail.deliverable_data as { content?: string })?.content?.length) || 0) > 500 && "..."}
+                                  </pre>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-weavrn-muted">
+                                Created {new Date(disputeJobDetail.created_at).toLocaleString()}
+                                {" · "}
+                                Updated {new Date(disputeJobDetail.updated_at).toLocaleString()}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-red-400">Could not load job details</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Resolve actions */}
+                      {resolvingId === d.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={resolveNotes}
+                            onChange={(e) => setResolveNotes(e.target.value)}
+                            placeholder="Admin notes — explain the decision"
+                            rows={2}
+                            className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-2 text-xs text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleResolve(d.id, "completed")}
+                              className="px-3 py-1.5 rounded-lg text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20"
+                            >
+                              Release to Provider
+                            </button>
+                            <button
+                              onClick={() => handleResolve(d.id, "cancelled")}
+                              className="px-3 py-1.5 rounded-lg text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+                            >
+                              Refund Requester
+                            </button>
+                            <button
+                              onClick={() => { setResolvingId(null); setResolveNotes(""); }}
+                              className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setResolvingId(d.id)}
+                          className="px-4 py-2 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 border border-weavrn-accent/20"
+                        >
+                          Resolve Dispute
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
