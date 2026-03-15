@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getProviderAndSigner, checkAndSwitchChain, getChainConfig } from "@/lib/contracts";
 
@@ -17,6 +17,26 @@ export default function WalletConnect({
 }: WalletConnectProps) {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-connect on mount if MetaMask is already authorized
+  const tried = useRef(false);
+  useEffect(() => {
+    if (tried.current || address) return;
+    tried.current = true;
+    if (!window.ethereum) return;
+    // eth_accounts doesn't prompt — returns [] if not connected
+    window.ethereum.request({ method: "eth_accounts" }).then(async (accounts: string[]) => {
+      if (accounts.length === 0) return;
+      try {
+        const switched = await checkAndSwitchChain();
+        if (!switched) return;
+        const { signer, address: addr } = await getProviderAndSigner();
+        onConnect(addr, signer);
+      } catch {
+        // silent fail on auto-connect
+      }
+    }).catch(() => {});
+  }, [address, onConnect]);
 
   const connect = useCallback(async () => {
     if (!window.ethereum) {
