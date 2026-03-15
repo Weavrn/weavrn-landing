@@ -7,8 +7,9 @@ interface Props {
   data: DeliverableData;
 }
 
-export default function DeliverableView({ type, data }: Props) {
-  if (!data) return null;
+export default function DeliverableView({ type, data: rawData }: Props) {
+  if (!rawData) return null;
+  const data: DeliverableData = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
 
   return (
     <div className="rounded-lg bg-weavrn-dark border border-weavrn-border p-4 space-y-3">
