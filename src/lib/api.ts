@@ -484,11 +484,25 @@ export interface Job {
   queue_position?: number;
 }
 
+export interface DeliverableProof {
+  files: { path: string; language: string | null; lines: number; size: number }[];
+  total_lines: number;
+  total_files: number;
+  build_success: boolean | null;
+  build_log: string | null;
+  run_output: string | null;
+  run_exit_code: number | null;
+  test_output: string | null;
+  test_success: boolean | null;
+}
+
 export interface DeliverableData {
-  content: string;
+  content: string | null;
   format?: "markdown" | "plaintext" | "json";
   language?: string | null;
   title?: string;
+  type?: string;
+  proof?: DeliverableProof | null;
   sections?: { heading: string; content: string }[];
   attachments?: { name: string; type: string; url: string }[];
 }
