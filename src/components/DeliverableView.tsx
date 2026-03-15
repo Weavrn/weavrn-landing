@@ -6,6 +6,9 @@ interface Props {
   type: string;
   data: DeliverableData | string;
   status: "delivered" | "completed" | "disputed";
+  jobId?: number;
+  walletAddress?: string;
+  signer?: import("ethers").JsonRpcSigner | null;
 }
 
 function ProofPanel({ proof }: { proof: DeliverableProof }) {
@@ -73,7 +76,7 @@ function ProofPanel({ proof }: { proof: DeliverableProof }) {
   );
 }
 
-export default function DeliverableView({ type, data: rawData, status }: Props) {
+export default function DeliverableView({ type, data: rawData, status, jobId, walletAddress, signer }: Props) {
   if (!rawData) return null;
   const data: DeliverableData = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
 
@@ -104,30 +107,75 @@ export default function DeliverableView({ type, data: rawData, status }: Props) 
       {hasContent && !isLocked ? (
         <div className="border-t border-weavrn-border/50 pt-3">
           {type === "code" ? (
-            <pre className="text-xs font-mono bg-black/40 rounded p-3 overflow-x-auto whitespace-pre-wrap text-green-300 max-h-96 overflow-y-auto">
-              {data.content}
-            </pre>
+            <>
+              {/* For code deliverables, show the report but emphasize the archive download */}
+              <div className="text-xs text-weavrn-muted whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto mb-3">
+                {data.content}
+              </div>
+              {(data as DeliverableData & { has_archive?: boolean }).has_archive && jobId && signer && walletAddress ? (
+                <button
+                  onClick={async () => {
+                    try {
+                      const timestamp = Date.now();
+                      const message = `weavrn:download-job:${walletAddress.toLowerCase()}:${timestamp}`;
+                      const signature = await signer.signMessage(message);
+                      const params = new URLSearchParams({ wallet_address: walletAddress.toLowerCase(), signature, timestamp: String(timestamp) });
+                      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+                      const res = await fetch(`${API_URL}/jobs/${jobId}/download?${params}`);
+                      if (!res.ok) throw new Error("Download failed");
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `job-${jobId}-deliverable.tar.gz`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch (err) {
+                      console.error("Download failed:", err);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover transition-all"
+                >
+                  Download Project (.tar.gz)
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    const blob = new Blob([data.content || ""], { type: "text/markdown" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `job-${jobId || "deliverable"}.md`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-xs text-weavrn-accent hover:underline"
+                >
+                  Download as markdown
+                </button>
+              )}
+            </>
           ) : (
-            <div className="text-xs text-weavrn-muted whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
-              {data.content}
-            </div>
+            <>
+              <div className="text-xs text-weavrn-muted whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
+                {data.content}
+              </div>
+              <button
+                onClick={() => {
+                  const blob = new Blob([data.content || ""], { type: "text/markdown" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `job-${jobId || "deliverable"}.md`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="mt-2 text-xs text-weavrn-accent hover:underline"
+              >
+                Download deliverable
+              </button>
+            </>
           )}
-
-          {/* Download button for completed deliverables */}
-          <button
-            onClick={() => {
-              const blob = new Blob([data.content || ""], { type: "text/markdown" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `deliverable.${type === "code" ? "md" : "md"}`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            className="mt-2 text-xs text-weavrn-accent hover:underline"
-          >
-            Download deliverable
-          </button>
         </div>
       ) : isLocked && !hasProof ? (
         <p className="text-xs text-weavrn-muted italic">

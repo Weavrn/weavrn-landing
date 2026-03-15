@@ -213,7 +213,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
             </div>
             {/* Deliverable preview */}
             {expandedJobId === j.id && j.deliverable_data && j.deliverable_type && (
-              <DeliverableView type={j.deliverable_type} data={j.deliverable_data} status={j.status as "delivered" | "completed" | "disputed"} />
+              <DeliverableView type={j.deliverable_type} data={j.deliverable_data} status={j.status as "delivered" | "completed" | "disputed"} jobId={j.id} walletAddress={walletAddress} signer={signer} />
             )}
             {/* Chat */}
             {chatJobId === j.id && (
