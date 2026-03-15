@@ -42,25 +42,32 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [chatJobId, setChatJobId] = useState<number | null>(null);
 
-  const fetchJobs = useCallback(async (p: number) => {
-    setLoading(true);
+  const fetchJobs = useCallback(async (p: number, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = tab === "provider"
         ? await getAgentJobs(walletAddress, p, 20)
         : await getAgentRequests(walletAddress, p, 20);
-      setJobs(res.jobs);
+      setJobs((prev) => {
+        const newJson = JSON.stringify(res.jobs);
+        const prevJson = JSON.stringify(prev);
+        return newJson === prevJson ? prev : res.jobs;
+      });
       setTotal(res.total);
-      setPage(p);
+      if (!silent) setPage(p);
     } catch {
       // ignore
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [walletAddress, tab]);
 
   useEffect(() => {
     fetchJobs(1);
-    const interval = setInterval(() => fetchJobs(page), 5000);
+  }, [fetchJobs]);
+
+  useEffect(() => {
+    const interval = setInterval(() => fetchJobs(page, true), 5000);
     return () => clearInterval(interval);
   }, [fetchJobs, page]);
 
