@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
-import { getJobMessages, sendJobMessage } from "@/lib/api";
+import { sendJobMessage } from "@/lib/api";
 import type { JobMessage } from "@/lib/api";
 
 interface Props {
@@ -26,19 +26,20 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchMessages = useCallback(async () => {
-    if (!signer) return;
     try {
-      const res = await getJobMessages(signer, walletAddress, jobId);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`);
+      if (!res.ok) return;
+      const data = await res.json();
       setMessages((prev) => {
-        if (res.messages.length !== prev.length) {
-          // New messages arrived — stop waiting
-          if (res.messages.length > prev.length && waiting) {
-            const lastMsg = res.messages[res.messages.length - 1];
+        if (data.messages.length !== prev.length) {
+          if (data.messages.length > prev.length && waiting) {
+            const lastMsg = data.messages[data.messages.length - 1];
             if (lastMsg.role === "agent" || lastMsg.role === "system") {
               setWaiting(false);
             }
           }
-          return res.messages;
+          return data.messages;
         }
         return prev;
       });
@@ -47,7 +48,7 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [jobId, walletAddress, signer, waiting]);
+  }, [jobId, walletAddress, waiting]);
 
   // Initial fetch
   useEffect(() => {
