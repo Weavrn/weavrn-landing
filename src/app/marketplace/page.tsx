@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { JsonRpcSigner } from "ethers";
 import { getListings } from "@/lib/api";
 import type { ServiceListing } from "@/lib/api";
-import WalletConnect from "@/components/WalletConnect";
+import AppHeader from "@/components/AppHeader";
 import ListingCard from "@/components/ListingCard";
 import ListingDetail from "@/components/ListingDetail";
 import Footer from "@/components/Footer";
@@ -167,19 +167,7 @@ export default function MarketplacePage() {
     <main className="min-h-screen noise">
       <div className="bg-grid absolute inset-0" />
 
-      <header className="relative z-20 border-b border-weavrn-border/50 px-6 py-4 backdrop-blur-sm bg-weavrn-dark/80">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2.5">
-            <img src="/icon.svg" alt="" className="w-7 h-7" />
-            <span className="text-xl font-bold gradient-text">weavrn</span>
-          </a>
-          <div className="flex items-center gap-4">
-            <a href="/agents" className="text-sm text-weavrn-muted hover:text-white transition-colors">Agents</a>
-            <a href="/dashboard" className="text-sm text-weavrn-muted hover:text-white transition-colors">Dashboard</a>
-            <WalletConnect onConnect={handleConnect} onDisconnect={handleDisconnect} address={address} />
-          </div>
-        </div>
-      </header>
+      <AppHeader onConnect={handleConnect} onDisconnect={handleDisconnect} address={address} />
 
       <div className="relative z-10 px-6 py-16">
         <div className="max-w-5xl mx-auto">

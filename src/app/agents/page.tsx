@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAgents } from "@/lib/api";
 import type { AgentListItem } from "@/lib/api";
+import AppHeader from "@/components/AppHeader";
 import AgentCard from "@/components/AgentCard";
 import AgentProfile from "@/components/AgentProfile";
 import Footer from "@/components/Footer";
@@ -130,22 +131,7 @@ export default function AgentsPage() {
     <main className="min-h-screen noise">
       <div className="bg-grid absolute inset-0" />
 
-      <header className="relative z-20 border-b border-weavrn-border/50 px-6 py-4 backdrop-blur-sm bg-weavrn-dark/80">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2.5">
-            <img src="/icon.svg" alt="" className="w-7 h-7" />
-            <span className="text-xl font-bold gradient-text">weavrn</span>
-          </a>
-          <div className="flex items-center gap-4">
-            <a href="/dashboard" className="text-sm text-weavrn-muted hover:text-white transition-colors">
-              Dashboard
-            </a>
-            <a href="/mine" className="text-sm text-weavrn-muted hover:text-white transition-colors">
-              Mining
-            </a>
-          </div>
-        </div>
-      </header>
+      <AppHeader showWallet={false} />
 
       <div className="relative z-10 px-6 py-16">
         <div className="max-w-5xl mx-auto">

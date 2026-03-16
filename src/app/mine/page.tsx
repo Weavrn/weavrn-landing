@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
-import WalletConnect from "@/components/WalletConnect";
+import AppHeader from "@/components/AppHeader";
 import MiningDashboard from "@/components/MiningDashboard";
 import Footer from "@/components/Footer";
 
@@ -27,20 +27,7 @@ export default function MinePage() {
     <main className="min-h-screen noise">
       <div className="bg-grid absolute inset-0" />
 
-      {/* Header */}
-      <header className="relative z-20 border-b border-weavrn-border/50 px-6 py-4 backdrop-blur-sm bg-weavrn-dark/80">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2.5">
-            <img src="/icon.svg" alt="" className="w-7 h-7" />
-            <span className="text-xl font-bold gradient-text">weavrn</span>
-          </a>
-          <WalletConnect
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-            address={address}
-          />
-        </div>
-      </header>
+      <AppHeader onConnect={handleConnect} onDisconnect={handleDisconnect} address={address} />
 
       <div className="relative z-10 px-6 py-16">
         {!address ? (
