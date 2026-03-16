@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
-import { sendJobMessage } from "@/lib/api";
+import { sendJobMessage, uploadJobFile, getJobFileUrl } from "@/lib/api";
 import type { JobMessage } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 
@@ -52,15 +52,42 @@ function ChatMarkdown({ content }: { content: string }) {
   );
 }
 
+function FileCard({ message, jobId, walletAddress }: { message: JobMessage; jobId: number; walletAddress: string }) {
+  const meta = message.metadata || {};
+  const fileName = (meta.file_name as string) || message.content;
+  const fileSize = meta.file_size as number;
+  const storedName = (meta.stored_name as string) || fileName;
+  const downloadUrl = getJobFileUrl(jobId, storedName, walletAddress);
+
+  return (
+    <a
+      href={downloadUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-weavrn-dark border border-weavrn-border hover:border-weavrn-accent/30 transition-colors"
+    >
+      <svg className="w-4 h-4 text-weavrn-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      </svg>
+      <div className="min-w-0">
+        <p className="text-xs text-white truncate">{fileName}</p>
+        {fileSize && <p className="text-[10px] text-weavrn-muted">{fileSize < 1024 ? `${fileSize}B` : `${Math.round(fileSize / 1024)}KB`}</p>}
+      </div>
+    </a>
+  );
+}
+
 export default function JobChat({ jobId, walletAddress, signer }: Props) {
   const [messages, setMessages] = useState<JobMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -120,6 +147,22 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !signer) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const msg = await uploadJobFile(signer, walletAddress, jobId, file);
+      setMessages((prev) => [...prev, msg]);
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -162,7 +205,9 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
                       {new Date(m.created_at).toLocaleTimeString()}
                     </span>
                   </div>
-                  {m.role === "agent" ? (
+                  {m.content_type === "file_ref" ? (
+                    <FileCard message={m} jobId={jobId} walletAddress={walletAddress} />
+                  ) : m.role === "agent" ? (
                     <div className="chat-markdown">
                       <ChatMarkdown content={m.content} />
                     </div>
@@ -191,6 +236,29 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
       <div className="p-3 border-t border-weavrn-border/50">
         {error && <p className="text-[10px] text-red-400 mb-2">{error}</p>}
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || !signer}
+            className="px-2 py-2 border border-weavrn-border rounded-lg text-weavrn-muted hover:text-weavrn-accent hover:border-weavrn-accent/30 disabled:opacity-50 transition-all shrink-0"
+            title="Upload file"
+          >
+            {uploading ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+            )}
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

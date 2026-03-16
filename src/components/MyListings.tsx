@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getAgentListings, createListing, deactivateListing } from "@/lib/api";
-import type { ServiceListing } from "@/lib/api";
+import type { ServiceListing, InputField } from "@/lib/api";
 
 interface Props {
   walletAddress: string;
@@ -11,6 +11,109 @@ interface Props {
 }
 
 const CATEGORIES = ["data", "code", "research", "automation", "creative", "trading", "other"];
+const FIELD_TYPES: InputField["type"][] = ["text", "textarea", "select", "code", "url", "git_url", "file", "number"];
+
+function emptyField(): InputField {
+  return { name: "", label: "", type: "text", required: false };
+}
+
+function InputFieldEditor({ field, onChange, onRemove }: {
+  field: InputField;
+  onChange: (f: InputField) => void;
+  onRemove: () => void;
+}) {
+  const inputCls = "w-full px-2 py-1.5 bg-weavrn-surface border border-weavrn-border rounded text-xs focus:outline-none focus:border-weavrn-accent/50";
+  return (
+    <div className="p-3 rounded-lg bg-weavrn-surface border border-weavrn-border/50 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-weavrn-muted uppercase tracking-wider">Field</span>
+        <button onClick={onRemove} className="text-[10px] text-red-400 hover:text-red-300">Remove</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Label</label>
+          <input
+            value={field.label}
+            onChange={(e) => {
+              const label = e.target.value;
+              const name = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+              onChange({ ...field, label, name });
+            }}
+            placeholder="GitHub Repository URL"
+            className={inputCls}
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Type</label>
+          <select
+            value={field.type}
+            onChange={(e) => onChange({ ...field, type: e.target.value as InputField["type"] })}
+            className={inputCls}
+          >
+            {FIELD_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Placeholder</label>
+          <input
+            value={field.placeholder || ""}
+            onChange={(e) => onChange({ ...field, placeholder: e.target.value || undefined })}
+            placeholder="Optional"
+            className={inputCls}
+          />
+        </div>
+        <div className="flex items-end gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-weavrn-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={field.required}
+              onChange={(e) => onChange({ ...field, required: e.target.checked })}
+              className="rounded border-weavrn-border"
+            />
+            Required
+          </label>
+        </div>
+      </div>
+      {field.type === "select" && (
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (comma-separated)</label>
+          <input
+            value={field.options?.join(", ") || ""}
+            onChange={(e) => onChange({ ...field, options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+            placeholder="Option A, Option B, Option C"
+            className={inputCls}
+          />
+        </div>
+      )}
+      {field.type === "file" && (
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Accepted extensions (comma-separated)</label>
+          <input
+            value={field.accept?.join(", ") || ""}
+            onChange={(e) => onChange({ ...field, accept: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) || undefined })}
+            placeholder=".py, .ts, .json"
+            className={inputCls}
+          />
+        </div>
+      )}
+      {field.description !== undefined || field.type === "git_url" || field.type === "file" ? null : (
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Helper text</label>
+          <input
+            value={field.description || ""}
+            onChange={(e) => onChange({ ...field, description: e.target.value || undefined })}
+            placeholder="Optional description shown below the label"
+            className={inputCls}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MyListings({ walletAddress, signer }: Props) {
   const [listings, setListings] = useState<ServiceListing[]>([]);
@@ -30,6 +133,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
   const [priceAmount, setPriceAmount] = useState("");
   const [escrowStrategy, setEscrowStrategy] = useState("all_or_nothing");
   const [estimatedDuration, setEstimatedDuration] = useState("");
+  const [inputFields, setInputFields] = useState<InputField[]>([]);
   const [creating, setCreating] = useState(false);
 
   const fetchListings = useCallback(async (p: number) => {
@@ -55,6 +159,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
     setCreating(true);
     setError(null);
     try {
+      const validFields = inputFields.filter((f) => f.name && f.label);
       await createListing(signer, walletAddress, {
         title,
         description,
@@ -64,12 +169,14 @@ export default function MyListings({ walletAddress, signer }: Props) {
         price_amount: priceAmount || undefined,
         escrow_strategy: escrowStrategy,
         estimated_duration: estimatedDuration || undefined,
+        input_schema: validFields.length > 0 ? validFields : undefined,
       });
       setTitle("");
       setDescription("");
       setTags("");
       setPriceAmount("");
       setEstimatedDuration("");
+      setInputFields([]);
       setShowForm(false);
       fetchListings(1);
     } catch (err: unknown) {
@@ -194,6 +301,40 @@ export default function MyListings({ walletAddress, signer }: Props) {
               />
             </div>
           </div>
+
+          {/* Input Fields Builder */}
+          <div className="border-t border-weavrn-border/50 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-weavrn-muted">Input Fields (optional)</label>
+              <button
+                onClick={() => {
+                  if (inputFields.length < 10) setInputFields([...inputFields, emptyField()]);
+                }}
+                disabled={inputFields.length >= 10}
+                className="text-[10px] px-2 py-1 rounded bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 disabled:opacity-30 transition-colors"
+              >
+                + Add Field
+              </button>
+            </div>
+            {inputFields.length === 0 && (
+              <p className="text-[10px] text-weavrn-muted/50">No custom fields. Requesters will see generic text inputs.</p>
+            )}
+            <div className="space-y-2">
+              {inputFields.map((field, i) => (
+                <InputFieldEditor
+                  key={i}
+                  field={field}
+                  onChange={(updated) => {
+                    const next = [...inputFields];
+                    next[i] = updated;
+                    setInputFields(next);
+                  }}
+                  onRemove={() => setInputFields(inputFields.filter((_, j) => j !== i))}
+                />
+              ))}
+            </div>
+          </div>
+
           {error && <p className="text-xs text-red-400">{error}</p>}
           <button
             onClick={handleCreate}
@@ -221,10 +362,15 @@ export default function MyListings({ walletAddress, signer }: Props) {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${l.active ? "bg-weavrn-accent/10 text-weavrn-accent" : "bg-red-500/10 text-red-400"}`}>
                     {l.active ? "Active" : "Inactive"}
                   </span>
+                  {l.input_schema && l.input_schema.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                      {l.input_schema.length} fields
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-semibold truncate">{l.title}</p>
                 <p className="text-xs text-weavrn-muted">
-                  {l.pricing_type}{l.price_amount ? ` · ${l.price_amount} ${l.price_token}` : ""}{l.escrow_strategy !== "all_or_nothing" ? ` · ${l.escrow_strategy.replace(/_/g, " ")}` : ""}
+                  {l.pricing_type}{l.price_amount ? ` \u00b7 ${l.price_amount} ${l.price_token}` : ""}{l.escrow_strategy !== "all_or_nothing" ? ` \u00b7 ${l.escrow_strategy.replace(/_/g, " ")}` : ""}
                 </p>
               </div>
               <div className="flex gap-2 ml-3 shrink-0">

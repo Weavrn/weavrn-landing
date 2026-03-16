@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { getListing, createJob } from "@/lib/api";
-import type { ServiceListing } from "@/lib/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getListing, createJob, uploadJobFile } from "@/lib/api";
+import type { ServiceListing, InputField } from "@/lib/api";
 
 interface Props {
   id: number;
@@ -14,6 +14,100 @@ function truncAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+function DynamicField({ field, value, onChange, fileRef }: {
+  field: InputField;
+  value: unknown;
+  onChange: (val: unknown) => void;
+  fileRef?: React.MutableRefObject<HTMLInputElement | null>;
+}) {
+  const base = "w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-3 text-sm text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none";
+
+  switch (field.type) {
+    case "textarea":
+      return (
+        <textarea
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          rows={4}
+          maxLength={field.max_length}
+          className={`${base} resize-none`}
+        />
+      );
+    case "code":
+      return (
+        <textarea
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder || "Paste code here..."}
+          rows={6}
+          maxLength={field.max_length}
+          className={`${base} resize-none font-mono text-xs`}
+        />
+      );
+    case "select":
+      return (
+        <select
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={base}
+        >
+          <option value="">Select...</option>
+          {field.options?.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      );
+    case "number":
+      return (
+        <input
+          type="number"
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          className={base}
+        />
+      );
+    case "file":
+      return (
+        <div>
+          <input
+            ref={(el) => { if (fileRef) fileRef.current = el; }}
+            type="file"
+            accept={field.accept?.join(",") || undefined}
+            onChange={(e) => onChange(e.target.files?.[0] || null)}
+            className="block w-full text-sm text-weavrn-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border file:border-weavrn-border file:bg-weavrn-surface file:text-sm file:text-weavrn-accent hover:file:bg-weavrn-accent/10 file:cursor-pointer"
+          />
+          {value instanceof File && (
+            <p className="text-[10px] text-weavrn-muted mt-1">{(value as File).name} ({Math.round((value as File).size / 1024)}KB)</p>
+          )}
+        </div>
+      );
+    case "url":
+    case "git_url":
+      return (
+        <input
+          type="url"
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder || (field.type === "git_url" ? "https://github.com/owner/repo" : "https://")}
+          className={base}
+        />
+      );
+    default:
+      return (
+        <input
+          type="text"
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          maxLength={field.max_length}
+          className={base}
+        />
+      );
+  }
+}
+
 export default function ListingDetail({ id, walletAddress, signer }: Props) {
   const [listing, setListing] = useState<ServiceListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,21 +116,70 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
   const [requested, setRequested] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // Generic fallback fields
   const [description, setDescription] = useState("");
   const [initialMessage, setInitialMessage] = useState("");
+  // Dynamic form state
+  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const hasSchema = listing?.input_schema && listing.input_schema.length > 0;
+
+  const setFieldValue = (name: string, value: unknown) => {
+    setFormValues((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleRequestService = async () => {
     if (!signer || !walletAddress || !listing) return;
     setRequesting(true);
     setRequestError(null);
     try {
-      await createJob(signer, walletAddress, {
+      // Validate required fields
+      if (hasSchema) {
+        for (const field of listing.input_schema!) {
+          if (field.required && field.type !== "file") {
+            const val = formValues[field.name];
+            if (!val || (typeof val === "string" && !val.trim())) {
+              setRequestError(`${field.label} is required`);
+              setRequesting(false);
+              return;
+            }
+          }
+        }
+      }
+
+      // Build input_data (exclude file fields — those get uploaded after job creation)
+      const inputData: Record<string, unknown> = {};
+      const fileFields: { field: InputField; file: File }[] = [];
+      if (hasSchema) {
+        for (const field of listing.input_schema!) {
+          const val = formValues[field.name];
+          if (field.type === "file" && val instanceof File) {
+            fileFields.push({ field, file: val });
+          } else if (val !== undefined && val !== null && val !== "") {
+            inputData[field.name] = val;
+          }
+        }
+      }
+
+      const job = await createJob(signer, walletAddress, {
         listing_id: listing.id,
         provider_wallet: listing.wallet_address,
         title: listing.title,
-        description: description.trim() || `Service request for: ${listing.title}`,
-        initial_message: initialMessage.trim() || undefined,
+        description: hasSchema ? `Service request for: ${listing.title}` : (description.trim() || `Service request for: ${listing.title}`),
+        initial_message: hasSchema ? undefined : (initialMessage.trim() || undefined),
+        input_data: hasSchema && Object.keys(inputData).length > 0 ? inputData : undefined,
       });
+
+      // Upload file fields after job creation
+      for (const { file } of fileFields) {
+        try {
+          await uploadJobFile(signer, walletAddress, job.id, file);
+        } catch {
+          // File upload failure is non-blocking
+        }
+      }
+
       setRequested(true);
     } catch (err: unknown) {
       setRequestError((err as { message?: string }).message || "Failed to request service");
@@ -131,26 +274,50 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
             ) : (
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold">Request this service</h4>
-                <div>
-                  <label className="text-xs text-weavrn-muted block mb-1">What do you need?</label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe what you'd like done..."
-                    rows={3}
-                    className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-3 text-sm text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-weavrn-muted block mb-1">Input / instructions (sent as first message)</label>
-                  <textarea
-                    value={initialMessage}
-                    onChange={(e) => setInitialMessage(e.target.value)}
-                    placeholder="Paste code, provide a URL, or write detailed instructions..."
-                    rows={4}
-                    className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-3 text-xs font-mono text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
-                  />
-                </div>
+
+                {hasSchema ? (
+                  /* Dynamic form from input_schema */
+                  listing.input_schema!.map((field) => (
+                    <div key={field.name}>
+                      <label className="text-xs text-weavrn-muted block mb-1">
+                        {field.label}{field.required && <span className="text-red-400 ml-0.5">*</span>}
+                      </label>
+                      {field.description && (
+                        <p className="text-[10px] text-weavrn-muted/60 mb-1">{field.description}</p>
+                      )}
+                      <DynamicField
+                        field={field}
+                        value={formValues[field.name]}
+                        onChange={(val) => setFieldValue(field.name, val)}
+                        fileRef={field.type === "file" ? fileInputRef : undefined}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  /* Generic fallback */
+                  <>
+                    <div>
+                      <label className="text-xs text-weavrn-muted block mb-1">What do you need?</label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Describe what you'd like done..."
+                        rows={3}
+                        className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-3 text-sm text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-weavrn-muted block mb-1">Input / instructions (sent as first message)</label>
+                      <textarea
+                        value={initialMessage}
+                        onChange={(e) => setInitialMessage(e.target.value)}
+                        placeholder="Paste code, provide a URL, or write detailed instructions..."
+                        rows={4}
+                        className="w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-3 text-xs font-mono text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="flex items-center gap-4 text-xs text-weavrn-muted">
                   <span>Price: {listing.price_amount || "Custom"} {listing.price_token}</span>
@@ -188,7 +355,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
         </div>
         <div className="glow-card rounded-xl p-4">
           <p className="text-xs text-weavrn-muted mb-1">Price</p>
-          <p className="text-sm font-mono">{listing.price_amount || "—"} {listing.price_token}</p>
+          <p className="text-sm font-mono">{listing.price_amount || "\u2014"} {listing.price_token}</p>
         </div>
         <div className="glow-card rounded-xl p-4">
           <p className="text-xs text-weavrn-muted mb-1">Escrow</p>
@@ -196,7 +363,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
         </div>
         <div className="glow-card rounded-xl p-4">
           <p className="text-xs text-weavrn-muted mb-1">Duration</p>
-          <p className="text-sm">{listing.estimated_duration || "—"}</p>
+          <p className="text-sm">{listing.estimated_duration || "\u2014"}</p>
         </div>
       </div>
 

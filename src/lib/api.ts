@@ -384,6 +384,18 @@ export async function updateAgentProfile(
 
 // ── Service Listings ──
 
+export interface InputField {
+  name: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "code" | "url" | "git_url" | "file" | "number";
+  required: boolean;
+  placeholder?: string;
+  options?: string[];
+  description?: string;
+  max_length?: number;
+  accept?: string[];
+}
+
 export interface ServiceListing {
   id: number;
   wallet_address: string;
@@ -398,6 +410,7 @@ export interface ServiceListing {
   milestone_config: unknown;
   trickle_duration: number | null;
   estimated_duration: string | null;
+  input_schema: InputField[] | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -444,6 +457,7 @@ export async function createListing(
     milestone_config?: unknown;
     trickle_duration?: number;
     estimated_duration?: string;
+    input_schema?: InputField[];
   },
 ) {
   const { signature, timestamp } = await signForWallet(signer, wallet, "create-listing");
@@ -557,7 +571,7 @@ export function getAgentRequests(wallet: string, page = 1, limit = 50, status?: 
 export async function createJob(
   signer: import("ethers").JsonRpcSigner,
   wallet: string,
-  data: { listing_id?: number; provider_wallet: string; title: string; description?: string; initial_message?: string },
+  data: { listing_id?: number; provider_wallet: string; title: string; description?: string; initial_message?: string; input_data?: Record<string, unknown> },
 ) {
   const { signature, timestamp } = await signForWallet(signer, wallet, "create-job");
   return apiFetch<Job>("/jobs", {
@@ -746,4 +760,34 @@ export function getAgentsFiltered(
   return apiFetch<{ agents: AgentListItem[]; total: number; page: number; limit: number }>(
     `/agents?${params}`,
   );
+}
+
+// ── File Uploads ──
+
+export async function uploadJobFile(
+  signer: import("ethers").JsonRpcSigner,
+  wallet: string,
+  jobId: number,
+  file: File,
+) {
+  const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file");
+  const form = new FormData();
+  form.append("file", file);
+  form.append("wallet_address", wallet.toLowerCase());
+  form.append("signature", signature);
+  form.append("timestamp", String(timestamp));
+
+  const res = await fetch(`${API_URL}/jobs/${jobId}/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || body.message || res.statusText);
+  }
+  return res.json() as Promise<JobMessage>;
+}
+
+export function getJobFileUrl(jobId: number, storedName: string, wallet: string) {
+  return `${API_URL}/jobs/${jobId}/files/${encodeURIComponent(storedName)}?wallet_address=${wallet.toLowerCase()}`;
 }
