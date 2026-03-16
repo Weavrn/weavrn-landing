@@ -727,18 +727,8 @@ export async function sendJobMessage(
   });
 }
 
-export async function getJobMessages(
-  signer: import("ethers").JsonRpcSigner,
-  wallet: string,
-  jobId: number,
-) {
-  const { signature, timestamp } = await signForWallet(signer, wallet, "get-messages");
-  const params = new URLSearchParams({
-    wallet_address: wallet.toLowerCase(),
-    signature,
-    timestamp: String(timestamp),
-  });
-  return apiFetch<{ messages: JobMessage[] }>(`/jobs/${jobId}/messages?${params}`);
+export function getJobMessages(wallet: string, jobId: number) {
+  return apiFetch<{ messages: JobMessage[] }>(`/jobs/${jobId}/messages?wallet_address=${wallet.toLowerCase()}`);
 }
 
 // ── Extended Agent Search ──
