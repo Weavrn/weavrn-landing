@@ -121,7 +121,13 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
   const [initialMessage, setInitialMessage] = useState("");
   // Dynamic form state
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRefs = useRef<Record<string, React.MutableRefObject<HTMLInputElement | null>>>({});
+  const getFileRef = (name: string) => {
+    if (!fileInputRefs.current[name]) {
+      fileInputRefs.current[name] = { current: null };
+    }
+    return fileInputRefs.current[name];
+  };
 
   const hasSchema = listing?.input_schema && listing.input_schema.length > 0;
 
@@ -293,7 +299,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
                         field={field}
                         value={formValues[field.name]}
                         onChange={(val) => setFieldValue(field.name, val)}
-                        fileRef={field.type === "file" ? fileInputRef : undefined}
+                        fileRef={field.type === "file" ? getFileRef(field.name) : undefined}
                       />
                     </div>
                   ))
