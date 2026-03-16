@@ -46,3 +46,21 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           rsync -rlgoDzvc --delete -e "ssh -i ~/.ssh/deploy_key" out/ "root@${HOST}:${TARGET}"
+  notify:
+    needs: [deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        run: |
+          RESULT="${{ needs.deploy.result }}"
+          if [ "$RESULT" = "success" ]; then
+            EMOJI=":white_check_mark:"
+            STATUS="succeeded"
+          else
+            EMOJI=":x:"
+            STATUS="failed"
+          fi
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \"${EMOJI} *weavrn-landing* deploy ${STATUS} — <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${GITHUB_SHA::7}> by ${{ github.actor }}\"}"
