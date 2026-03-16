@@ -54,6 +54,7 @@ jobs:
       - name: Notify Slack
         run: |
           RESULT="${{ needs.deploy.result }}"
+          ENV="${{ github.ref_name == 'main' && 'production' || 'develop' }}"
           if [ "$RESULT" = "success" ]; then
             EMOJI=":white_check_mark:"
             STATUS="succeeded"
@@ -63,4 +64,4 @@ jobs:
           fi
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"text\": \"${EMOJI} *weavrn-landing* deploy to *${{ github.ref_name }}* ${STATUS} — <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${GITHUB_SHA::7}> by ${{ github.actor }}\"}"
+            -d "{\"text\": \"${EMOJI} *weavrn-landing* deploy to *${ENV}* ${STATUS} — <https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${GITHUB_SHA::7}> by ${{ github.actor }}\"}"
