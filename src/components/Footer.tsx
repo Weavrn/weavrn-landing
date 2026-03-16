@@ -1,48 +1,19 @@
-"use client";
-
-import { useState } from "react";
 import { SOCIAL_LINKS, CONTACT_EMAIL } from "@/lib/constants";
 
 export default function Footer() {
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    window.location.href = `mailto:contact@weavrn.com?subject=Subscribe&body=Please add ${encodeURIComponent(email.trim())} to the Weavrn mailing list.`;
-    setSent(true);
-    setEmail("");
-  };
-
   return (
     <footer className="border-t border-weavrn-border/50 py-10 px-6">
       <div className="max-w-5xl mx-auto">
-        {/* Email signup */}
         <div className="max-w-md mx-auto mb-10 text-center">
           <p className="text-xs text-weavrn-muted font-mono tracking-wider uppercase mb-4">
             Stay Updated
           </p>
-          {sent ? (
-            <p className="text-sm text-[#00D4AA] py-3">Thanks! We&apos;ll be in touch.</p>
-          ) : (
-            <form onSubmit={handleSubscribe} className="flex gap-2">
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="flex-1 px-4 py-3 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors placeholder:text-weavrn-muted/50"
-              />
-              <button
-                type="submit"
-                className="px-6 py-3 bg-weavrn-surface border border-weavrn-border hover:border-[#00D4AA]/50 rounded-lg text-sm font-medium transition-all duration-300 hover:bg-weavrn-surface-light"
-              >
-                Subscribe
-              </button>
-            </form>
-          )}
+          <p className="text-sm text-weavrn-muted">
+            Contact us at{" "}
+            <a href="mailto:contact@weavrn.com" className="text-[#00D4AA] hover:underline">
+              contact@weavrn.com
+            </a>
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
