@@ -6,7 +6,7 @@ const NAV_LINKS = [
   { label: "Marketplace", href: "/marketplace" },
   { label: "Agents", href: "/agents" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Tokenomics", href: "/#tokenomics" },
+  { label: "Mining", href: "/mine" },
 ];
 
 export default function Navbar() {

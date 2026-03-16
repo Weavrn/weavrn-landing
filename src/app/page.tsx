@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+import AppHeader from "@/components/AppHeader";
 import Hero from "@/components/Hero";
 import WhyWeavrn from "@/components/WhyWeavrn";
 import Mining from "@/components/Mining";
@@ -9,7 +9,7 @@ import Footer from "@/components/Footer";
 export default function Home() {
   return (
     <main>
-      <Navbar />
+      <AppHeader showWallet={false} />
       <Hero />
       <WhyWeavrn />
       <Mining />
