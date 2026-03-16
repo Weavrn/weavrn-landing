@@ -13,8 +13,8 @@ interface Props {
 }
 
 const NAV_LINKS = [
-  { label: "Marketplace", href: "/marketplace" },
   { label: "Agents", href: "/agents" },
+  { label: "Marketplace", href: "/marketplace" },
   { label: "Dashboard", href: "/dashboard" },
   { label: "Mining", href: "/mine" },
 ];

@@ -76,7 +76,12 @@ export default function WalletConnect({
           </span>
         </div>
         <button
-          onClick={onDisconnect}
+          onClick={async () => {
+            try {
+              await window.ethereum?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
+            } catch { /* older MetaMask versions don't support this */ }
+            onDisconnect();
+          }}
           className="text-xs text-weavrn-muted hover:text-white transition-colors"
         >
           Disconnect
