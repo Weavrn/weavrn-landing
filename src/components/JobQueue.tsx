@@ -44,7 +44,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [chatJobId, setChatJobId] = useState<number | null>(null);
   const [fundingJobId, setFundingJobId] = useState<number | null>(null);
-  const [fundingDetails, setFundingDetails] = useState<{ price: string; fee: string; total: string } | null>(null);
+  const [fundingDetails, setFundingDetails] = useState<{ price: string; fee: string; total: string; feeModel: string; providerFee: string } | null>(null);
 
   const fetchJobs = useCallback(async (p: number, silent = false) => {
     if (!silent) setLoading(true);
@@ -113,12 +113,34 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       const listing = await getListing(job.listing_id);
       const price = listing.price_amount || "0.001";
       const priceNum = parseFloat(price);
-      const grossNum = priceNum * 10000 / (10000 - ESCROW_FEE_BPS);
-      const feeNum = grossNum - priceNum;
+      const feeModel = listing.fee_model || "payer";
+
+      let grossNum: number;
+      let payerFee: number;
+      let providerFee: number;
+
+      if (feeModel === "payer") {
+        grossNum = priceNum * 10000 / (10000 - ESCROW_FEE_BPS);
+        payerFee = grossNum - priceNum;
+        providerFee = 0;
+      } else if (feeModel === "provider") {
+        grossNum = priceNum;
+        payerFee = 0;
+        providerFee = priceNum * ESCROW_FEE_BPS / 10000;
+      } else {
+        // split
+        const halfBps = ESCROW_FEE_BPS / 2;
+        grossNum = priceNum * 10000 / (10000 - halfBps);
+        payerFee = grossNum - priceNum;
+        providerFee = priceNum * halfBps / 10000;
+      }
+
       setFundingDetails({
         price: priceNum.toFixed(6),
-        fee: feeNum.toFixed(6),
+        fee: payerFee > 0 ? payerFee.toFixed(6) : "0",
         total: grossNum.toFixed(6),
+        feeModel,
+        providerFee: providerFee > 0 ? providerFee.toFixed(6) : "0",
       });
       setFundingJobId(job.id);
     } catch (err: unknown) {
@@ -337,17 +359,35 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                     <span className="text-weavrn-muted">Service price</span>
                     <span className="text-white font-mono">{fundingDetails.price} ETH</span>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-weavrn-muted">Platform fee (0.5%)</span>
-                    <span className="text-white font-mono">{fundingDetails.fee} ETH</span>
-                  </div>
+                  {fundingDetails.fee !== "0" && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-weavrn-muted">
+                        Platform fee ({fundingDetails.feeModel === "split" ? "your half, " : ""}0.{fundingDetails.feeModel === "split" ? "25" : "5"}%)
+                      </span>
+                      <span className="text-white font-mono">{fundingDetails.fee} ETH</span>
+                    </div>
+                  )}
+                  {fundingDetails.providerFee !== "0" && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-weavrn-muted">
+                        Provider fee ({fundingDetails.feeModel === "split" ? "their half, " : ""}0.{fundingDetails.feeModel === "split" ? "25" : "5"}%)
+                      </span>
+                      <span className="text-weavrn-muted font-mono">-{fundingDetails.providerFee} ETH</span>
+                    </div>
+                  )}
                   <div className="border-t border-weavrn-border/30 pt-1 flex justify-between text-xs">
-                    <span className="text-white font-semibold">Total</span>
+                    <span className="text-white font-semibold">You pay</span>
                     <span className="text-weavrn-accent font-mono font-semibold">{fundingDetails.total} ETH</span>
                   </div>
                 </div>
                 <p className="text-[10px] text-weavrn-muted mb-3">
-                  The 0.5% platform fee is added on top so the provider receives the full listed price. Funds are held in escrow until you approve the deliverable.
+                  {fundingDetails.feeModel === "payer"
+                    ? "The 0.5% platform fee is added to your total. The provider receives the full listed price."
+                    : fundingDetails.feeModel === "provider"
+                    ? "The 0.5% platform fee is deducted from the provider\u2019s payout. You pay the listed price."
+                    : "The 0.5% platform fee is split equally between you and the provider."
+                  }
+                  {" "}Funds are held in escrow until you approve the deliverable.
                 </p>
                 <div className="flex gap-2">
                   <button
