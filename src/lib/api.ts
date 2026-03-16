@@ -497,7 +497,7 @@ export interface Job {
   provider_wallet: string;
   title: string;
   description: string | null;
-  status: "pending" | "accepted" | "in_progress" | "delivered" | "completed" | "cancelled" | "disputed";
+  status: "pending" | "accepted" | "in_progress" | "awaiting_input" | "delivered" | "completed" | "cancelled" | "disputed";
   escrow_id: number | null;
   deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
   deliverable_data: DeliverableData | null;

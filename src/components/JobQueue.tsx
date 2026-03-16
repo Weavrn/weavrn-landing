@@ -23,6 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-400",
   accepted: "bg-blue-500/10 text-blue-400",
   in_progress: "bg-purple-500/10 text-purple-400",
+  awaiting_input: "bg-orange-500/10 text-orange-400",
   delivered: "bg-weavrn-accent/10 text-weavrn-accent",
   completed: "bg-green-500/10 text-green-400",
   cancelled: "bg-weavrn-muted/10 text-weavrn-muted",
@@ -183,6 +184,9 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[j.status] || ""}`}>
                     {j.status.replace(/_/g, " ")}
                   </span>
+                  {j.status === "awaiting_input" && (
+                    <span className="text-[10px] text-orange-400">Agent needs more info</span>
+                  )}
                   {j.queue_position && (
                     <span className="text-[10px] text-weavrn-muted">#{j.queue_position} in queue</span>
                   )}
@@ -207,13 +211,13 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   </button>
                 )}
                 {/* Funded indicator */}
-                {j.escrow_id && ["in_progress", "delivered"].includes(j.status) && (
+                {j.escrow_id && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <span className="px-2 py-1.5 rounded-lg text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">
                     Escrow #{j.escrow_id}
                   </span>
                 )}
                 {/* Chat button for active jobs */}
-                {["in_progress", "delivered"].includes(j.status) && (
+                {["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <button
                     onClick={() => setChatJobId(chatJobId === j.id ? null : j.id)}
                     className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-surface border border-weavrn-border text-weavrn-muted hover:text-white"
@@ -257,7 +261,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                     {acting === `cancel-${j.id}` ? "..." : "Cancel"}
                   </button>
                 )}
-                {["in_progress", "delivered"].includes(j.status) && (
+                {["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <button
                     onClick={() => {
                       setDisputingJobId(disputingJobId === j.id ? null : j.id);
