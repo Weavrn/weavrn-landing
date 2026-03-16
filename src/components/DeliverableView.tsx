@@ -79,7 +79,16 @@ function ProofPanel({ proof }: { proof: DeliverableProof }) {
 
 export default function DeliverableView({ type, data: rawData, status, jobId, walletAddress, signer }: Props) {
   if (!rawData) return null;
-  const data: DeliverableData = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+  let data: DeliverableData;
+  try {
+    data = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+  } catch {
+    return (
+      <div className="rounded-lg bg-weavrn-dark border border-red-500/20 p-4">
+        <p className="text-xs text-red-400">Failed to parse deliverable data.</p>
+      </div>
+    );
+  }
 
   const isLocked = status !== "completed";
   const hasProof = data.proof && data.proof.total_files > 0;

@@ -80,13 +80,17 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     try {
       if (action === "accept") await acceptJob(signer, walletAddress, jobId);
       else if (action === "complete") {
-        // Find the job to get escrow_id
         const job = jobs.find(j => j.id === jobId);
         if (job?.escrow_id) {
-          // Release escrow on-chain first
           await releaseEscrow(signer, job.escrow_id);
         }
-        await completeJob(signer, walletAddress, jobId);
+        try {
+          await completeJob(signer, walletAddress, jobId);
+        } catch {
+          setError("Escrow released but job update failed. Click Approve again to retry.");
+          fetchJobs(page);
+          return;
+        }
       }
       else if (action === "cancel") await cancelJob(signer, walletAddress, jobId);
       fetchJobs(page);

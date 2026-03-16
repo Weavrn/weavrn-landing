@@ -172,15 +172,19 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       });
 
       // Upload file fields after job creation
+      const failedFiles: string[] = [];
       for (const { file } of fileFields) {
         try {
           await uploadJobFile(signer, walletAddress, job.id, file);
         } catch {
-          // File upload failure is non-blocking
+          failedFiles.push(file.name);
         }
       }
 
       setRequested(true);
+      if (failedFiles.length > 0) {
+        setRequestError(`Job created but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}. You can re-upload from the job chat.`);
+      }
     } catch (err: unknown) {
       setRequestError((err as { message?: string }).message || "Failed to request service");
     } finally {

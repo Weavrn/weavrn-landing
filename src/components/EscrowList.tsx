@@ -243,15 +243,6 @@ export default function EscrowList({
                             Claim{trInfo ? ` ${parseFloat(trInfo.claimable).toFixed(4)}` : ""}
                           </button>
                         )}
-                        {!isSender && strategyType !== "trickle" && e.status === "active" && (
-                          <button
-                            onClick={() => handleClaimStream(e.escrow_id)}
-                            disabled={acting === e.escrow_id}
-                            className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-semibold disabled:opacity-50"
-                          >
-                            Claim
-                          </button>
-                        )}
                         {isSender && pastDeadline && (
                           <button
                             onClick={() => handleRefund(e.escrow_id)}

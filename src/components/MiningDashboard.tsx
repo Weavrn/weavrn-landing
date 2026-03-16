@@ -43,8 +43,9 @@ function formatCountdown(endTimestamp: number): string {
   if (remaining <= 0) return "Closing...";
   const hours = Math.floor(remaining / 3600);
   const minutes = Math.floor((remaining % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  const seconds = remaining % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
 }
 
 function FilterTab<T extends string>({
@@ -146,7 +147,7 @@ export default function MiningDashboard({
       setCountdown(formatCountdown(data.current_block.end_time));
     };
     update();
-    const interval = setInterval(update, 60000);
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [data?.current_block, fetchData]);
 

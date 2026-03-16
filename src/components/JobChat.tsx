@@ -126,6 +126,12 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
   }, [fetchMessages]);
 
   useEffect(() => {
+    if (!waiting) return;
+    const timeout = setTimeout(() => setWaiting(false), 180_000);
+    return () => clearTimeout(timeout);
+  }, [waiting]);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
