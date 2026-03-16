@@ -43,6 +43,8 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [disputeReason, setDisputeReason] = useState("");
   const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
   const [chatJobId, setChatJobId] = useState<number | null>(null);
+  const [fundingJobId, setFundingJobId] = useState<number | null>(null);
+  const [fundingDetails, setFundingDetails] = useState<{ price: string; fee: string; total: string } | null>(null);
 
   const fetchJobs = useCallback(async (p: number, silent = false) => {
     if (!silent) setLoading(true);
@@ -102,28 +104,49 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     }
   };
 
+  const ESCROW_FEE_BPS = 50; // 0.5%
+
   const handleFundJob = async (job: Job) => {
-    if (!signer || !job.listing_id) return;
+    if (!job.listing_id) return;
+    setError(null);
+    try {
+      const listing = await getListing(job.listing_id);
+      const price = listing.price_amount || "0.001";
+      const priceNum = parseFloat(price);
+      const grossNum = priceNum * 10000 / (10000 - ESCROW_FEE_BPS);
+      const feeNum = grossNum - priceNum;
+      setFundingDetails({
+        price: priceNum.toFixed(6),
+        fee: feeNum.toFixed(6),
+        total: grossNum.toFixed(6),
+      });
+      setFundingJobId(job.id);
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Failed to load listing");
+    }
+  };
+
+  const confirmFund = async () => {
+    const job = jobs.find(j => j.id === fundingJobId);
+    if (!signer || !job?.listing_id || !fundingDetails) return;
     setActing(`fund-${job.id}`);
     setError(null);
     try {
-      // Get listing details for price and escrow strategy
       const listing = await getListing(job.listing_id);
-      const amount = listing.price_amount || "0.001";
       const strategy = listing.escrow_strategy || "all_or_nothing";
 
-      // Create escrow on-chain (7 day deadline)
       const { escrowId } = await createEscrowETH(
         signer,
         job.provider_wallet,
-        amount,
+        fundingDetails.total,
         7 * 24 * 60 * 60,
         strategy,
         `Job #${job.id}: ${job.title}`,
       );
 
-      // Link escrow to job via API
       await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+      setFundingJobId(null);
+      setFundingDetails(null);
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
@@ -305,6 +328,43 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   fetchJobs(page);
                 }}
               />
+            )}
+            {fundingJobId === j.id && fundingDetails && (
+              <div className="p-3 rounded-lg bg-weavrn-accent/5 border border-weavrn-accent/20">
+                <p className="text-xs text-white font-semibold mb-2">Fund Escrow</p>
+                <div className="space-y-1 mb-3">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-weavrn-muted">Service price</span>
+                    <span className="text-white font-mono">{fundingDetails.price} ETH</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-weavrn-muted">Platform fee (0.5%)</span>
+                    <span className="text-white font-mono">{fundingDetails.fee} ETH</span>
+                  </div>
+                  <div className="border-t border-weavrn-border/30 pt-1 flex justify-between text-xs">
+                    <span className="text-white font-semibold">Total</span>
+                    <span className="text-weavrn-accent font-mono font-semibold">{fundingDetails.total} ETH</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-weavrn-muted mb-3">
+                  The 0.5% platform fee is added on top so the provider receives the full listed price. Funds are held in escrow until you approve the deliverable.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmFund}
+                    disabled={acting === `fund-${j.id}`}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover disabled:opacity-50"
+                  >
+                    {acting === `fund-${j.id}` ? "Funding..." : "Confirm & Fund"}
+                  </button>
+                  <button
+                    onClick={() => { setFundingJobId(null); setFundingDetails(null); }}
+                    className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
             {disputingJobId === j.id && (
               <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
