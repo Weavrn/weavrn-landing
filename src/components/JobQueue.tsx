@@ -166,7 +166,16 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         `Job #${job.id}: ${job.title}`,
       );
 
-      await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+      // Retry linking — escrow indexer polls every 30s
+      for (let i = 0; i < 8; i++) {
+        try {
+          await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+          break;
+        } catch {
+          if (i === 7) throw new Error("Escrow created on-chain but indexer hasn't picked it up yet. Try refreshing in 30 seconds.");
+          await new Promise(r => setTimeout(r, 5000));
+        }
+      }
       setFundingJobId(null);
       setFundingDetails(null);
       fetchJobs(page);
