@@ -84,14 +84,17 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       else if (action === "complete") {
         const job = jobs.find(j => j.id === jobId);
         if (job?.escrow_id) {
-          await releaseEscrow(signer, job.escrow_id);
+          try { await releaseEscrow(signer, job.escrow_id); } catch { /* already released */ }
         }
-        try {
-          await completeJob(signer, walletAddress, jobId);
-        } catch {
-          setError("Escrow released but job update failed. Click Approve again to retry.");
-          fetchJobs(page);
-          return;
+        // Retry — escrow indexer needs time to pick up the release
+        for (let i = 0; i < 8; i++) {
+          try {
+            await completeJob(signer, walletAddress, jobId);
+            break;
+          } catch {
+            if (i === 7) { setError("Escrow released but indexer is slow. Try Approve again in 30s."); fetchJobs(page); return; }
+            await new Promise(r => setTimeout(r, 5000));
+          }
         }
       }
       else if (action === "cancel") await cancelJob(signer, walletAddress, jobId);
