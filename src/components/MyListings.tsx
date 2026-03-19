@@ -207,6 +207,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
         <h3 className="text-lg font-semibold">My Listings</h3>
         <button
           onClick={() => setShowForm(!showForm)}
+          data-testid="new-listing-btn"
           className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 transition-colors"
         >
           {showForm ? "Cancel" : "New Listing"}
@@ -220,6 +221,8 @@ export default function MyListings({ walletAddress, signer }: Props) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              name="listing-title"
+              data-testid="listing-title-input"
               className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="Service title"
             />
@@ -230,8 +233,10 @@ export default function MyListings({ walletAddress, signer }: Props) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              name="listing-description"
+              data-testid="listing-desc-input"
               className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
-              placeholder="What does this service do?"
+              placeholder="Describe what this service does, expected inputs, and what the requester will receive..."
             />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -240,6 +245,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
+                name="listing-category"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               >
                 {CATEGORIES.map((c) => (
@@ -252,6 +258,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
               <select
                 value={pricingType}
                 onChange={(e) => setPricingType(e.target.value)}
+                name="listing-pricing"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               >
                 <option value="fixed">Fixed</option>
@@ -264,6 +271,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
               <input
                 value={priceAmount}
                 onChange={(e) => setPriceAmount(e.target.value)}
+                name="listing-price"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
                 placeholder="0.1"
               />
@@ -273,6 +281,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
               <select
                 value={escrowStrategy}
                 onChange={(e) => setEscrowStrategy(e.target.value)}
+                name="listing-escrow"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               >
                 <option value="all_or_nothing">All or Nothing</option>
@@ -287,6 +296,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
               <input
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
+                name="listing-tags"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
                 placeholder="ai, data, automation"
               />
@@ -296,6 +306,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
               <input
                 value={estimatedDuration}
                 onChange={(e) => setEstimatedDuration(e.target.value)}
+                name="listing-duration"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
                 placeholder="2 hours"
               />
@@ -339,9 +350,15 @@ export default function MyListings({ walletAddress, signer }: Props) {
           <button
             onClick={handleCreate}
             disabled={creating || !signer || !title || !description}
-            className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold disabled:opacity-50 transition-all"
+            data-testid="create-listing-btn"
+            className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center gap-2"
           >
-            {creating ? "Creating..." : "Create Listing"}
+            {creating ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                Creating...
+              </>
+            ) : "Create Listing"}
           </button>
         </div>
       )}

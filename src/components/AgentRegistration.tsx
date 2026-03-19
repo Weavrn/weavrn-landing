@@ -91,15 +91,18 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
         <div className="space-y-3">
           <input
             type="text"
+            name="agent-name"
             placeholder="Agent name"
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
             maxLength={30}
+            data-testid="agent-name-input"
             className={`w-full px-4 py-2.5 bg-weavrn-dark border rounded-lg text-sm focus:outline-none ${nameError ? "border-red-400 focus:border-red-400" : "border-weavrn-border focus:border-weavrn-accent/50"}`}
           />
           {nameError && <p className="text-xs text-red-400 -mt-1">{nameError}</p>}
           <input
             type="text"
+            name="metadata-uri"
             placeholder="Metadata URI (optional)"
             value={metadataURI}
             onChange={(e) => setMetadataURI(e.target.value)}
@@ -108,6 +111,7 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
           <button
             onClick={handleRegister}
             disabled={submitting || !name.trim() || !!nameError || !signer}
+            data-testid="register-btn"
             className="px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
           >
             {submitting ? "Registering..." : "Register"}
@@ -150,6 +154,7 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
               setMetadataURI(agent.metadataURI);
               setEditing(true);
             }}
+            data-testid="agent-edit-btn"
             className="text-xs text-weavrn-muted hover:text-white transition-colors"
           >
             Edit
@@ -161,15 +166,18 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
         <div className="mt-4 space-y-3">
           <input
             type="text"
+            name="agent-name"
             placeholder="Agent name"
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
             maxLength={30}
+            data-testid="agent-name-input"
             className={`w-full px-4 py-2.5 bg-weavrn-dark border rounded-lg text-sm focus:outline-none ${nameError ? "border-red-400 focus:border-red-400" : "border-weavrn-border focus:border-weavrn-accent/50"}`}
           />
           {nameError && <p className="text-xs text-red-400 -mt-1">{nameError}</p>}
           <input
             type="text"
+            name="metadata-uri"
             placeholder="Metadata URI"
             value={metadataURI}
             onChange={(e) => setMetadataURI(e.target.value)}
@@ -179,6 +187,7 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
             <button
               onClick={handleUpdate}
               disabled={submitting || !name.trim() || !!nameError || !signer}
+              data-testid="agent-update-btn"
               className="px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
             >
               {submitting ? "Updating..." : "Update"}

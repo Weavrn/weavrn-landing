@@ -270,15 +270,23 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
+            name="chat-message"
+            data-testid="chat-input"
             rows={1}
             className="flex-1 bg-weavrn-surface border border-weavrn-border rounded-lg px-3 py-2 text-xs text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none resize-none"
           />
           <button
             onClick={handleSend}
             disabled={sending || waiting || !input.trim() || !signer}
-            className="px-3 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold disabled:opacity-50 transition-all shrink-0"
+            data-testid="chat-send-btn"
+            className="px-3 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold disabled:opacity-50 transition-all shrink-0 flex items-center gap-1"
           >
-            {sending ? "..." : "Send"}
+            {sending ? (
+              <>
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                Sending...
+              </>
+            ) : "Send"}
           </button>
         </div>
       </div>

@@ -94,8 +94,10 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             rows={3}
+            name="bio"
+            data-testid="profile-bio"
             className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
-            placeholder="Describe what your agent does..."
+            placeholder="Describe what your agent does, its capabilities, and what makes it unique..."
           />
         </div>
 
@@ -105,6 +107,8 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
+              name="tags"
+              data-testid="profile-tags"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="ai, data, automation"
             />
@@ -114,6 +118,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={specializations}
               onChange={(e) => setSpecializations(e.target.value)}
+              name="specializations"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="code-review, data-analysis"
             />
@@ -126,6 +131,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
+              name="website"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="https://..."
             />
@@ -135,6 +141,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={githubUrl}
               onChange={(e) => setGithubUrl(e.target.value)}
+              name="github-url"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="https://github.com/..."
             />
@@ -144,6 +151,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={xHandle}
               onChange={(e) => setXHandle(e.target.value)}
+              name="x-handle"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="@handle"
             />
@@ -156,6 +164,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <select
               value={availability}
               onChange={(e) => setAvailability(e.target.value)}
+              name="availability"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
             >
               <option value="available">Available</option>
@@ -168,6 +177,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={preferredTokens}
               onChange={(e) => setPreferredTokens(e.target.value)}
+              name="preferred-tokens"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="ETH, WVRN, USDC"
             />
@@ -177,6 +187,7 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
             <input
               value={minAmount}
               onChange={(e) => setMinAmount(e.target.value)}
+              name="min-amount"
               className="w-full px-3 py-2 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
               placeholder="0.01 ETH"
             />
@@ -189,9 +200,15 @@ export default function ProfileEditor({ walletAddress, signer }: Props) {
         <button
           onClick={handleSave}
           disabled={saving || !signer}
-          className="px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold disabled:opacity-50 transition-all"
+          data-testid="profile-save-btn"
+          className="px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center gap-2"
         >
-          {saving ? "Saving..." : "Save Profile"}
+          {saving ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+              Saving...
+            </>
+          ) : "Save Profile"}
         </button>
       </div>
     </div>

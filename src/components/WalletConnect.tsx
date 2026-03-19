@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getProviderAndSigner, checkAndSwitchChain, getChainConfig } from "@/lib/contracts";
+import { createSession, clearSession } from "@/lib/api";
 
 interface WalletConnectProps {
   onConnect: (address: string, signer: JsonRpcSigner) => void;
@@ -31,6 +32,7 @@ export default function WalletConnect({
         const switched = await checkAndSwitchChain();
         if (!switched) return;
         const { signer, address: addr } = await getProviderAndSigner();
+        await createSession(signer, addr);
         onConnect(addr, signer);
       } catch {
         // silent fail on auto-connect
@@ -53,6 +55,7 @@ export default function WalletConnect({
         return;
       }
       const { signer, address: addr } = await getProviderAndSigner();
+      await createSession(signer, addr);
       onConnect(addr, signer);
     } catch (err: unknown) {
       const e = err as { code?: number; message?: string };
@@ -77,11 +80,13 @@ export default function WalletConnect({
         </div>
         <button
           onClick={async () => {
+            await clearSession();
             try {
               await window.ethereum?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
             } catch { /* older MetaMask versions don't support this */ }
             onDisconnect();
           }}
+          data-testid="disconnect-btn"
           className="text-xs text-weavrn-muted hover:text-white transition-colors"
         >
           Disconnect
@@ -95,6 +100,7 @@ export default function WalletConnect({
       <button
         onClick={connect}
         disabled={connecting}
+        data-testid="connect-wallet-btn"
         className="px-5 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
       >
         {connecting ? "Connecting..." : "Connect Wallet"}

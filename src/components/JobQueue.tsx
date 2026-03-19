@@ -30,6 +30,32 @@ const STATUS_COLORS: Record<string, string> = {
   disputed: "bg-red-500/10 text-red-400",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  in_progress: "In Progress",
+  awaiting_input: "Needs Info",
+  delivered: "Ready for Review",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  disputed: "Disputed",
+};
+
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = Math.max(0, now - then);
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
 export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [tab, setTab] = useState<"provider" | "requester">("requester");
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -216,12 +242,14 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         <div className="flex gap-1">
           <button
             onClick={() => setTab("provider")}
+            data-testid="job-tab-providing"
             className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${tab === "provider" ? "border-weavrn-accent text-weavrn-accent" : "border-weavrn-border text-weavrn-muted"}`}
           >
             Providing
           </button>
           <button
             onClick={() => setTab("requester")}
+            data-testid="job-tab-requesting"
             className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${tab === "requester" ? "border-weavrn-accent text-weavrn-accent" : "border-weavrn-border text-weavrn-muted"}`}
           >
             Requesting
@@ -243,7 +271,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[j.status] || ""}`}>
-                    {j.status.replace(/_/g, " ")}
+                    {STATUS_LABELS[j.status] || j.status}
                   </span>
                   {j.status === "awaiting_input" && (
                     <span className="text-[10px] text-orange-400">Agent needs more info</span>
@@ -251,8 +279,12 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   {j.queue_position && (
                     <span className="text-[10px] text-weavrn-muted">#{j.queue_position} in queue</span>
                   )}
+                  <span className="text-[10px] text-weavrn-muted/60">{relativeTime(j.created_at)}</span>
                 </div>
-                <p className="text-sm font-semibold truncate">{j.title}</p>
+                <p className="text-sm font-semibold truncate">
+                  <span className="text-weavrn-muted font-mono text-xs mr-1.5">#{j.id}</span>
+                  {j.title}
+                </p>
                 <p className="text-xs text-weavrn-muted">
                   {tab === "provider" ? `From ${truncAddr(j.requester_wallet)}` : `To ${truncAddr(j.provider_wallet)}`}
                   {!j.escrow_id && j.status === "in_progress" && tab === "requester" && (
@@ -266,6 +298,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   <button
                     onClick={() => handleFundJob(j)}
                     disabled={acting === `fund-${j.id}`}
+                    data-testid="job-fund-btn"
                     className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover disabled:opacity-50 transition-all"
                   >
                     {acting === `fund-${j.id}` ? "Funding..." : "Fund"}
@@ -281,6 +314,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 {["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <button
                     onClick={() => setChatJobId(chatJobId === j.id ? null : j.id)}
+                    data-testid="job-chat-btn"
                     className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-surface border border-weavrn-border text-weavrn-muted hover:text-white"
                   >
                     {chatJobId === j.id ? "Close" : "Chat"}
@@ -308,9 +342,10 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   <button
                     onClick={() => handleAction("complete", j.id)}
                     disabled={acting === `complete-${j.id}`}
-                    className="px-3 py-1.5 rounded-lg text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20 disabled:opacity-50"
+                    data-testid="job-approve-btn"
+                    className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover disabled:opacity-50 transition-all"
                   >
-                    {acting === `complete-${j.id}` ? "..." : "Approve"}
+                    {acting === `complete-${j.id}` ? "..." : "Approve & Release"}
                   </button>
                 )}
                 {["pending", "accepted"].includes(j.status) && (
@@ -329,6 +364,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                       setDisputeReason("");
                     }}
                     disabled={acting === `dispute-${j.id}`}
+                    data-testid="job-dispute-btn"
                     className="px-3 py-1.5 rounded-lg text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                   >
                     {acting === `dispute-${j.id}` ? "..." : "Dispute"}
