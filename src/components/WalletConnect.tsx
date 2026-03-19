@@ -32,8 +32,9 @@ export default function WalletConnect({
         const switched = await checkAndSwitchChain();
         if (!switched) return;
         const { signer, address: addr } = await getProviderAndSigner();
-        await createSession(signer, addr);
         onConnect(addr, signer);
+        // Create session in background — don't block auto-connect
+        createSession(signer, addr).catch(() => {});
       } catch {
         // silent fail on auto-connect
       }
@@ -55,8 +56,9 @@ export default function WalletConnect({
         return;
       }
       const { signer, address: addr } = await getProviderAndSigner();
-      await createSession(signer, addr);
       onConnect(addr, signer);
+      // Create session in background — don't block manual connect
+      createSession(signer, addr).catch(() => {});
     } catch (err: unknown) {
       const e = err as { code?: number; message?: string };
       if (e.code === 4001) return; // user rejected
