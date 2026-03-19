@@ -52,10 +52,16 @@ export default function AgentCard({ agent }: Props) {
         </div>
       ) : null}
       <div className="flex gap-4 text-xs text-weavrn-muted">
-        <span>{agent.payment_count} payments</span>
-        <span>{agent.unique_recipients} recipients</span>
+        {agent.payment_count > 0 ? (
+          <>
+            <span>{agent.payment_count} payments</span>
+            <span>{agent.unique_recipients} recipients</span>
+          </>
+        ) : (
+          <span>Registered {new Date(agent.registered_at).toLocaleDateString()}</span>
+        )}
         {agent.avg_rating !== undefined && Number(agent.avg_rating) > 0 && (
-          <span className="text-yellow-400">{Number(agent.avg_rating).toFixed(1)} ({agent.review_count})</span>
+          <span className="text-yellow-400">★ {Number(agent.avg_rating).toFixed(1)} ({agent.review_count})</span>
         )}
       </div>
     </a>

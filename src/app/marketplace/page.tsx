@@ -85,10 +85,10 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
           <button
             key={cat}
             onClick={() => setCategory(cat)}
-            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+            className={`px-3 py-2 min-h-[40px] rounded-lg text-xs font-medium border transition-colors ${
               category === cat
                 ? "border-weavrn-accent text-weavrn-accent bg-weavrn-accent/10"
-                : "border-weavrn-border text-weavrn-muted hover:text-white"
+                : "border-weavrn-border text-gray-300 bg-weavrn-surface hover:text-white hover:border-gray-500"
             }`}
           >
             {cat.charAt(0).toUpperCase() + cat.slice(1)}

@@ -26,8 +26,27 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  const NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9 -]{0,28}[a-zA-Z0-9]$/;
+
+  const validateName = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) return "Name must be at least 2 characters";
+    if (trimmed.length > 30) return "Name must be 30 characters or less";
+    if (!NAME_REGEX.test(trimmed)) return "Letters, numbers, spaces, and hyphens only";
+    return null;
+  };
+
+  const handleNameChange = (value: string) => {
+    setName(value);
+    if (value.trim()) setNameError(validateName(value));
+    else setNameError(null);
+  };
 
   const handleRegister = async () => {
+    const err = validateName(name);
+    if (err) { setNameError(err); return; }
     if (!signer || !name.trim()) return;
     setSubmitting(true);
     setError(null);
@@ -74,9 +93,11 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
             type="text"
             placeholder="Agent name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
+            onChange={(e) => handleNameChange(e.target.value)}
+            maxLength={30}
+            className={`w-full px-4 py-2.5 bg-weavrn-dark border rounded-lg text-sm focus:outline-none ${nameError ? "border-red-400 focus:border-red-400" : "border-weavrn-border focus:border-weavrn-accent/50"}`}
           />
+          {nameError && <p className="text-xs text-red-400 -mt-1">{nameError}</p>}
           <input
             type="text"
             placeholder="Metadata URI (optional)"
@@ -86,7 +107,7 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
           />
           <button
             onClick={handleRegister}
-            disabled={submitting || !name.trim() || !signer}
+            disabled={submitting || !name.trim() || !!nameError || !signer}
             className="px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
           >
             {submitting ? "Registering..." : "Register"}
@@ -142,9 +163,11 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
             type="text"
             placeholder="Agent name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
+            onChange={(e) => handleNameChange(e.target.value)}
+            maxLength={30}
+            className={`w-full px-4 py-2.5 bg-weavrn-dark border rounded-lg text-sm focus:outline-none ${nameError ? "border-red-400 focus:border-red-400" : "border-weavrn-border focus:border-weavrn-accent/50"}`}
           />
+          {nameError && <p className="text-xs text-red-400 -mt-1">{nameError}</p>}
           <input
             type="text"
             placeholder="Metadata URI"
@@ -155,7 +178,7 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
           <div className="flex gap-2">
             <button
               onClick={handleUpdate}
-              disabled={submitting || !name.trim() || !signer}
+              disabled={submitting || !name.trim() || !!nameError || !signer}
               className="px-4 py-2.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
             >
               {submitting ? "Updating..." : "Update"}
