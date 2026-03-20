@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getProviderAndSigner, checkAndSwitchChain, getChainConfig } from "@/lib/contracts";
-import { createSession, clearSession } from "@/lib/api";
+import { clearSession } from "@/lib/api";
 
 interface WalletConnectProps {
   onConnect: (address: string, signer: JsonRpcSigner) => void;
@@ -33,7 +33,6 @@ export default function WalletConnect({
         if (!switched) return;
         const { signer, address: addr } = await getProviderAndSigner();
         onConnect(addr, signer);
-        createSession(signer, addr).catch(() => {});
       } catch {
         // silent fail on auto-connect
       }
@@ -76,8 +75,6 @@ export default function WalletConnect({
       }
       const { signer, address: addr } = await getProviderAndSigner();
       onConnect(addr, signer);
-      // Create session in background — don't block manual connect
-      createSession(signer, addr).catch(() => {});
     } catch (err: unknown) {
       const e = err as { code?: number; message?: string };
       if (e.code === 4001) return; // user rejected
