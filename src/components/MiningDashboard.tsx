@@ -532,24 +532,6 @@ export default function MiningDashboard({
         </div>
       )}
 
-      {/* Earnings chart */}
-      <EarningsChart walletAddress={walletAddress} />
-
-      {/* Leaderboard */}
-      <MiningLeaderboard />
-
-      {/* YouTube verification (if X is linked but YT isn't) */}
-      {xHandle && !profile?.yt_handle && (
-        <YouTubeVerification
-          walletAddress={walletAddress}
-          signer={signer}
-          ytHandle={null}
-          ytVerificationCode={profile?.yt_verification_code ?? null}
-          ytVerificationHandle={profile?.yt_verification_handle ?? null}
-          onUpdate={fetchData}
-        />
-      )}
-
       {/* Mining rules */}
       <MiningRules
         followerCount={profile?.x_follower_count}
@@ -888,6 +870,28 @@ export default function MiningDashboard({
           </div>
         )}
       </div>
+
+      {/* Earnings chart — only show when there's data */}
+      {blockRewards.length > 0 && (
+        <EarningsChart walletAddress={walletAddress} />
+      )}
+
+      {/* Leaderboard — only show when there's data */}
+      {blockRewards.length > 0 && (
+        <MiningLeaderboard />
+      )}
+
+      {/* YouTube verification (if X is linked but YT isn't) */}
+      {xHandle && !profile?.yt_handle && (
+        <YouTubeVerification
+          walletAddress={walletAddress}
+          signer={signer}
+          ytHandle={null}
+          ytVerificationCode={profile?.yt_verification_code ?? null}
+          ytVerificationHandle={profile?.yt_verification_handle ?? null}
+          onUpdate={fetchData}
+        />
+      )}
     </div>
   );
 }
