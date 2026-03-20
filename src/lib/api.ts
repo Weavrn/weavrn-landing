@@ -69,6 +69,7 @@ export interface TrackedPost {
   first_seen_at: string;
   deactivated: boolean;
   deleted_at: string | null;
+  platform: "x" | "youtube";
   likes: number | null;
   retweets: number | null;
   replies: number | null;
@@ -110,6 +111,13 @@ export interface Profile {
   verification_code: string | null;
   verification_handle: string | null;
   verification_expires_at: string | null;
+  x_follower_count: number | null;
+  yt_channel_id: string | null;
+  yt_handle: string | null;
+  yt_verification_code: string | null;
+  yt_verification_handle: string | null;
+  yt_verification_expires_at: string | null;
+  yt_subscriber_count: number | null;
   created_at: string;
 }
 
@@ -841,4 +849,90 @@ export async function uploadJobFile(
 
 export function getJobFileUrl(jobId: number, storedName: string, wallet: string) {
   return `${API_URL}/jobs/${jobId}/files/${encodeURIComponent(storedName)}?wallet_address=${wallet.toLowerCase()}`;
+}
+
+// ── Leaderboard ──
+
+export interface LeaderboardEntry {
+  wallet_address: string;
+  x_handle: string | null;
+  yt_handle: string | null;
+  delta_score: number;
+  total_delta?: number;
+  post_count: number;
+  reward_amount?: string;
+  total_earned?: string;
+}
+
+export interface LeaderboardResponse {
+  block: number | "alltime";
+  leaderboard: LeaderboardEntry[];
+}
+
+export function getLeaderboard(block?: number | "alltime", limit = 20) {
+  const params = new URLSearchParams();
+  if (block != null) params.set("block", String(block));
+  if (limit !== 20) params.set("limit", String(limit));
+  return apiFetch<LeaderboardResponse>(`/rewards/leaderboard?${params}`);
+}
+
+// ── Earnings History ──
+
+export interface EarningsBlock {
+  block_number: number;
+  delta_score: number;
+  post_count: number;
+  reward_amount: string | null;
+}
+
+export function getEarningsHistory(wallet: string, blocks = 20) {
+  return apiFetch<{ wallet: string; blocks: EarningsBlock[] }>(
+    `/rewards/${wallet.toLowerCase()}/history?blocks=${blocks}`
+  );
+}
+
+// ── Mining Stats ──
+
+export interface MiningStatsResponse {
+  current_block: number;
+  current_emission: string;
+  total_miners: number;
+  total_blocks_settled: number;
+  total_wvrn_distributed: string;
+  active_miners_this_block: number;
+  rules: {
+    min_engagement_score: number;
+    min_x_followers: number;
+    min_yt_subscribers: number;
+  };
+}
+
+export function getMiningStats() {
+  return apiFetch<MiningStatsResponse>("/rewards/stats");
+}
+
+// ── YouTube Verification ──
+
+export async function startYouTubeVerification(signer: import("ethers").JsonRpcSigner, wallet: string, ytHandle: string) {
+  const auth = await authBody(signer, wallet, "start-yt-verification");
+  return apiFetch<VerificationResponse>("/auth/start-yt-verification", {
+    method: "POST",
+    body: JSON.stringify({ ...auth, yt_handle: ytHandle }),
+  });
+}
+
+export async function verifyYouTubeHandle(signer: import("ethers").JsonRpcSigner, wallet: string) {
+  const auth = await authBody(signer, wallet, "verify-yt");
+  return apiFetch<Profile>("/auth/verify-yt", {
+    method: "POST",
+    body: JSON.stringify(auth),
+  });
+}
+
+export async function unlinkYouTubeHandle(signer: import("ethers").JsonRpcSigner, wallet: string) {
+  const auth = await authBody(signer, wallet, "unlink-yt");
+  return apiFetch<Profile>("/auth/unlink-yt", {
+    method: "POST",
+    body: JSON.stringify(auth),
+  });
 }

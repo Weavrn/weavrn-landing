@@ -14,6 +14,7 @@ import {
   markClaimed,
   type Submission,
   type RewardsResponse,
+  type Profile,
 } from "@/lib/api";
 import {
   claimReward,
@@ -21,6 +22,13 @@ import {
   addTokenToWallet,
   getExplorerTxUrl,
 } from "@/lib/contracts";
+
+import MiningLeaderboard from "./MiningLeaderboard";
+import EarningsChart from "./EarningsChart";
+import ScoreBreakdown from "./ScoreBreakdown";
+import YouTubeVerification from "./YouTubeVerification";
+import PlatformFilter from "./PlatformFilter";
+import MiningRules from "./MiningRules";
 
 interface MiningDashboardProps {
   walletAddress: string;
@@ -89,6 +97,7 @@ export default function MiningDashboard({
   const [handleInput, setHandleInput] = useState("");
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
   const [verificationHandle, setVerificationHandle] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [data, setData] = useState<RewardsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -104,24 +113,26 @@ export default function MiningDashboard({
   const [rewardFilter, setRewardFilter] = useState<RewardFilter>("claimable");
   const [postFilter, setPostFilter] = useState<PostFilter>("active");
   const [postSort, setPostSort] = useState<PostSort>("newest");
+  const [platformFilter, setPlatformFilter] = useState<"all" | "x" | "youtube">("all");
 
   const fetchData = useCallback(async () => {
     try {
-      const [rewards, profile] = await Promise.all([
+      const [rewards, p] = await Promise.all([
         getRewards(walletAddress),
         getProfile(walletAddress),
       ]);
       setData(rewards);
-      if (profile.x_handle) {
-        setXHandle(profile.x_handle);
+      setProfile(p);
+      if (p.x_handle) {
+        setXHandle(p.x_handle);
         setVerificationCode(null);
         setVerificationHandle(null);
-      } else if (profile.verification_code && profile.verification_handle) {
-        const expired = profile.verification_expires_at
-          && new Date(profile.verification_expires_at) < new Date();
+      } else if (p.verification_code && p.verification_handle) {
+        const expired = p.verification_expires_at
+          && new Date(p.verification_expires_at) < new Date();
         if (!expired) {
-          setVerificationCode(profile.verification_code);
-          setVerificationHandle(profile.verification_handle);
+          setVerificationCode(p.verification_code);
+          setVerificationHandle(p.verification_handle);
         }
       }
     } catch (err: unknown) {
@@ -175,8 +186,8 @@ export default function MiningDashboard({
     setError(null);
     try {
       if (!signer) { setError("Wallet not connected"); return; }
-      const profile = await verifyHandle(signer, walletAddress);
-      setXHandle(profile.x_handle);
+      const p = await verifyHandle(signer, walletAddress);
+      setXHandle(p.x_handle);
       setVerificationCode(null);
       setVerificationHandle(null);
       await fetchData();
@@ -290,6 +301,9 @@ export default function MiningDashboard({
 
   const filteredPosts = useMemo(() => {
     let posts = trackedPosts;
+    if (platformFilter !== "all") {
+      posts = posts.filter((p) => p.platform === platformFilter);
+    }
     if (postFilter === "active") {
       posts = posts.filter((p) => !p.deleted_at);
     }
@@ -300,7 +314,7 @@ export default function MiningDashboard({
       return [...posts].sort((a, b) => b.estimated_wvrn - a.estimated_wvrn);
     }
     return posts;
-  }, [trackedPosts, postFilter, postSort]);
+  }, [trackedPosts, postFilter, postSort, platformFilter]);
 
   const deletedCount = trackedPosts.filter((p) => p.deleted_at).length;
 
@@ -332,10 +346,11 @@ export default function MiningDashboard({
     );
   }
 
-  // State A: No handle, no pending verification
-  if (!xHandle && !verificationCode) {
+  // State A: No handle linked on either platform, no pending verification
+  const hasAnyHandle = xHandle || profile?.yt_handle;
+  if (!hasAnyHandle && !verificationCode) {
     return (
-      <div className="max-w-md mx-auto">
+      <div className="max-w-md mx-auto space-y-6">
         <div className="glow-card rounded-2xl p-8">
           <h3 className="text-lg font-bold text-white mb-2">
             Link your X account
@@ -362,11 +377,19 @@ export default function MiningDashboard({
           </form>
           {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
         </div>
+        <YouTubeVerification
+          walletAddress={walletAddress}
+          signer={signer}
+          ytHandle={profile?.yt_handle ?? null}
+          ytVerificationCode={profile?.yt_verification_code ?? null}
+          ytVerificationHandle={profile?.yt_verification_handle ?? null}
+          onUpdate={fetchData}
+        />
       </div>
     );
   }
 
-  // State B: Pending verification
+  // State B: Pending X verification
   if (!xHandle && verificationCode) {
     return (
       <div className="max-w-md mx-auto">
@@ -482,13 +505,21 @@ export default function MiningDashboard({
                 Block {data.current_block.number}
               </h3>
               <p className="text-sm text-weavrn-muted mt-1">
-                @{xHandle}
-                <button
-                  onClick={handleUnlink}
-                  className="ml-2 text-xs text-weavrn-muted/50 hover:text-red-400 transition-colors"
-                >
-                  change
-                </button>
+                {xHandle && (
+                  <>
+                    @{xHandle}
+                    <button
+                      onClick={handleUnlink}
+                      className="ml-2 text-xs text-weavrn-muted/50 hover:text-red-400 transition-colors"
+                    >
+                      change
+                    </button>
+                  </>
+                )}
+                {xHandle && profile?.yt_handle && <span className="mx-2 text-weavrn-border">|</span>}
+                {profile?.yt_handle && (
+                  <span className="text-weavrn-muted">YT @{profile.yt_handle}</span>
+                )}
               </p>
             </div>
             <div className="text-right">
@@ -500,6 +531,30 @@ export default function MiningDashboard({
           </div>
         </div>
       )}
+
+      {/* Earnings chart */}
+      <EarningsChart walletAddress={walletAddress} />
+
+      {/* Leaderboard */}
+      <MiningLeaderboard />
+
+      {/* YouTube verification (if X is linked but YT isn't) */}
+      {xHandle && !profile?.yt_handle && (
+        <YouTubeVerification
+          walletAddress={walletAddress}
+          signer={signer}
+          ytHandle={null}
+          ytVerificationCode={profile?.yt_verification_code ?? null}
+          ytVerificationHandle={profile?.yt_verification_handle ?? null}
+          onUpdate={fetchData}
+        />
+      )}
+
+      {/* Mining rules */}
+      <MiningRules
+        followerCount={profile?.x_follower_count}
+        subscriberCount={profile?.yt_subscriber_count}
+      />
 
       {/* Block Rewards */}
       <div>
@@ -611,6 +666,7 @@ export default function MiningDashboard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
+            <PlatformFilter value={platformFilter} onChange={setPlatformFilter} />
             <div className="flex items-center gap-1">
               <FilterTab
                 value="active"
@@ -655,17 +711,18 @@ export default function MiningDashboard({
         </div>
         {trackedPosts.length === 0 ? (
           <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No posts discovered yet. Post about Weavrn on X and they&apos;ll
+            No posts discovered yet. Post about Weavrn on X or YouTube and they&apos;ll
             appear here automatically.
           </div>
         ) : filteredPosts.length === 0 ? (
           <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No active posts. Switch to &quot;All&quot; to view deleted posts.
+            No matching posts. Try changing filters.
           </div>
         ) : (
           <div className="space-y-3">
             {filteredPosts.map((p) => {
               const isExpanded = expandedPostId === p.id;
+              const isYouTube = p.platform === "youtube";
               return (
                 <div
                   key={p.id}
@@ -707,6 +764,9 @@ export default function MiningDashboard({
                             </a>
                           )}
                           <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-mono text-weavrn-muted/60">
+                              {isYouTube ? "YouTube" : "X"}
+                            </span>
                             {p.text && (
                               <a
                                 href={p.post_url}
@@ -715,7 +775,7 @@ export default function MiningDashboard({
                                 className="text-weavrn-accent/60 hover:text-weavrn-accent transition-colors font-mono text-[10px]"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                view post
+                                view
                               </a>
                             )}
                             {p.deleted_at && (
@@ -742,11 +802,13 @@ export default function MiningDashboard({
                         <span className="text-[11px] text-weavrn-muted font-mono">
                           {p.likes ?? 0} likes
                         </span>
+                        {!isYouTube && (
+                          <span className="text-[11px] text-weavrn-muted font-mono">
+                            {p.retweets ?? 0} RTs
+                          </span>
+                        )}
                         <span className="text-[11px] text-weavrn-muted font-mono">
-                          {p.retweets ?? 0} RTs
-                        </span>
-                        <span className="text-[11px] text-weavrn-muted font-mono">
-                          {p.replies ?? 0} replies
+                          {p.replies ?? 0} {isYouTube ? "comments" : "replies"}
                         </span>
                         <span className="text-[11px] text-weavrn-muted font-mono">
                           {(p.views ?? 0).toLocaleString()} views
@@ -758,7 +820,18 @@ export default function MiningDashboard({
                     )}
                   </div>
                   {isExpanded && (
-                    <div className="px-4 pb-4">
+                    <div className="px-4 pb-4 space-y-3">
+                      {/* Score breakdown */}
+                      {p.raw_score != null && (
+                        <ScoreBreakdown
+                          likes={p.likes ?? 0}
+                          retweets={p.retweets ?? 0}
+                          replies={p.replies ?? 0}
+                          views={p.views ?? 0}
+                          platform={p.platform || "x"}
+                        />
+                      )}
+                      {/* Block history table */}
                       <div className="border-t border-weavrn-border/30 pt-3">
                         {p.block_history.length === 0 ? (
                           <p className="text-xs text-weavrn-muted text-center py-3">
@@ -771,8 +844,8 @@ export default function MiningDashboard({
                                 <tr className="text-weavrn-muted border-b border-weavrn-border/20">
                                   <th className="text-left py-1.5 pr-3">Block</th>
                                   <th className="text-right py-1.5 px-2">Likes</th>
-                                  <th className="text-right py-1.5 px-2">RTs</th>
-                                  <th className="text-right py-1.5 px-2">Replies</th>
+                                  {!isYouTube && <th className="text-right py-1.5 px-2">RTs</th>}
+                                  <th className="text-right py-1.5 px-2">{isYouTube ? "Comments" : "Replies"}</th>
                                   <th className="text-right py-1.5 px-2">Views</th>
                                   <th className="text-right py-1.5 px-2">Score</th>
                                   <th className="text-right py-1.5 px-2">Delta</th>
@@ -784,7 +857,7 @@ export default function MiningDashboard({
                                   <tr key={b.block_number} className="text-weavrn-muted/80 border-b border-weavrn-border/10">
                                     <td className="py-1.5 pr-3 text-white">{b.block_number}</td>
                                     <td className="text-right py-1.5 px-2">{b.likes}</td>
-                                    <td className="text-right py-1.5 px-2">{b.retweets}</td>
+                                    {!isYouTube && <td className="text-right py-1.5 px-2">{b.retweets}</td>}
                                     <td className="text-right py-1.5 px-2">{b.replies}</td>
                                     <td className="text-right py-1.5 px-2">{b.views.toLocaleString()}</td>
                                     <td className="text-right py-1.5 px-2">{b.raw_score}</td>
@@ -797,7 +870,7 @@ export default function MiningDashboard({
                               </tbody>
                               <tfoot>
                                 <tr className="border-t border-weavrn-border/30 text-white font-medium">
-                                  <td className="py-1.5 pr-3" colSpan={7}>Total</td>
+                                  <td className="py-1.5 pr-3" colSpan={isYouTube ? 6 : 7}>Total</td>
                                   <td className="text-right py-1.5 pl-2 text-weavrn-accent">
                                     {fmtWvrn(p.estimated_wvrn)}
                                   </td>
