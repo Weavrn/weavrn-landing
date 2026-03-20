@@ -180,6 +180,8 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const confirmFund = async () => {
     const job = jobs.find(j => j.id === fundingJobId);
     if (!signer || !job?.listing_id || !fundingDetails) return;
+    // Prevent double-funding: re-check escrow_id before creating
+    if (job.escrow_id) { setError("Job already funded"); setFundingJobId(null); return; }
     setActing(`fund-${job.id}`);
     setError(null);
     try {

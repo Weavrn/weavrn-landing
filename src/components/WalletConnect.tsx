@@ -33,13 +33,32 @@ export default function WalletConnect({
         if (!switched) return;
         const { signer, address: addr } = await getProviderAndSigner();
         onConnect(addr, signer);
-        // Create session in background — don't block auto-connect
         createSession(signer, addr).catch(() => {});
       } catch {
         // silent fail on auto-connect
       }
     }).catch(() => {});
   }, [address, onConnect]);
+
+  // Listen for chain/account changes
+  useEffect(() => {
+    if (!window.ethereum) return;
+    const handleChainChanged = () => { window.location.reload(); };
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (accounts.length === 0) {
+        clearSession();
+        onDisconnect();
+      } else {
+        window.location.reload();
+      }
+    };
+    window.ethereum.on("chainChanged", handleChainChanged);
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+    return () => {
+      window.ethereum?.removeListener("chainChanged", handleChainChanged);
+      window.ethereum?.removeListener("accountsChanged", handleAccountsChanged);
+    };
+  }, [onDisconnect]);
 
   const connect = useCallback(async () => {
     if (!window.ethereum) {
