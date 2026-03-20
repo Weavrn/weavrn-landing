@@ -125,7 +125,9 @@ export async function checkAndSwitchChain(): Promise<boolean> {
       method: "wallet_switchEthereumChain",
       params: [{ chainId: targetHex }],
     });
-    return true;
+    // Verify the switch actually happened
+    const currentChain = await window.ethereum.request({ method: "eth_chainId" });
+    return currentChain === targetHex;
   } catch (err: unknown) {
     const switchErr = err as { code?: number };
     if (switchErr.code === 4902) {
@@ -142,7 +144,8 @@ export async function checkAndSwitchChain(): Promise<boolean> {
           },
         ],
       });
-      return true;
+      const currentChain = await window.ethereum.request({ method: "eth_chainId" });
+      return currentChain === targetHex;
     }
     return false;
   }

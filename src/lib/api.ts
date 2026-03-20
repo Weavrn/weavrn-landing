@@ -150,10 +150,14 @@ async function apiFetch<T>(
   if (hasSession()) {
     headers["Authorization"] = `Bearer ${sessionToken}`;
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const msg = body.message || body.error || res.statusText;
