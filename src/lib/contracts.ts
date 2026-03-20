@@ -411,9 +411,9 @@ const ESCROW_ROUTER_GETESCROW_ABI = [
 
 // Known strategy addresses (Base Sepolia)
 const STRATEGY_ADDRESSES: Record<string, string> = {
-  "0xe0a77e8dd41945991a2f1454517b86e30b04be56": "all_or_nothing",
-  "0x8f744571abd15d53cbb373fb973fd060775d62e9": "milestone",
-  "0x31c8fdd969e70a2a4afe1f15d187a702b9d0465e": "trickle",
+  "0xbadf7908c00fcca8cc136ae4d7669eb72abf4829": "all_or_nothing",
+  "0x08dd54c7d9f1300dc2c3df823ddabfa1a0aaf8aa": "milestone",
+  "0x4b5f4aa57e352902845d5e65b665b0109b04bfd3": "trickle",
 };
 
 export function getStrategyType(strategyAddress: string | null): "all_or_nothing" | "milestone" | "trickle" | "unknown" {
@@ -602,9 +602,9 @@ export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number
 
 // Reverse lookup: strategy name → contract address
 const STRATEGY_NAME_TO_ADDRESS: Record<string, string> = {
-  all_or_nothing: "0xe0A77E8dD41945991a2F1454517B86E30B04bE56",
-  milestone: "0x8F744571abD15D53cbb373fb973fd060775d62e9",
-  trickle: "0x31C8fdd969e70A2a4AFE1F15D187a702b9D0465e",
+  all_or_nothing: "0xbadf7908c00fcca8cc136ae4d7669eb72abf4829",
+  milestone: "0x08dd54c7d9f1300dc2c3df823ddabfa1a0aaf8aa",
+  trickle: "0x4b5f4aa57e352902845d5e65b665b0109b04bfd3",
 };
 
 export function getStrategyAddress(name: string): string {
