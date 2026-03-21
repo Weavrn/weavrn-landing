@@ -233,6 +233,15 @@ export async function unlinkHandle(signer: JsonRpcSigner, wallet: string) {
   });
 }
 
+export async function reactivateAgent(signer: JsonRpcSigner, walletOrId: string) {
+  const wallet = (await signer.getAddress()).toLowerCase();
+  const auth = await authBody(signer, wallet, "reactivate");
+  return apiFetch<{ message: string; agent_id: number; tx_hash: string }>(`/agents/${wallet}/reactivate`, {
+    method: "POST",
+    body: JSON.stringify(auth),
+  });
+}
+
 export async function markClaimed(signer: JsonRpcSigner, wallet: string, onChainId: number, txHash: string) {
   const auth = await authBody(signer, wallet, "claim");
   return apiFetch<Submission>("/claim", {

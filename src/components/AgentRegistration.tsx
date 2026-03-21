@@ -4,6 +4,7 @@ import { useState } from "react";
 import { JsonRpcSigner } from "ethers";
 import { registerAgent, updateAgentOnChain } from "@/lib/contracts";
 import { getExplorerTxUrl } from "@/lib/contracts";
+import { reactivateAgent } from "@/lib/api";
 
 interface AgentInfo {
   agentId: number;
@@ -142,6 +143,22 @@ export default function AgentRegistration({ agent, signer, onRegistered }: Props
             <span className={`text-xs px-2 py-0.5 rounded ${agent.active ? "bg-weavrn-accent/10 text-weavrn-accent" : "bg-red-500/10 text-red-400"}`}>
               {agent.active ? "Active" : "Inactive"}
             </span>
+            {!agent.active && signer && (
+              <button
+                onClick={async () => {
+                  setError(null);
+                  try {
+                    await reactivateAgent(signer, agent.agentId.toString());
+                    onRegistered();
+                  } catch (err: unknown) {
+                    setError((err as Error).message);
+                  }
+                }}
+                className="text-xs px-2 py-0.5 rounded bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 transition-colors"
+              >
+                Reactivate
+              </button>
+            )}
           </div>
           {agent.metadataURI && (
             <p className="text-xs text-weavrn-muted font-mono truncate max-w-md">{agent.metadataURI}</p>
