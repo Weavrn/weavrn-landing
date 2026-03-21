@@ -1,201 +1,103 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import type { Submission } from "@/lib/supabase";
+import { useState, useEffect } from 'react';
+import WalletConnect from './WalletConnect';
 
-interface MiningDashboardProps {
-  walletAddress: string;
-  xHandle: string | null;
-  onLinkX: (handle: string) => void;
+interface MiningStats {
+  totalMined: number;
+  totalRewards: number;
+  activeMiners: number;
+  networkHashrate: string;
 }
 
-export default function MiningDashboard({
-  walletAddress,
-  xHandle,
-  onLinkX,
-}: MiningDashboardProps) {
-  const [handleInput, setHandleInput] = useState("");
-  const [postUrl, setPostUrl] = useState("");
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
+export default function MiningDashboard() {
+  const [stats, setStats] = useState<MiningStats>({
+    totalMined: 0,
+    totalRewards: 0,
+    activeMiners: 0,
+    networkHashrate: '0 TH/s',
+  });
 
-  const fetchSubmissions = useCallback(async () => {
-    try {
-      const res = await fetch(
-        `/api/rewards?wallet=${encodeURIComponent(walletAddress)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(data.submissions ?? []);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [walletAddress]);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (walletAddress) fetchSubmissions();
-  }, [walletAddress, fetchSubmissions]);
+    // Simulate real-time stats updates
+    const interval = setInterval(() => {
+      setStats((prev) => ({
+        totalMined: prev.totalMined + Math.random() * 10,
+        totalRewards: prev.totalRewards + Math.random() * 5,
+        activeMiners: Math.floor(Math.random() * 10000) + 5000,
+        networkHashrate: (Math.random() * 500 + 100).toFixed(2) + ' TH/s',
+      }));
+    }, 3000);
 
-  const handleLinkX = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleaned = handleInput.replace(/^@/, "").trim();
-    if (cleaned) onLinkX(cleaned);
-  };
-
-  const handleSubmitPost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!postUrl.trim() || !xHandle) return;
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet_address: walletAddress,
-          x_handle: xHandle,
-          post_url: postUrl.trim(),
-        }),
-      });
-      if (res.ok) {
-        setPostUrl("");
-        fetchSubmissions();
-      } else {
-        const data = await res.json();
-        alert(data.error || "Submission failed");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const totalEarned = submissions
-    .filter((s) => s.status === "approved")
-    .reduce((sum, s) => sum + (s.reward_amount ?? 0), 0);
-
-  if (!xHandle) {
-    return (
-      <div className="max-w-md mx-auto">
-        <div className="glow-card rounded-2xl p-8">
-          <h3 className="text-lg font-bold text-white mb-2">Link your X account</h3>
-          <p className="text-sm text-weavrn-muted mb-6">
-            Connect your X handle to start submitting content.
-          </p>
-          <form onSubmit={handleLinkX} className="flex gap-2">
-            <input
-              type="text"
-              value={handleInput}
-              onChange={(e) => setHandleInput(e.target.value)}
-              placeholder="@yourhandle"
-              className="flex-1 px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors placeholder:text-weavrn-muted/50"
-            />
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300"
-            >
-              Link
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { value: submissions.length, label: "Submissions" },
-          { value: submissions.filter((s) => s.status === "approved").length, label: "Approved" },
-          { value: totalEarned.toLocaleString(), label: "WVRN Earned", highlight: true },
-        ].map((stat) => (
-          <div key={stat.label} className="glow-card rounded-xl p-5 text-center">
-            <div className={`text-2xl font-bold ${stat.highlight ? "gradient-text" : "text-white"}`}>
-              {stat.value}
-            </div>
-            <div className="text-xs text-weavrn-muted font-mono mt-1">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Submit post */}
-      <div className="glow-card rounded-2xl p-8">
-        <h3 className="text-lg font-bold text-white mb-2">Submit a Post</h3>
-        <p className="text-sm text-weavrn-muted mb-5">
-          Share content about AI agents, DeFi, or Weavrn on X and submit the
-          URL. Max 3 per day.
+    <section className="py-20 px-4 bg-slate-900">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="text-4xl font-bold text-center mb-4 text-white">
+          Mining Dashboard
+        </h2>
+        <p className="text-center text-slate-300 mb-12">
+          Real-time mining and rewards statistics
         </p>
-        <form onSubmit={handleSubmitPost} className="flex gap-2">
-          <input
-            type="url"
-            value={postUrl}
-            onChange={(e) => setPostUrl(e.target.value)}
-            placeholder="https://x.com/yourhandle/status/..."
-            required
-            className="flex-1 px-4 py-2.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-[#00D4AA]/50 transition-colors font-mono text-xs placeholder:text-weavrn-muted/50"
-          />
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-6 py-2.5 bg-[#00D4AA] hover:bg-[#00F0C0] text-black rounded-lg text-sm font-semibold transition-all duration-300 disabled:opacity-50"
-          >
-            {submitting ? "..." : "Submit"}
-          </button>
-        </form>
-      </div>
 
-      {/* Submissions list */}
-      <div>
-        <h3 className="text-lg font-bold text-white mb-4">Your Submissions</h3>
-        {loading ? (
-          <p className="text-sm text-weavrn-muted">Loading...</p>
-        ) : submissions.length === 0 ? (
-          <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No submissions yet. Share something on X to get started.
+        {!isConnected ? (
+          <div className="text-center mb-12">
+            <WalletConnect onConnect={() => setIsConnected(true)} />
           </div>
-        ) : (
-          <div className="space-y-2">
-            {submissions.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
-              >
-                <div className="flex-1 truncate mr-4">
-                  <a
-                    href={s.post_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#00D4AA] hover:text-[#00F0C0] transition-colors font-mono text-xs"
-                  >
-                    {s.post_url}
-                  </a>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {s.reward_amount != null && (
-                    <span className="text-weavrn-muted font-mono text-xs">
-                      {s.reward_amount.toLocaleString()} WVRN
-                    </span>
-                  )}
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
-                      s.status === "approved"
-                        ? "bg-[#00D4AA]/10 text-[#00D4AA] border border-[#00D4AA]/20"
-                        : s.status === "rejected"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                          : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                    }`}
-                  >
-                    {s.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+        ) : null}
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg p-6 border border-slate-600">
+            <p className="text-slate-400 text-sm mb-2">Total Mined</p>
+            <p className="text-3xl font-bold text-white">
+              {stats.totalMined.toFixed(2)}
+            </p>
+            <p className="text-xs text-slate-500 mt-2">WVRN</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg p-6 border border-slate-600">
+            <p className="text-slate-400 text-sm mb-2">Total Rewards</p>
+            <p className="text-3xl font-bold text-blue-400">
+              {stats.totalRewards.toFixed(2)}
+            </p>
+            <p className="text-xs text-slate-500 mt-2">WVRN</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg p-6 border border-slate-600">
+            <p className="text-slate-400 text-sm mb-2">Active Miners</p>
+            <p className="text-3xl font-bold text-green-400">
+              {stats.activeMiners.toLocaleString()}
+            </p>
+            <p className="text-xs text-slate-500 mt-2">Worldwide</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg p-6 border border-slate-600">
+            <p className="text-slate-400 text-sm mb-2">Network Hashrate</p>
+            <p className="text-3xl font-bold text-purple-400">
+              {stats.networkHashrate}
+            </p>
+            <p className="text-xs text-slate-500 mt-2">Current</p>
+          </div>
+        </div>
+
+        {isConnected && (
+          <div className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-center">
+            <h3 className="text-2xl font-bold text-white mb-2">
+              Start Earning Rewards
+            </h3>
+            <p className="text-blue-100 mb-6">
+              Connect your wallet and begin mining to accumulate rewards
+            </p>
+            <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition">
+              Start Mining
+            </button>
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
