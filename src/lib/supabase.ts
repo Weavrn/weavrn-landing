@@ -27,6 +27,6 @@ export interface Submission {
 export interface UserProfile {
   wallet_address: string;
   x_handle: string | null;
-  total_earned: number;
+  total_rewarded: number;
   created_at: string;
 }
