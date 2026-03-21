@@ -195,6 +195,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         7 * 24 * 60 * 60,
         strategy,
         `Job #${job.id}: ${job.title}`,
+        listing.escrow_strategy_address,
       );
 
       // Retry linking — escrow indexer polls every 30s

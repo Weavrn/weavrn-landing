@@ -603,15 +603,10 @@ export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number
   return receipt.hash;
 }
 
-// Reverse lookup: strategy name → contract address
-const STRATEGY_NAME_TO_ADDRESS: Record<string, string> = {
-  all_or_nothing: "0xbadf7908c00fcca8cc136ae4d7669eb72abf4829",
-  milestone: "0x08dd54c7d9f1300dc2c3df823ddabfa1a0aaf8aa",
-  trickle: "0x4b5f4aa57e352902845d5e65b665b0109b04bfd3",
-};
-
-export function getStrategyAddress(name: string): string {
-  return STRATEGY_NAME_TO_ADDRESS[name] || STRATEGY_NAME_TO_ADDRESS["all_or_nothing"];
+// Strategy address resolved from listing data (no hardcoded addresses)
+export function getStrategyAddress(name: string, strategyAddress?: string | null): string {
+  if (strategyAddress) return strategyAddress;
+  throw new Error(`No strategy address provided for ${name}. Listing data may be stale.`);
 }
 
 export async function createEscrowETH(
@@ -621,10 +616,11 @@ export async function createEscrowETH(
   deadlineSeconds: number,
   strategyName: string,
   memo: string,
+  strategyAddress?: string | null,
 ): Promise<{ escrowId: number; txHash: string }> {
   const { parseEther, AbiCoder } = await import("ethers");
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
-  const strategyAddr = getStrategyAddress(strategyName);
+  const strategyAddr = getStrategyAddress(strategyName, strategyAddress);
   const deadline = Math.floor(Date.now() / 1000) + deadlineSeconds;
   const strategyData = new AbiCoder().encode([], []);
 

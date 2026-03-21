@@ -477,6 +477,7 @@ export interface ServiceListing {
   price_amount: string | null;
   price_token: string;
   escrow_strategy: "all_or_nothing" | "milestone" | "trickle";
+  escrow_strategy_address: string | null;
   fee_model: "payer" | "provider" | "split";
   milestone_config: unknown;
   trickle_duration: number | null;
