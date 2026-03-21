@@ -1,63 +1,92 @@
-import { SOCIAL_LINKS, CONTACT_EMAIL } from "@/lib/constants";
+'use client';
+
+import { useState } from 'react';
 
 export default function Footer() {
-  return (
-    <footer className="border-t border-weavrn-border/50 py-10 px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="max-w-md mx-auto mb-10 text-center">
-          <p className="text-xs text-weavrn-muted font-mono tracking-wider uppercase mb-4">
-            Stay Updated
-          </p>
-          <p className="text-sm text-weavrn-muted">
-            Contact us at{" "}
-            <a href="mailto:contact@weavrn.com" className="text-[#00D4AA] hover:underline">
-              contact@weavrn.com
-            </a>
-          </p>
-        </div>
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="text-sm text-weavrn-muted font-mono">
-            weavrn {new Date().getFullYear()}
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage('✓ Thank you for subscribing!');
+        setEmail('');
+      } else {
+        setMessage(data.error || 'Subscription failed');
+      }
+    } catch (error) {
+      setMessage('An error occurred. Please try again.');
+      console.error('Subscribe error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <footer className="bg-gray-900 text-white py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Weavrn</h3>
+            <p className="text-gray-400">Building the future of distributed computing.</p>
           </div>
-          <div className="flex gap-8">
-            {Object.entries(SOCIAL_LINKS).map(
-              ([name, url]) =>
-                url && (
-                  <a
-                    key={name}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-weavrn-muted hover:text-[#00D4AA] transition-colors font-mono lowercase"
-                  >
-                    {name}
-                  </a>
-                )
-            )}
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="text-sm text-weavrn-muted hover:text-[#00D4AA] transition-colors font-mono lowercase"
-            >
-              contact
-            </a>
+          <div>
+            <h4 className="font-semibold mb-4">Product</h4>
+            <ul className="space-y-2 text-gray-400">
+              <li><a href="#mining" className="hover:text-white">Mining</a></li>
+              <li><a href="#rewards" className="hover:text-white">Rewards</a></li>
+              <li><a href="#tokenomics" className="hover:text-white">Tokenomics</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Community</h4>
+            <ul className="space-y-2 text-gray-400">
+              <li><a href="#" className="hover:text-white">Discord</a></li>
+              <li><a href="#" className="hover:text-white">Twitter</a></li>
+              <li><a href="#" className="hover:text-white">GitHub</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Subscribe</h4>
+            <form onSubmit={handleSubscribe} className="space-y-2">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-2 bg-gray-800 text-white rounded border border-gray-700 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-semibold transition"
+              >
+                {loading ? 'Subscribing...' : 'Subscribe'}
+              </button>
+              {message && (
+                <p className={`text-sm ${message.includes('✓') ? 'text-green-400' : 'text-red-400'}`}>
+                  {message}
+                </p>
+              )}
+            </form>
           </div>
         </div>
-        <div className="mt-6 pt-6 border-t border-weavrn-border/30 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="flex gap-6">
-            {["Terms", "Privacy", "Disclaimer"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                className="text-xs text-weavrn-muted/60 hover:text-weavrn-muted transition-colors font-mono"
-              >
-                {link}
-              </a>
-            ))}
-          </div>
-          <p className="text-xs text-weavrn-muted/40 text-center sm:text-right max-w-md">
-            WVRN is a utility token. Nothing on this site constitutes financial advice.
-          </p>
+        <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
+          <p>&copy; 2024 Weavrn. All rights reserved.</p>
         </div>
       </div>
     </footer>
