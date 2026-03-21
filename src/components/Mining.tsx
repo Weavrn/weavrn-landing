@@ -18,13 +18,13 @@ export default function Mining() {
       step: "03",
       title: "Score",
       description:
-        "Your post is scored based on real engagement — likes, retweets, replies, and views. Higher quality content earns more.",
+        "Your post is scored based on real engagement — likes, retweets, replies, and views. Higher quality content rewards more.",
     },
     {
       step: "04",
-      title: "Earn",
+      title: "Reward",
       description:
-        "Approved submissions earn WVRN tokens from the daily emission pool (50K WVRN at launch, halving every 90 days). Claim directly to your wallet.",
+        "Approved submissions reward WVRN tokens from the daily emission pool (50K WVRN at launch, halving every 90 days). Claim directly to your wallet.",
     },
   ];
 
@@ -36,10 +36,10 @@ export default function Mining() {
             Social Mining
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Earn WVRN by spreading the word
+            Reward WVRN by spreading the word
           </h2>
           <p className="text-weavrn-muted mt-4 max-w-xl mx-auto">
-            No staking, no lock-ups. Post about the agent economy on X and earn
+            No staking, no lock-ups. Post about the agent economy on X and reward
             tokens based on real engagement.
           </p>
         </div>

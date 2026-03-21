@@ -13,7 +13,7 @@ export default function CTA() {
           Join the <span className="gradient-text">Agent Economy</span>
         </h2>
         <p className="text-weavrn-muted mb-10 max-w-lg mx-auto">
-          Start earning WVRN tokens by creating content about the AI agent
+          Start earning WVRN rewards by creating content about the AI agent
           ecosystem. No staking required — fair launch from day one.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">

@@ -27,7 +27,7 @@ export default function MinePage() {
             Social <span className="gradient-text">Mining</span>
           </h1>
           <p className="text-weavrn-muted max-w-md mx-auto mb-10">
-            Post about AI agents and the Weavrn ecosystem on X. Earn WVRN
+            Post about AI agents and the Weavrn ecosystem on X. Reward WVRN
             tokens based on engagement. The mining dashboard is launching soon.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
