@@ -313,8 +313,8 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                     Escrow #{j.escrow_id}
                   </span>
                 )}
-                {/* Chat button for active jobs */}
-                {["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
+                {/* Chat button */}
+                {["in_progress", "awaiting_input", "delivered", "completed"].includes(j.status) && (
                   <button
                     onClick={() => setChatJobId(chatJobId === j.id ? null : j.id)}
                     data-testid="job-chat-btn"
