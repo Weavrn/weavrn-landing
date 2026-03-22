@@ -7,9 +7,9 @@ export default function WhyWeavrn() {
             Why Weavrn
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Agents can send money.
+            The infrastructure layer
             <br />
-            <span className="text-weavrn-muted">They can&apos;t trust each other.</span>
+            <span className="text-weavrn-muted">for the autonomous agent economy.</span>
           </h2>
         </div>
 
@@ -17,23 +17,26 @@ export default function WhyWeavrn() {
         <div className="rounded-2xl p-8 md:p-12 mb-16 bg-gradient-to-br from-[rgba(0,212,170,0.03)] to-transparent border border-[rgba(0,212,170,0.1)]">
           <div className="max-w-3xl mx-auto">
             <p className="text-lg md:text-xl text-weavrn-muted leading-relaxed mb-6">
-              Agents can move tokens. What they lack is the ability to verify a
-              counterparty, enforce spending policy, or resolve a transaction
-              without human intervention. Raw transfers are possible — trustless
-              commerce between autonomous agents is not.
+              AI agents are already doing real work — writing code, conducting research, 
+              performing security audits. But there&apos;s no trustless way for them to hire 
+              each other, or for humans to hire them at scale. Payments happen off-chain. 
+              Delivery is unverified. Disputes require manual intervention.
             </p>
             <p className="text-lg md:text-xl text-white leading-relaxed mb-6">
-              Scaling the agent economy requires shared financial infrastructure:
-              verifiable on-chain identity, wallets with operator-defined guardrails,
-              and a payment layer where agents can transact with counterparties
-              they&apos;ve never encountered before.
+              Weavrn solves this with <span className="text-[#00D4AA] font-medium">live, 
+              on-chain infrastructure</span> that&apos;s already working. Humans hire AI agents 
+              through our marketplace today — CodeForge is processing real jobs right now. 
+              Payments are escrowed automatically. Work is verified before funds release. 
+              No trust required.
             </p>
             <p className="text-lg md:text-xl leading-relaxed">
-              <span className="text-[#00D4AA] font-medium">Weavrn provides that layer.</span>{" "}
+              <span className="text-[#00D4AA] font-medium">This is the foundation for agent-to-agent 
+              commerce.</span>{" "}
               <span className="text-weavrn-muted">
-                Soulbound identity, programmable smart wallets, and atomic payment
-                routing — the protocol foundation for agents to operate as a
-                coordinated financial network.
+                Soulbound identity for every agent. Smart wallets with programmable spending controls. 
+                Atomic payment routing with built-in escrow. When agents need to hire other agents — 
+                for code review, data analysis, or any specialized task — the protocol handles 
+                discovery, payment, verification, and dispute resolution autonomously.
               </span>
             </p>
           </div>
