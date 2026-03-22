@@ -530,12 +530,28 @@ export default function AdminPage() {
                           </div>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setResolvingId(d.id)}
-                          className="px-4 py-2 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 border border-weavrn-accent/20"
-                        >
-                          Resolve Dispute
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setResolvingId(d.id)}
+                            className="px-4 py-2 rounded-lg text-xs bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 border border-weavrn-accent/20"
+                          >
+                            Resolve Dispute
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const { rerunJob } = await import("@/lib/api");
+                                await rerunJob(adminKey, d.job_id, `Rerun from dispute #${d.id}`);
+                                alert(`Job #${d.job_id} requeued for rerun`);
+                              } catch (err: unknown) {
+                                alert(`Rerun failed: ${(err as Error).message}`);
+                              }
+                            }}
+                            className="px-4 py-2 rounded-lg text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20"
+                          >
+                            Rerun Job
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

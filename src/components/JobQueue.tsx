@@ -340,14 +340,37 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   </button>
                 )}
                 {tab === "requester" && j.status === "delivered" && (
-                  <button
-                    onClick={() => handleAction("complete", j.id)}
-                    disabled={acting === `complete-${j.id}`}
-                    data-testid="job-approve-btn"
-                    className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover disabled:opacity-50 transition-all"
-                  >
-                    {acting === `complete-${j.id}` ? "..." : "Approve & Release"}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleAction("complete", j.id)}
+                      disabled={acting === `complete-${j.id}`}
+                      data-testid="job-approve-btn"
+                      className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover disabled:opacity-50 transition-all"
+                    >
+                      {acting === `complete-${j.id}` ? "..." : "Approve & Release"}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const reason = window.prompt("Why does this job need a rerun?");
+                        if (!reason) return;
+                        setActing(`dispute-${j.id}`);
+                        setError(null);
+                        try {
+                          await disputeJob(signer!, walletAddress, j.id, reason);
+                          fetchJobs(page);
+                          onAction?.();
+                        } catch (err: unknown) {
+                          setError((err as { message?: string }).message || "Failed to request rerun");
+                        } finally {
+                          setActing(null);
+                        }
+                      }}
+                      disabled={acting === `dispute-${j.id}`}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 disabled:opacity-50"
+                    >
+                      {acting === `dispute-${j.id}` ? "..." : "Request Rerun"}
+                    </button>
+                  </>
                 )}
                 {["pending", "accepted"].includes(j.status) && (
                   <button

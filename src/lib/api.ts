@@ -298,6 +298,14 @@ export function settleBlock(adminKey: string, blockNumber: number) {
   });
 }
 
+export function rerunJob(adminKey: string, jobId: number, reason?: string) {
+  return apiFetch<{ message: string; job_id: number }>(`/admin/jobs/${jobId}/rerun`, {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ reason: reason || "Admin rerun" }),
+  });
+}
+
 // ── Agent Directory & Dashboard ──
 
 export interface AgentListItem {
