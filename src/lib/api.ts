@@ -701,6 +701,21 @@ export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet
   });
 }
 
+export async function completeJobWithAuth(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number): Promise<Job | null> {
+  // Sign once, retry the API call without re-signing (avoids multiple MetaMask popups)
+  const auth = await authBody(signer, wallet, "complete-job");
+  const body = JSON.stringify(auth);
+  for (let i = 0; i < 8; i++) {
+    try {
+      return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body });
+    } catch {
+      if (i === 7) return null;
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+  return null;
+}
+
 export async function cancelJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
   const auth = await authBody(signer, wallet, "cancel-job");
   return apiFetch<Job>(`/jobs/${jobId}/cancel`, {

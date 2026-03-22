@@ -112,15 +112,13 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         if (job?.escrow_id) {
           try { await releaseEscrow(signer, job.escrow_id); } catch { /* already released */ }
         }
-        // Retry — escrow indexer needs time to pick up the release
-        for (let i = 0; i < 8; i++) {
-          try {
-            await completeJob(signer, walletAddress, jobId);
-            break;
-          } catch {
-            if (i === 7) { setError("Escrow released but indexer is slow. Try Approve again in 30s."); fetchJobs(page); return; }
-            await new Promise(r => setTimeout(r, 5000));
-          }
+        // Sign once, then retry with the same auth — avoids multiple MetaMask popups
+        const { completeJobWithAuth } = await import("@/lib/api");
+        const auth = await completeJobWithAuth(signer, walletAddress, jobId);
+        if (!auth) {
+          setError("Escrow released but could not complete job. Try again in 30s.");
+          fetchJobs(page);
+          return;
         }
       }
       else if (action === "cancel") await cancelJob(signer, walletAddress, jobId);
