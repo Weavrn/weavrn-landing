@@ -77,6 +77,9 @@ export interface TrackedPost {
   raw_score: number | null;
   estimated_wvrn: number;
   block_history: PostBlockHistory[];
+  flagged?: boolean;
+  flag_reason?: string | null;
+  posted_at?: string | null;
 }
 
 export interface BlockReward {

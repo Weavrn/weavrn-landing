@@ -305,7 +305,7 @@ export default function MiningDashboard({
       posts = posts.filter((p) => p.platform === platformFilter);
     }
     if (postFilter === "active") {
-      posts = posts.filter((p) => !p.deleted_at);
+      posts = posts.filter((p) => !p.deleted_at && !p.flagged);
     }
     if (postSort === "oldest") {
       return [...posts].reverse();
@@ -316,7 +316,7 @@ export default function MiningDashboard({
     return posts;
   }, [trackedPosts, postFilter, postSort, platformFilter]);
 
-  const deletedCount = trackedPosts.filter((p) => p.deleted_at).length;
+  const inactiveCount = trackedPosts.filter((p) => p.deleted_at || p.flagged).length;
 
   const handleClaimAll = async () => {
     if (!signer || claimableSubs.length === 0) return;
@@ -654,10 +654,10 @@ export default function MiningDashboard({
                 value="active"
                 current={postFilter}
                 label="Active"
-                count={trackedPosts.length - deletedCount}
+                count={trackedPosts.length - inactiveCount}
                 onClick={setPostFilter}
               />
-              {deletedCount > 0 && (
+              {inactiveCount > 0 && (
                 <FilterTab
                   value="all"
                   current={postFilter}
@@ -709,7 +709,7 @@ export default function MiningDashboard({
                 <div
                   key={p.id}
                   className={`rounded-xl border bg-weavrn-surface/30 text-sm ${
-                    p.deleted_at
+                    p.deleted_at || p.flagged
                       ? "border-red-500/20 opacity-60"
                       : "border-weavrn-border/50"
                   }`}
@@ -763,6 +763,16 @@ export default function MiningDashboard({
                             {p.deleted_at && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">
                                 deleted
+                              </span>
+                            )}
+                            {p.flagged && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                                {p.flag_reason === "duplicate content" ? "duplicate" : "flagged"}
+                              </span>
+                            )}
+                            {p.block_history.length === 1 && p.block_history[0].delta === 0 && !p.deleted_at && !p.flagged && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                baseline
                               </span>
                             )}
                           </div>
