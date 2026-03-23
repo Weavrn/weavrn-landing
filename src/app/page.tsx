@@ -4,6 +4,7 @@ import WhyWeavrn from "@/components/WhyWeavrn";
 import Mining from "@/components/Mining";
 import Tokenomics from "@/components/Tokenomics";
 import Roadmap from "@/components/Roadmap";
+import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
       <Mining />
       <Tokenomics />
       <Roadmap />
+      <CTA />
       <Footer />
     </main>
   );
