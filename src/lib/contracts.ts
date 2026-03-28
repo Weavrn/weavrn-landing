@@ -13,6 +13,7 @@ const AGENT_REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_AGENT_REGISTRY_ADDRESS ||
 const PAYMENT_ROUTER_ADDRESS = process.env.NEXT_PUBLIC_PAYMENT_ROUTER_ADDRESS || "";
 const ESCROW_ROUTER_ADDRESS = process.env.NEXT_PUBLIC_ESCROW_ROUTER_ADDRESS || "";
 const USAGE_INCENTIVES_ADDRESS = process.env.NEXT_PUBLIC_USAGE_INCENTIVES_ADDRESS || "";
+const MERKLE_REWARDS_ADDRESS = process.env.NEXT_PUBLIC_MERKLE_REWARDS_ADDRESS || "";
 const CHAIN_ID = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "";
 
@@ -664,6 +665,57 @@ export async function claimStream(signer: JsonRpcSigner, escrowId: number): Prom
 export async function refundEscrow(signer: JsonRpcSigner, escrowId: number): Promise<string> {
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
   const tx = await contract.refund(escrowId);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+// --- MerkleRewards ---
+
+const MERKLE_REWARDS_ABI = [
+  {
+    inputs: [
+      { name: "blockNumber", type: "uint256" },
+      { name: "amount", type: "uint256" },
+      { name: "proof", type: "bytes32[]" },
+    ],
+    name: "claim",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "blockNumbers", type: "uint256[]" },
+      { name: "amounts", type: "uint256[]" },
+      { name: "proofs", type: "bytes32[][]" },
+    ],
+    name: "batchClaim",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+];
+
+export async function claimMerkleReward(
+  signer: JsonRpcSigner,
+  blockNumber: number,
+  amount: string,
+  proof: string[],
+): Promise<string> {
+  const contract = new Contract(MERKLE_REWARDS_ADDRESS, MERKLE_REWARDS_ABI, signer);
+  const tx = await contract.claim(blockNumber, amount, proof);
+  const receipt = await tx.wait();
+  return receipt.hash;
+}
+
+export async function batchClaimMerkleRewards(
+  signer: JsonRpcSigner,
+  blockNumbers: number[],
+  amounts: string[],
+  proofs: string[][],
+): Promise<string> {
+  const contract = new Contract(MERKLE_REWARDS_ADDRESS, MERKLE_REWARDS_ABI, signer);
+  const tx = await contract.batchClaim(blockNumbers, amounts, proofs);
   const receipt = await tx.wait();
   return receipt.hash;
 }

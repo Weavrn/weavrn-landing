@@ -89,6 +89,10 @@ export interface BlockReward {
   delta_score: number;
   post_count: number;
   submission_id: number | null;
+  reward_amount: string | null;
+  merkle_block: boolean;
+  claimed: boolean;
+  claim_tx_hash: string | null;
   created_at: string;
 }
 
@@ -1142,5 +1146,27 @@ export function setMockAutoIncrement(adminKey: string, config: Partial<MockAutoI
     method: "POST",
     headers: adminHeaders(adminKey),
     body: JSON.stringify(config),
+  });
+}
+
+// Merkle rewards
+
+export interface MerkleProofResponse {
+  block_number: number;
+  wallet: string;
+  amount: string;
+  proof: string[];
+  merkle_root: string;
+}
+
+export function getMerkleProof(wallet: string, blockNumber: number) {
+  return apiFetch<MerkleProofResponse>(`/rewards/${wallet.toLowerCase()}/proof/${blockNumber}`);
+}
+
+export async function markMerkleClaimed(signer: import("ethers").JsonRpcSigner, wallet: string, blockNumber: number, txHash: string) {
+  const auth = await authBody(signer, wallet, "claim-merkle");
+  return apiFetch(`/claim/merkle`, {
+    method: "POST",
+    body: JSON.stringify({ block_number: blockNumber, tx_hash: txHash, ...auth }),
   });
 }

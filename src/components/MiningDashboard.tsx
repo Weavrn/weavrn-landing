@@ -12,13 +12,17 @@ import {
   verifyHandle,
   unlinkHandle,
   markClaimed,
+  getMerkleProof,
+  markMerkleClaimed,
   type Submission,
   type RewardsResponse,
+  type BlockReward,
   type Profile,
 } from "@/lib/api";
 import {
   claimReward,
   batchClaimRewards,
+  claimMerkleReward,
   addTokenToWallet,
   getExplorerTxUrl,
 } from "@/lib/contracts";
@@ -266,6 +270,24 @@ export default function MiningDashboard({
     }
   };
 
+  const handleMerkleClaim = async (br: BlockReward) => {
+    if (!signer || !br.reward_amount) return;
+    setClaimingId(br.id);
+    setError(null);
+    try {
+      const proofData = await getMerkleProof(walletAddress, br.block_number);
+      const txHash = await claimMerkleReward(signer, br.block_number, proofData.amount, proofData.proof);
+      await markMerkleClaimed(signer, walletAddress, br.block_number, txHash).catch(() => {
+        setError("Claimed on-chain but failed to update dashboard. Please refresh.");
+      });
+      await fetchData();
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   // Derived data
   const submissions = data?.submissions ?? [];
   const blockRewards = data?.block_rewards ?? [];
@@ -276,9 +298,18 @@ export default function MiningDashboard({
     [submissions],
   );
 
+  const claimableMerkle = useMemo(
+    () => blockRewards.filter((br) => br.merkle_block && br.reward_amount && !br.claimed),
+    [blockRewards],
+  );
+
   const unclaimedAmount = useMemo(
-    () => claimableSubs.reduce((sum, s) => sum + parseFloat(s.reward_amount || "0"), 0),
-    [claimableSubs],
+    () => {
+      const legacyAmount = claimableSubs.reduce((sum, s) => sum + parseFloat(s.reward_amount || "0"), 0);
+      const merkleAmount = claimableMerkle.reduce((sum, br) => sum + parseFloat(br.reward_amount || "0"), 0);
+      return legacyAmount + merkleAmount;
+    },
+    [claimableSubs, claimableMerkle],
   );
 
   const filteredRewards = useMemo(() => {
@@ -293,6 +324,7 @@ export default function MiningDashboard({
 
   const claimedCount = useMemo(
     () => blockRewards.filter((br) => {
+      if (br.merkle_block) return br.claimed;
       const sub = submissions.find((s) => s.id === br.submission_id);
       return sub?.status === "claimed";
     }).length,
@@ -599,14 +631,16 @@ export default function MiningDashboard({
                     </span>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    {sub?.reward_amount != null && (
+                    {/* Reward amount */}
+                    {(br.merkle_block ? br.reward_amount : sub?.reward_amount) != null && (
                       <span className="text-weavrn-muted font-mono text-xs">
-                        {fmtWvrn(parseFloat(sub.reward_amount))} WVRN
+                        {fmtWvrn(parseFloat((br.merkle_block ? br.reward_amount : sub?.reward_amount) || "0"))} WVRN
                       </span>
                     )}
-                    {sub?.tx_hash && (
+                    {/* Tx link */}
+                    {(br.merkle_block ? br.claim_tx_hash : sub?.tx_hash) && (
                       <a
-                        href={getExplorerTxUrl(sub.tx_hash)}
+                        href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
@@ -614,7 +648,18 @@ export default function MiningDashboard({
                         tx
                       </a>
                     )}
-                    {sub &&
+                    {/* Merkle claim button */}
+                    {br.merkle_block && !br.claimed && br.reward_amount && signer && (
+                      <button
+                        onClick={() => handleMerkleClaim(br)}
+                        disabled={claimingId === br.id || claimingAll}
+                        className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
+                      >
+                        {claimingId === br.id ? "Claiming..." : "Claim"}
+                      </button>
+                    )}
+                    {/* Legacy claim button */}
+                    {!br.merkle_block && sub &&
                       sub.status === "approved" &&
                       sub.on_chain_id != null &&
                       signer && (
@@ -626,7 +671,14 @@ export default function MiningDashboard({
                           {claimingId === sub.id ? "Claiming..." : "Claim"}
                         </button>
                       )}
-                    {sub && (
+                    {/* Status badge */}
+                    {br.merkle_block ? (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                        br.claimed ? STATUS_STYLES.claimed : STATUS_STYLES.approved
+                      }`}>
+                        {br.claimed ? "claimed" : "claimable"}
+                      </span>
+                    ) : sub && (
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
                           STATUS_STYLES[sub.status] || STATUS_STYLES.pending
