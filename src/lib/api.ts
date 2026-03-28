@@ -972,3 +972,107 @@ export async function unlinkYouTubeHandle(signer: import("ethers").JsonRpcSigner
     body: JSON.stringify(auth),
   });
 }
+
+// Mock provider admin
+
+export interface MockUser {
+  id: string;
+  username: string;
+  bio: string;
+  followersCount: number;
+}
+
+export interface MockTweet {
+  id: string;
+  text: string;
+  authorUsername: string;
+  createdAt: string;
+  likes: number;
+  retweets: number;
+  replies: number;
+  views: number;
+}
+
+export interface MockVideo {
+  id: string;
+  title: string;
+  description: string;
+  channelId: string;
+  channelTitle: string;
+  publishedAt: string;
+  views: number;
+  likes: number;
+  comments: number;
+}
+
+export interface MockChannel {
+  id: string;
+  title: string;
+  handle: string;
+  customUrl: string;
+  description: string;
+  subscriberCount: number;
+}
+
+export function getMockUsers(adminKey: string) {
+  return apiFetch<MockUser[]>("/admin/mock/users", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockUserBio(adminKey: string, username: string, bio: string) {
+  return apiFetch<MockUser>(`/admin/mock/users/${username}/bio`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ bio }),
+  });
+}
+
+export function getMockTweets(adminKey: string) {
+  return apiFetch<MockTweet[]>("/admin/mock/tweets", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockTweetMetrics(adminKey: string, id: string, metrics: Partial<Pick<MockTweet, "likes" | "retweets" | "replies" | "views">>) {
+  return apiFetch<MockTweet>(`/admin/mock/tweets/${id}/metrics`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(metrics),
+  });
+}
+
+export function getMockChannels(adminKey: string) {
+  return apiFetch<MockChannel[]>("/admin/mock/channels", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockChannelDescription(adminKey: string, id: string, description: string) {
+  return apiFetch<MockChannel>(`/admin/mock/channels/${id}/description`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ description }),
+  });
+}
+
+export function getMockVideos(adminKey: string) {
+  return apiFetch<MockVideo[]>("/admin/mock/videos", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockVideoMetrics(adminKey: string, id: string, metrics: Partial<Pick<MockVideo, "views" | "likes" | "comments">>) {
+  return apiFetch<MockVideo>(`/admin/mock/videos/${id}/metrics`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(metrics),
+  });
+}
+
+export function resetMockData(adminKey: string) {
+  return apiFetch<{ ok: boolean }>("/admin/mock/reset", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export function bulkUpdateMockMetrics(adminKey: string, tweetDelta?: Partial<Pick<MockTweet, "likes" | "retweets" | "replies" | "views">>, videoDelta?: Partial<Pick<MockVideo, "views" | "likes" | "comments">>) {
+  return apiFetch<{ ok: boolean }>("/admin/mock/bulk-update-metrics", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ tweetDelta, videoDelta }),
+  });
+}

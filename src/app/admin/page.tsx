@@ -11,14 +11,28 @@ import {
   getAdminDisputes,
   resolveDispute,
   getJob,
+  getMockUsers,
+  getMockTweets,
+  getMockChannels,
+  getMockVideos,
+  updateMockUserBio,
+  updateMockTweetMetrics,
+  updateMockChannelDescription,
+  updateMockVideoMetrics,
+  resetMockData,
+  bulkUpdateMockMetrics,
   type BlockStats,
   type BlockDetail,
   type TrackedPost,
   type Dispute,
   type Job,
+  type MockUser,
+  type MockTweet,
+  type MockChannel,
+  type MockVideo,
 } from "@/lib/api";
 
-type Tab = "blocks" | "posts" | "disputes";
+type Tab = "blocks" | "posts" | "disputes" | "mock";
 
 export default function AdminPage() {
   const [adminKey, setAdminKey] = useState("");
@@ -36,6 +50,16 @@ export default function AdminPage() {
   const [expandedDisputeId, setExpandedDisputeId] = useState<number | null>(null);
   const [disputeJobDetail, setDisputeJobDetail] = useState<Job | null>(null);
   const [loadingJob, setLoadingJob] = useState(false);
+  const [mockUsers, setMockUsers] = useState<MockUser[]>([]);
+  const [mockTweets, setMockTweets] = useState<MockTweet[]>([]);
+  const [mockChannels, setMockChannels] = useState<MockChannel[]>([]);
+  const [mockVideos, setMockVideos] = useState<MockVideo[]>([]);
+  const [mockSection, setMockSection] = useState<"users" | "tweets" | "channels" | "videos">("users");
+  const [editingBio, setEditingBio] = useState<string | null>(null);
+  const [editBioValue, setEditBioValue] = useState("");
+  const [editingDesc, setEditingDesc] = useState<string | null>(null);
+  const [editDescValue, setEditDescValue] = useState("");
+  const [mockAvailable, setMockAvailable] = useState(true);
 
   const fetchBlocks = useCallback(async (key: string) => {
     setLoading(true);
@@ -76,6 +100,28 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchMock = useCallback(async (key: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [users, tweets, channels, videos] = await Promise.all([
+        getMockUsers(key),
+        getMockTweets(key),
+        getMockChannels(key),
+        getMockVideos(key),
+      ]);
+      setMockUsers(users);
+      setMockTweets(tweets);
+      setMockChannels(channels);
+      setMockVideos(videos);
+      setMockAvailable(true);
+    } catch {
+      setMockAvailable(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const handleResolve = async (disputeId: number, resolution: "completed" | "cancelled") => {
     setError(null);
     try {
@@ -100,7 +146,8 @@ export default function AdminPage() {
     setSelectedBlock(null);
     if (t === "blocks") fetchBlocks(adminKey);
     else if (t === "posts") fetchPosts(adminKey);
-    else fetchDisputes(adminKey);
+    else if (t === "disputes") fetchDisputes(adminKey);
+    else if (t === "mock") fetchMock(adminKey);
   };
 
   const handleViewBlock = async (blockNumber: number) => {
@@ -202,6 +249,14 @@ export default function AdminPage() {
               }`}
             >
               Disputes
+            </button>
+            <button
+              onClick={() => handleTabChange("mock")}
+              className={`text-xs font-mono transition-colors ${
+                tab === "mock" ? "text-weavrn-accent" : "text-weavrn-muted hover:text-white"
+              }`}
+            >
+              Mock
             </button>
             <span className="text-xs text-weavrn-muted font-mono">Admin</span>
           </div>
@@ -364,7 +419,7 @@ export default function AdminPage() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === "disputes" ? (
           /* Disputes tab */
           <>
             <h2 className="text-lg font-bold text-white mb-4">Open Disputes</h2>
@@ -557,6 +612,226 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </>
+        ) : (
+          /* Mock provider tab */
+          <>
+            {!mockAvailable ? (
+              <div className="text-center py-16 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+                Mock provider not connected. Set <code className="text-weavrn-accent">X_BASE_URL</code> in the API to enable.
+              </div>
+            ) : (
+              <>
+                {/* Controls */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-bold text-white">Mock Provider</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await bulkUpdateMockMetrics(adminKey, { likes: 5, retweets: 2, replies: 1, views: 500 }, { views: 100, likes: 3, comments: 1 });
+                          await fetchMock(adminKey);
+                        } catch (err: unknown) { setError((err as Error).message); }
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20"
+                    >
+                      Bump Metrics
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await resetMockData(adminKey);
+                          await fetchMock(adminKey);
+                        } catch (err: unknown) { setError((err as Error).message); }
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+                    >
+                      Reset Data
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section tabs */}
+                <div className="flex gap-3 mb-4">
+                  {(["users", "tweets", "channels", "videos"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setMockSection(s)}
+                      className={`text-xs font-mono transition-colors ${
+                        mockSection === s ? "text-weavrn-accent" : "text-weavrn-muted hover:text-white"
+                      }`}
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)} ({s === "users" ? mockUsers.length : s === "tweets" ? mockTweets.length : s === "channels" ? mockChannels.length : mockVideos.length})
+                    </button>
+                  ))}
+                </div>
+
+                {/* Users */}
+                {mockSection === "users" && (
+                  <div className="space-y-2">
+                    {mockUsers.map((u) => (
+                      <div key={u.username} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-white font-semibold">@{u.username}</span>
+                          <span className="text-xs text-weavrn-muted font-mono">{u.followersCount.toLocaleString()} followers</span>
+                        </div>
+                        {editingBio === u.username ? (
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              value={editBioValue}
+                              onChange={(e) => setEditBioValue(e.target.value)}
+                              className="flex-1 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white focus:outline-none focus:border-weavrn-accent/50"
+                            />
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await updateMockUserBio(adminKey, u.username, editBioValue);
+                                  setEditingBio(null);
+                                  await fetchMock(adminKey);
+                                } catch (err: unknown) { setError((err as Error).message); }
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold"
+                            >
+                              Save
+                            </button>
+                            <button onClick={() => setEditingBio(null)} className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted">
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-weavrn-muted truncate mr-4">{u.bio}</p>
+                            <button
+                              onClick={() => { setEditingBio(u.username); setEditBioValue(u.bio); }}
+                              className="text-[10px] text-weavrn-accent hover:underline shrink-0"
+                            >
+                              Edit Bio
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tweets */}
+                {mockSection === "tweets" && (
+                  <div className="space-y-2">
+                    {mockTweets.map((t) => (
+                      <div key={t.id} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-weavrn-accent font-mono">@{t.authorUsername}</span>
+                          <span className="text-[10px] text-weavrn-muted font-mono">{t.id}</span>
+                        </div>
+                        <p className="text-xs text-white/80 mb-2 line-clamp-2">{t.text}</p>
+                        <div className="flex items-center gap-4 text-[10px] font-mono text-weavrn-muted">
+                          <span>
+                            <button onClick={async () => { await updateMockTweetMetrics(adminKey, t.id, { likes: t.likes + 10 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{t.likes} likes
+                          </span>
+                          <span>
+                            <button onClick={async () => { await updateMockTweetMetrics(adminKey, t.id, { retweets: t.retweets + 5 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{t.retweets} RTs
+                          </span>
+                          <span>
+                            <button onClick={async () => { await updateMockTweetMetrics(adminKey, t.id, { replies: t.replies + 3 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{t.replies} replies
+                          </span>
+                          <span>
+                            <button onClick={async () => { await updateMockTweetMetrics(adminKey, t.id, { views: t.views + 1000 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{t.views.toLocaleString()} views
+                          </span>
+                          <span className="text-weavrn-accent">
+                            score: {Math.floor(t.likes + t.retweets * 3 + t.replies * 2 + t.views * 0.01)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Channels */}
+                {mockSection === "channels" && (
+                  <div className="space-y-2">
+                    {mockChannels.map((ch) => (
+                      <div key={ch.id} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-white font-semibold">{ch.title}</span>
+                          <span className="text-xs text-weavrn-muted font-mono">{ch.subscriberCount.toLocaleString()} subs</span>
+                        </div>
+                        <p className="text-xs text-weavrn-muted font-mono mb-1">@{ch.handle} · {ch.id}</p>
+                        {editingDesc === ch.id ? (
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              value={editDescValue}
+                              onChange={(e) => setEditDescValue(e.target.value)}
+                              className="flex-1 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white focus:outline-none focus:border-weavrn-accent/50"
+                            />
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await updateMockChannelDescription(adminKey, ch.id, editDescValue);
+                                  setEditingDesc(null);
+                                  await fetchMock(adminKey);
+                                } catch (err: unknown) { setError((err as Error).message); }
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold"
+                            >
+                              Save
+                            </button>
+                            <button onClick={() => setEditingDesc(null)} className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted">
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-weavrn-muted truncate mr-4">{ch.description}</p>
+                            <button
+                              onClick={() => { setEditingDesc(ch.id); setEditDescValue(ch.description); }}
+                              className="text-[10px] text-weavrn-accent hover:underline shrink-0"
+                            >
+                              Edit Desc
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Videos */}
+                {mockSection === "videos" && (
+                  <div className="space-y-2">
+                    {mockVideos.map((v) => (
+                      <div key={v.id} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-weavrn-accent font-mono">{v.channelTitle}</span>
+                          <span className="text-[10px] text-weavrn-muted font-mono">{v.id}</span>
+                        </div>
+                        <p className="text-xs text-white/80 mb-2 line-clamp-2">{v.title}</p>
+                        <div className="flex items-center gap-4 text-[10px] font-mono text-weavrn-muted">
+                          <span>
+                            <button onClick={async () => { await updateMockVideoMetrics(adminKey, v.id, { views: v.views + 1000 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{v.views.toLocaleString()} views
+                          </span>
+                          <span>
+                            <button onClick={async () => { await updateMockVideoMetrics(adminKey, v.id, { likes: v.likes + 10 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{v.likes} likes
+                          </span>
+                          <span>
+                            <button onClick={async () => { await updateMockVideoMetrics(adminKey, v.id, { comments: v.comments + 3 }); fetchMock(adminKey); }} className="hover:text-white">+</button>
+                            {" "}{v.comments} comments
+                          </span>
+                          <span className="text-weavrn-accent">
+                            score: {Math.floor(v.likes * 5 + v.comments * 10 + v.views * 0.02)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
