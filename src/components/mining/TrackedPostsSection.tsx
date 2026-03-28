@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { getRewards, type TrackedPost, type TrackedPostsPagination } from "@/lib/api";
 import ScoreBreakdown from "../ScoreBreakdown";
@@ -12,6 +12,39 @@ const fmtWvrn = (n: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function getLatestDelta(blockHistory: Array<{ delta: number }>): number | null {
+  if (!blockHistory.length) return null;
+  return blockHistory[blockHistory.length - 1].delta;
+}
+
+function EngagementStat({ icon, value }: { icon: React.ReactNode; value: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-mono text-weavrn-muted">
+      <span className="text-weavrn-muted/50">{icon}</span>
+      {value}
+    </span>
+  );
+}
+
+function PostTrendChip({ delta }: { delta: number | null }) {
+  if (delta == null) return null;
+  const cfg = delta > 0
+    ? { label: "\u2191", cls: "text-emerald-400" }
+    : delta < 0
+    ? { label: "\u2193", cls: "text-red-400" }
+    : { label: "\u2013", cls: "text-weavrn-muted/40" };
+  return <span className={`text-xs font-mono ${cfg.cls}`}>{cfg.label}</span>;
+}
 
 type PostFilter = "active" | "all";
 type PostSort = "newest" | "oldest" | "earned" | "engagement";
@@ -184,36 +217,51 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
           {trackedPosts.map((p) => {
             const isExpanded = expandedPostId === p.id;
             const isYouTube = p.platform === "youtube";
+            const isBaseline = p.block_history.length === 1 && p.block_history[0].delta === 0 && !p.deleted_at && !p.flagged;
             return (
               <div
                 key={p.id}
                 className={`rounded-xl border bg-weavrn-surface/30 text-sm ${
-                  p.deleted_at || p.flagged
-                    ? "border-red-500/20 opacity-60"
-                    : "border-weavrn-border/50"
+                  isYouTube ? "border-l-2 border-l-red-500/30" : "border-l-2 border-l-weavrn-accent/30"
+                } ${
+                  p.deleted_at || p.flagged ? "border-red-500/20" : "border-weavrn-border/50"
                 }`}
               >
+                {(p.deleted_at || p.flagged) && (
+                  <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-red-500/20 bg-red-500/5 rounded-t-xl">
+                    <span className="text-[10px] font-mono text-red-400">
+                      {p.deleted_at
+                        ? "Post deleted from platform"
+                        : (p.flag_reason === "duplicate content" ? "Duplicate content" : (p.flag_reason ?? "Flagged"))}
+                    </span>
+                  </div>
+                )}
                 <div
-                  className="p-4 cursor-pointer hover:bg-weavrn-surface/50 transition-colors rounded-xl"
-                  onClick={() =>
-                    setExpandedPostId(isExpanded ? null : p.id)
-                  }
+                  className="px-4 pt-4 pb-3 cursor-pointer hover:bg-weavrn-surface/50 transition-colors rounded-xl"
+                  onClick={() => setExpandedPostId(isExpanded ? null : p.id)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2 flex-1 min-w-0">
                       <svg
-                        className={`w-3 h-3 text-weavrn-muted flex-shrink-0 mt-0.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                        className={`w-3 h-3 text-weavrn-muted flex-shrink-0 mt-1 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
                         strokeWidth={2}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 5l7 7-7 7"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
+                      <div className={`w-7 h-7 rounded-md flex-shrink-0 flex items-center justify-center ${isYouTube ? "bg-red-500/10" : "bg-weavrn-accent/10"}`}>
+                        {isYouTube ? (
+                          <svg className="w-3.5 h-3.5 text-red-400" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5 text-weavrn-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <path d="M18 4L6 20M6 4l12 16" />
+                          </svg>
+                        )}
+                      </div>
                       <div className="min-w-0 flex-1">
                         {p.text ? (
                           <p className="text-sm text-white/90 leading-snug line-clamp-2">
@@ -230,9 +278,15 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                             {p.post_url}
                           </a>
                         )}
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {p.x_handle && (
+                            <>
+                              <span className="text-[10px] font-mono text-weavrn-muted/60">@{p.x_handle}</span>
+                              <span className="text-[10px] text-weavrn-muted/40">&middot;</span>
+                            </>
+                          )}
                           <span className="text-[10px] font-mono text-weavrn-muted/60">
-                            {isYouTube ? "YouTube" : "X"}
+                            {relativeTime(p.posted_at ?? p.first_seen_at)}
                           </span>
                           {p.text && (
                             <a
@@ -245,59 +299,73 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                               view
                             </a>
                           )}
-                          {p.deleted_at && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">
-                              deleted
+                          {isBaseline && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              baseline
                             </span>
                           )}
-                          {p.flagged && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                              {p.flag_reason === "duplicate content"
-                                ? "duplicate"
-                                : "flagged"}
-                            </span>
-                          )}
-                          {p.block_history.length === 1 &&
-                            p.block_history[0].delta === 0 &&
-                            !p.deleted_at &&
-                            !p.flagged && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                baseline
-                              </span>
-                            )}
                         </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       {p.estimated_wvrn > 0 && (
-                        <span className="text-xs font-mono text-weavrn-accent font-medium">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-weavrn-accent/10 border border-weavrn-accent/20 text-weavrn-accent text-xs font-mono font-semibold">
                           {fmtWvrn(p.estimated_wvrn)} WVRN
                         </span>
                       )}
-                      <span className="text-[10px] text-weavrn-muted font-mono">
-                        Block {p.discovered_in_block}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {!isBaseline && (
+                          <PostTrendChip delta={getLatestDelta(p.block_history)} />
+                        )}
+                        <span className="text-[10px] text-weavrn-muted font-mono">
+                          Block {p.discovered_in_block}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   {p.raw_score != null && (
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-weavrn-border/30">
-                      <span className="text-[11px] text-weavrn-muted font-mono">
-                        {p.likes ?? 0} likes
-                      </span>
+                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-weavrn-border/30 flex-wrap">
+                      <EngagementStat
+                        icon={
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="w-3 h-3">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                          </svg>
+                        }
+                        value={p.likes ?? 0}
+                      />
                       {!isYouTube && (
-                        <span className="text-[11px] text-weavrn-muted font-mono">
-                          {p.retweets ?? 0} RTs
-                        </span>
+                        <EngagementStat
+                          icon={
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="w-3 h-3">
+                              <polyline points="17 1 21 5 17 9"/>
+                              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                              <polyline points="7 23 3 19 7 15"/>
+                              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                            </svg>
+                          }
+                          value={p.retweets ?? 0}
+                        />
                       )}
-                      <span className="text-[11px] text-weavrn-muted font-mono">
-                        {p.replies ?? 0}{" "}
-                        {isYouTube ? "comments" : "replies"}
-                      </span>
-                      <span className="text-[11px] text-weavrn-muted font-mono">
-                        {(p.views ?? 0).toLocaleString()} views
-                      </span>
-                      <span className="ml-auto text-[11px] font-mono text-weavrn-muted">
-                        score {p.raw_score}
+                      <EngagementStat
+                        icon={
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="w-3 h-3">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          </svg>
+                        }
+                        value={`${p.replies ?? 0} ${isYouTube ? "comments" : "replies"}`}
+                      />
+                      <EngagementStat
+                        icon={
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="w-3 h-3">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        }
+                        value={(p.views ?? 0).toLocaleString()}
+                      />
+                      <span className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md bg-weavrn-surface border border-weavrn-border/40 text-[11px] font-mono">
+                        <span className="text-weavrn-muted">score</span>
+                        <span className="text-white">{p.raw_score}</span>
                       </span>
                     </div>
                   )}
