@@ -21,6 +21,12 @@ import {
   updateMockVideoMetrics,
   resetMockData,
   bulkUpdateMockMetrics,
+  createMockTweet,
+  createMockVideo,
+  getMockAutoIncrement,
+  setMockAutoIncrement,
+  getLinkedHandles,
+  linkHandle,
   type BlockStats,
   type BlockDetail,
   type TrackedPost,
@@ -30,6 +36,8 @@ import {
   type MockTweet,
   type MockChannel,
   type MockVideo,
+  type MockAutoIncrement,
+  type LinkedHandle,
 } from "@/lib/api";
 
 type Tab = "blocks" | "posts" | "disputes" | "mock";
@@ -60,6 +68,18 @@ export default function AdminPage() {
   const [editingDesc, setEditingDesc] = useState<string | null>(null);
   const [editDescValue, setEditDescValue] = useState("");
   const [mockAvailable, setMockAvailable] = useState(true);
+  const [showNewTweet, setShowNewTweet] = useState(false);
+  const [newTweetText, setNewTweetText] = useState("");
+  const [newTweetAuthor, setNewTweetAuthor] = useState("");
+  const [showNewVideo, setShowNewVideo] = useState(false);
+  const [newVideoTitle, setNewVideoTitle] = useState("");
+  const [newVideoChannel, setNewVideoChannel] = useState("");
+  const [autoInc, setAutoInc] = useState<MockAutoIncrement | null>(null);
+  const [showAutoInc, setShowAutoInc] = useState(false);
+  const [linkedHandles, setLinkedHandles] = useState<LinkedHandle[]>([]);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkWallet, setLinkWallet] = useState("");
+  const [linkUser, setLinkUser] = useState("");
 
   const fetchBlocks = useCallback(async (key: string) => {
     setLoading(true);
@@ -104,16 +124,20 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [users, tweets, channels, videos] = await Promise.all([
+      const [users, tweets, channels, videos, ai, handles] = await Promise.all([
         getMockUsers(key),
         getMockTweets(key),
         getMockChannels(key),
         getMockVideos(key),
+        getMockAutoIncrement(key),
+        getLinkedHandles(key),
       ]);
       setMockUsers(users);
       setMockTweets(tweets);
       setMockChannels(channels);
       setMockVideos(videos);
+      setAutoInc(ai);
+      setLinkedHandles(handles);
       setMockAvailable(true);
     } catch {
       setMockAvailable(false);
@@ -639,6 +663,12 @@ export default function AdminPage() {
                       Bump Metrics
                     </button>
                     <button
+                      onClick={() => setShowAutoInc(!showAutoInc)}
+                      className={`px-3 py-1.5 rounded-lg text-xs border ${autoInc?.enabled ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-weavrn-surface/30 text-weavrn-muted border-weavrn-border/50"}`}
+                    >
+                      Auto-Increment {autoInc?.enabled ? "ON" : "OFF"}
+                    </button>
+                    <button
                       onClick={async () => {
                         try {
                           await resetMockData(adminKey);
@@ -651,6 +681,72 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Auto-increment config */}
+                {showAutoInc && autoInc && (
+                  <div className="glow-card rounded-2xl p-4 mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-white">Auto-Increment Config</h3>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await setMockAutoIncrement(adminKey, { enabled: !autoInc.enabled });
+                            await fetchMock(adminKey);
+                          } catch (err: unknown) { setError((err as Error).message); }
+                        }}
+                        className={`px-3 py-1 rounded text-xs font-semibold ${autoInc.enabled ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}
+                      >
+                        {autoInc.enabled ? "Disable" : "Enable"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-weavrn-muted mb-3">Each time a tweet/video is fetched, metrics bump by these deltas. Simulates organic growth between crawls.</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[10px] text-weavrn-muted uppercase mb-2">Tweet Deltas</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["likes", "retweets", "replies", "views"] as const).map((k) => (
+                            <div key={k} className="flex items-center gap-1.5">
+                              <label className="text-[10px] text-weavrn-muted w-14">{k}</label>
+                              <input
+                                type="number"
+                                value={autoInc.tweets[k]}
+                                onChange={(e) => setAutoInc({ ...autoInc, tweets: { ...autoInc.tweets, [k]: parseInt(e.target.value) || 0 } })}
+                                className="w-16 px-2 py-1 bg-weavrn-dark border border-weavrn-border rounded text-xs text-white text-right focus:outline-none focus:border-weavrn-accent/50"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-weavrn-muted uppercase mb-2">Video Deltas</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["views", "likes", "comments"] as const).map((k) => (
+                            <div key={k} className="flex items-center gap-1.5">
+                              <label className="text-[10px] text-weavrn-muted w-14">{k}</label>
+                              <input
+                                type="number"
+                                value={autoInc.videos[k]}
+                                onChange={(e) => setAutoInc({ ...autoInc, videos: { ...autoInc.videos, [k]: parseInt(e.target.value) || 0 } })}
+                                className="w-16 px-2 py-1 bg-weavrn-dark border border-weavrn-border rounded text-xs text-white text-right focus:outline-none focus:border-weavrn-accent/50"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await setMockAutoIncrement(adminKey, { tweets: autoInc.tweets, videos: autoInc.videos });
+                          await fetchMock(adminKey);
+                        } catch (err: unknown) { setError((err as Error).message); }
+                      }}
+                      className="mt-3 px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold"
+                    >
+                      Save Deltas
+                    </button>
+                  </div>
+                )}
 
                 {/* Section tabs */}
                 <div className="flex gap-3 mb-4">
@@ -665,6 +761,68 @@ export default function AdminPage() {
                       {s.charAt(0).toUpperCase() + s.slice(1)} ({s === "users" ? mockUsers.length : s === "tweets" ? mockTweets.length : s === "channels" ? mockChannels.length : mockVideos.length})
                     </button>
                   ))}
+                </div>
+
+                {/* Wallet ↔ Handle Links */}
+                <div className="mb-4 p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-white">Wallet Links ({linkedHandles.length})</h3>
+                    <button
+                      onClick={() => setShowLinkForm(!showLinkForm)}
+                      className="text-[10px] text-weavrn-accent hover:underline"
+                    >
+                      {showLinkForm ? "Cancel" : "+ Link Wallet"}
+                    </button>
+                  </div>
+                  {showLinkForm && (
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        value={linkWallet}
+                        onChange={(e) => setLinkWallet(e.target.value)}
+                        placeholder="0x... wallet address"
+                        className="flex-1 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white font-mono placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50"
+                      />
+                      <select
+                        value={linkUser}
+                        onChange={(e) => setLinkUser(e.target.value)}
+                        className="px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white focus:outline-none focus:border-weavrn-accent/50"
+                      >
+                        <option value="">X handle...</option>
+                        {mockUsers.map((u) => (
+                          <option key={u.username} value={u.username}>@{u.username}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={async () => {
+                          if (!linkWallet || !linkUser) return;
+                          try {
+                            await linkHandle(adminKey, linkWallet, linkUser);
+                            setShowLinkForm(false);
+                            setLinkWallet("");
+                            setLinkUser("");
+                            await fetchMock(adminKey);
+                          } catch (err: unknown) { setError((err as Error).message); }
+                        }}
+                        disabled={!linkWallet || !linkUser}
+                        className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold disabled:opacity-50"
+                      >
+                        Link
+                      </button>
+                    </div>
+                  )}
+                  {linkedHandles.length > 0 && (
+                    <div className="space-y-1">
+                      {linkedHandles.map((h) => (
+                        <div key={h.wallet_address} className="flex items-center justify-between text-xs font-mono">
+                          <span className="text-weavrn-muted">{h.wallet_address.slice(0, 6)}...{h.wallet_address.slice(-4)}</span>
+                          <div className="flex gap-3">
+                            {h.x_handle && <span className="text-weavrn-accent">@{h.x_handle}</span>}
+                            {h.yt_handle && <span className="text-red-400">YT: {h.yt_handle}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Users */}
@@ -718,6 +876,65 @@ export default function AdminPage() {
                 {/* Tweets */}
                 {mockSection === "tweets" && (
                   <div className="space-y-2">
+                    {/* Create tweet */}
+                    {showNewTweet ? (
+                      <div className="p-4 rounded-xl border border-weavrn-accent/30 bg-weavrn-surface/30 space-y-2">
+                        <div className="flex gap-2">
+                          <select
+                            value={newTweetAuthor}
+                            onChange={(e) => setNewTweetAuthor(e.target.value)}
+                            className="px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white focus:outline-none focus:border-weavrn-accent/50"
+                          >
+                            <option value="">Select user...</option>
+                            {mockUsers.map((u) => (
+                              <option key={u.username} value={u.username}>@{u.username}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <textarea
+                          value={newTweetText}
+                          onChange={(e) => setNewTweetText(e.target.value)}
+                          placeholder="Tweet text (include weavrn/$WVRN/#WVRN to qualify for mining)"
+                          rows={2}
+                          className="w-full px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!newTweetAuthor || !newTweetText) return;
+                              try {
+                                await createMockTweet(adminKey, {
+                                  id: `t${Date.now()}`,
+                                  text: newTweetText,
+                                  authorUsername: newTweetAuthor,
+                                  createdAt: new Date().toISOString(),
+                                  likes: 0, retweets: 0, replies: 0, views: 0,
+                                });
+                                setShowNewTweet(false);
+                                setNewTweetText("");
+                                setNewTweetAuthor("");
+                                await fetchMock(adminKey);
+                              } catch (err: unknown) { setError((err as Error).message); }
+                            }}
+                            disabled={!newTweetAuthor || !newTweetText}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold disabled:opacity-50"
+                          >
+                            Create Tweet
+                          </button>
+                          <button onClick={() => setShowNewTweet(false)} className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowNewTweet(true)}
+                        className="w-full py-2 rounded-xl border border-dashed border-weavrn-border/50 text-xs text-weavrn-muted hover:text-weavrn-accent hover:border-weavrn-accent/30 transition-colors"
+                      >
+                        + New Tweet
+                      </button>
+                    )}
+
                     {mockTweets.map((t) => (
                       <div key={t.id} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
                         <div className="flex items-center justify-between mb-1">
@@ -803,6 +1020,65 @@ export default function AdminPage() {
                 {/* Videos */}
                 {mockSection === "videos" && (
                   <div className="space-y-2">
+                    {/* Create video */}
+                    {showNewVideo ? (
+                      <div className="p-4 rounded-xl border border-weavrn-accent/30 bg-weavrn-surface/30 space-y-2">
+                        <select
+                          value={newVideoChannel}
+                          onChange={(e) => setNewVideoChannel(e.target.value)}
+                          className="px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white focus:outline-none focus:border-weavrn-accent/50"
+                        >
+                          <option value="">Select channel...</option>
+                          {mockChannels.map((ch) => (
+                            <option key={ch.id} value={ch.id}>{ch.title} (@{ch.handle})</option>
+                          ))}
+                        </select>
+                        <input
+                          value={newVideoTitle}
+                          onChange={(e) => setNewVideoTitle(e.target.value)}
+                          placeholder="Video title (include weavrn/$WVRN to qualify)"
+                          className="w-full px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!newVideoChannel || !newVideoTitle) return;
+                              const ch = mockChannels.find((c) => c.id === newVideoChannel);
+                              try {
+                                await createMockVideo(adminKey, {
+                                  id: `v${Date.now()}`,
+                                  title: newVideoTitle,
+                                  description: newVideoTitle,
+                                  channelId: newVideoChannel,
+                                  channelTitle: ch?.title ?? "",
+                                  publishedAt: new Date().toISOString(),
+                                  views: 0, likes: 0, comments: 0,
+                                });
+                                setShowNewVideo(false);
+                                setNewVideoTitle("");
+                                setNewVideoChannel("");
+                                await fetchMock(adminKey);
+                              } catch (err: unknown) { setError((err as Error).message); }
+                            }}
+                            disabled={!newVideoChannel || !newVideoTitle}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold disabled:opacity-50"
+                          >
+                            Create Video
+                          </button>
+                          <button onClick={() => setShowNewVideo(false)} className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowNewVideo(true)}
+                        className="w-full py-2 rounded-xl border border-dashed border-weavrn-border/50 text-xs text-weavrn-muted hover:text-weavrn-accent hover:border-weavrn-accent/30 transition-colors"
+                      >
+                        + New Video
+                      </button>
+                    )}
+
                     {mockVideos.map((v) => (
                       <div key={v.id} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
                         <div className="flex items-center justify-between mb-1">

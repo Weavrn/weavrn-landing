@@ -1076,3 +1076,55 @@ export function bulkUpdateMockMetrics(adminKey: string, tweetDelta?: Partial<Pic
     body: JSON.stringify({ tweetDelta, videoDelta }),
   });
 }
+
+export interface LinkedHandle {
+  wallet_address: string;
+  x_handle: string | null;
+  yt_handle: string | null;
+}
+
+export function getLinkedHandles(adminKey: string) {
+  return apiFetch<LinkedHandle[]>("/admin/linked-handles", { headers: adminHeaders(adminKey) });
+}
+
+export function linkHandle(adminKey: string, wallet: string, x_handle: string) {
+  return apiFetch("/admin/link-handle", {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ wallet, x_handle }),
+  });
+}
+
+export function createMockTweet(adminKey: string, tweet: MockTweet) {
+  return apiFetch<MockTweet>("/admin/mock/tweets", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(tweet),
+  });
+}
+
+export function createMockVideo(adminKey: string, video: MockVideo) {
+  return apiFetch<MockVideo>("/admin/mock/videos", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(video),
+  });
+}
+
+export interface MockAutoIncrement {
+  enabled: boolean;
+  tweets: { likes: number; retweets: number; replies: number; views: number };
+  videos: { views: number; likes: number; comments: number };
+}
+
+export function getMockAutoIncrement(adminKey: string) {
+  return apiFetch<MockAutoIncrement>("/admin/mock/auto-increment", { headers: adminHeaders(adminKey) });
+}
+
+export function setMockAutoIncrement(adminKey: string, config: Partial<MockAutoIncrement>) {
+  return apiFetch<MockAutoIncrement>("/admin/mock/auto-increment", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(config),
+  });
+}
