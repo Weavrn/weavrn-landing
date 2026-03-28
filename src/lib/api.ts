@@ -1014,6 +1014,22 @@ export interface MockChannel {
   subscriberCount: number;
 }
 
+export function createMockUser(adminKey: string, user: MockUser) {
+  return apiFetch<MockUser>("/admin/mock/users", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(user),
+  });
+}
+
+export function createMockChannel(adminKey: string, channel: MockChannel) {
+  return apiFetch<MockChannel>("/admin/mock/channels", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(channel),
+  });
+}
+
 export function getMockUsers(adminKey: string) {
   return apiFetch<MockUser[]>("/admin/mock/users", { headers: adminHeaders(adminKey) });
 }

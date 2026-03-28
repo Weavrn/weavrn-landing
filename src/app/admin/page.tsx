@@ -27,6 +27,8 @@ import {
   setMockAutoIncrement,
   getLinkedHandles,
   linkHandle,
+  createMockUser,
+  createMockChannel,
   type BlockStats,
   type BlockDetail,
   type TrackedPost,
@@ -80,6 +82,14 @@ export default function AdminPage() {
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkWallet, setLinkWallet] = useState("");
   const [linkUser, setLinkUser] = useState("");
+  const [showNewUser, setShowNewUser] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newUserBio, setNewUserBio] = useState("");
+  const [newUserFollowers, setNewUserFollowers] = useState("500");
+  const [showNewChannel, setShowNewChannel] = useState(false);
+  const [newChannelTitle, setNewChannelTitle] = useState("");
+  const [newChannelHandle, setNewChannelHandle] = useState("");
+  const [newChannelSubs, setNewChannelSubs] = useState("100");
 
   const fetchBlocks = useCallback(async (key: string) => {
     setLoading(true);
@@ -828,6 +838,66 @@ export default function AdminPage() {
                 {/* Users */}
                 {mockSection === "users" && (
                   <div className="space-y-2">
+                    {showNewUser ? (
+                      <div className="p-4 rounded-xl border border-weavrn-accent/30 bg-weavrn-surface/30 space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            placeholder="username"
+                            className="flex-1 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50"
+                          />
+                          <input
+                            type="number"
+                            value={newUserFollowers}
+                            onChange={(e) => setNewUserFollowers(e.target.value)}
+                            placeholder="followers"
+                            className="w-24 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 text-right"
+                          />
+                        </div>
+                        <input
+                          value={newUserBio}
+                          onChange={(e) => setNewUserBio(e.target.value)}
+                          placeholder="Bio"
+                          className="w-full px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!newUsername) return;
+                              try {
+                                await createMockUser(adminKey, {
+                                  id: `${1000 + mockUsers.length + 1}`,
+                                  username: newUsername,
+                                  bio: newUserBio,
+                                  followersCount: parseInt(newUserFollowers) || 500,
+                                });
+                                setShowNewUser(false);
+                                setNewUsername("");
+                                setNewUserBio("");
+                                setNewUserFollowers("500");
+                                await fetchMock(adminKey);
+                              } catch (err: unknown) { setError((err as Error).message); }
+                            }}
+                            disabled={!newUsername}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold disabled:opacity-50"
+                          >
+                            Create User
+                          </button>
+                          <button onClick={() => setShowNewUser(false)} className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowNewUser(true)}
+                        className="w-full py-2 rounded-xl border border-dashed border-weavrn-border/50 text-xs text-weavrn-muted hover:text-weavrn-accent hover:border-weavrn-accent/30 transition-colors"
+                      >
+                        + New User
+                      </button>
+                    )}
+
                     {mockUsers.map((u) => (
                       <div key={u.username} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
                         <div className="flex items-center justify-between mb-1">
@@ -971,6 +1041,69 @@ export default function AdminPage() {
                 {/* Channels */}
                 {mockSection === "channels" && (
                   <div className="space-y-2">
+                    {showNewChannel ? (
+                      <div className="p-4 rounded-xl border border-weavrn-accent/30 bg-weavrn-surface/30 space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            value={newChannelTitle}
+                            onChange={(e) => setNewChannelTitle(e.target.value)}
+                            placeholder="Channel title"
+                            className="flex-1 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50"
+                          />
+                          <input
+                            value={newChannelHandle}
+                            onChange={(e) => setNewChannelHandle(e.target.value)}
+                            placeholder="handle"
+                            className="w-32 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50"
+                          />
+                          <input
+                            type="number"
+                            value={newChannelSubs}
+                            onChange={(e) => setNewChannelSubs(e.target.value)}
+                            placeholder="subs"
+                            className="w-20 px-3 py-1.5 bg-weavrn-dark border border-weavrn-border rounded-lg text-xs text-white placeholder:text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 text-right"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!newChannelTitle || !newChannelHandle) return;
+                              const id = `UC${Date.now().toString(36)}`;
+                              try {
+                                await createMockChannel(adminKey, {
+                                  id,
+                                  title: newChannelTitle,
+                                  handle: newChannelHandle,
+                                  customUrl: `@${newChannelHandle}`,
+                                  description: "",
+                                  subscriberCount: parseInt(newChannelSubs) || 100,
+                                });
+                                setShowNewChannel(false);
+                                setNewChannelTitle("");
+                                setNewChannelHandle("");
+                                setNewChannelSubs("100");
+                                await fetchMock(adminKey);
+                              } catch (err: unknown) { setError((err as Error).message); }
+                            }}
+                            disabled={!newChannelTitle || !newChannelHandle}
+                            className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold disabled:opacity-50"
+                          >
+                            Create Channel
+                          </button>
+                          <button onClick={() => setShowNewChannel(false)} className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowNewChannel(true)}
+                        className="w-full py-2 rounded-xl border border-dashed border-weavrn-border/50 text-xs text-weavrn-muted hover:text-weavrn-accent hover:border-weavrn-accent/30 transition-colors"
+                      >
+                        + New Channel
+                      </button>
+                    )}
+
                     {mockChannels.map((ch) => (
                       <div key={ch.id} className="p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30">
                         <div className="flex items-center justify-between mb-1">
