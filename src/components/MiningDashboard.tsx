@@ -23,6 +23,7 @@ import {
   claimReward,
   batchClaimRewards,
   claimMerkleReward,
+  batchClaimMerkleRewards,
   addTokenToWallet,
   getExplorerTxUrl,
 } from "@/lib/contracts";
@@ -362,14 +363,18 @@ export default function MiningDashboard({
           await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {});
         }
       }
-      // Merkle claims
-      for (const br of claimableMerkle) {
-        try {
-          const proofData = await getMerkleProof(walletAddress, br.block_number);
-          const txHash = await claimMerkleReward(signer, br.block_number, proofData.amount, proofData.proof);
+      // Merkle claims — batch into single transaction
+      if (claimableMerkle.length > 0) {
+        const proofs = await Promise.all(
+          claimableMerkle.map((br) => getMerkleProof(walletAddress, br.block_number))
+        );
+        const blockNumbers = proofs.map((p) => p.block_number);
+        const amounts = proofs.map((p) => p.amount);
+        const proofArrays = proofs.map((p) => p.proof);
+
+        const txHash = await batchClaimMerkleRewards(signer, blockNumbers, amounts, proofArrays);
+        for (const br of claimableMerkle) {
           await markMerkleClaimed(signer, walletAddress, br.block_number, txHash).catch(() => {});
-        } catch (err: unknown) {
-          setError(`Block ${br.block_number}: ${(err as Error).message}`);
         }
       }
       await fetchData();
