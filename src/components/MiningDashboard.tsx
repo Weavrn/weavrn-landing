@@ -27,7 +27,6 @@ import {
   getExplorerTxUrl,
 } from "@/lib/contracts";
 
-import MiningLeaderboard from "./MiningLeaderboard";
 import EarningsChart from "./EarningsChart";
 import ScoreBreakdown from "./ScoreBreakdown";
 import YouTubeVerification from "./YouTubeVerification";
@@ -351,16 +350,27 @@ export default function MiningDashboard({
   const inactiveCount = trackedPosts.filter((p) => p.deleted_at || p.flagged).length;
 
   const handleClaimAll = async () => {
-    if (!signer || claimableSubs.length === 0) return;
+    if (!signer) return;
     setClaimingAll(true);
     setError(null);
     try {
-      const onChainIds = claimableSubs.map((s) => s.on_chain_id!);
-      const txHash = await batchClaimRewards(signer, onChainIds);
-      for (const sub of claimableSubs) {
-        await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {
-          setError("Claimed on-chain but failed to update dashboard. Please refresh.");
-        });
+      // Legacy claims
+      if (claimableSubs.length > 0) {
+        const onChainIds = claimableSubs.map((s) => s.on_chain_id!);
+        const txHash = await batchClaimRewards(signer, onChainIds);
+        for (const sub of claimableSubs) {
+          await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {});
+        }
+      }
+      // Merkle claims
+      for (const br of claimableMerkle) {
+        try {
+          const proofData = await getMerkleProof(walletAddress, br.block_number);
+          const txHash = await claimMerkleReward(signer, br.block_number, proofData.amount, proofData.proof);
+          await markMerkleClaimed(signer, walletAddress, br.block_number, txHash).catch(() => {});
+        } catch (err: unknown) {
+          setError(`Block ${br.block_number}: ${(err as Error).message}`);
+        }
       }
       await fetchData();
     } catch (err: unknown) {
@@ -592,7 +602,7 @@ export default function MiningDashboard({
               />
             </div>
           </div>
-          {claimableSubs.length > 1 && signer && (
+          {(claimableSubs.length + claimableMerkle.length) > 1 && signer && (
             <button
               onClick={handleClaimAll}
               disabled={claimingAll || claimingId != null}
@@ -936,11 +946,6 @@ export default function MiningDashboard({
       {/* Earnings chart — only show when there's data */}
       {blockRewards.length > 0 && (
         <EarningsChart walletAddress={walletAddress} />
-      )}
-
-      {/* Leaderboard — only show when there's data */}
-      {blockRewards.length > 0 && (
-        <MiningLeaderboard />
       )}
 
       {/* YouTube verification (if X is linked but YT isn't) */}
