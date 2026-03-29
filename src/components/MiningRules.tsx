@@ -13,33 +13,42 @@ function RuleRow({
   label,
   threshold,
   userValue,
+  currentLabel,
 }: {
   label: string;
   threshold: number;
   userValue: number | null | undefined;
+  currentLabel?: string;
 }) {
   const met = userValue != null && userValue >= threshold;
   const unknown = userValue == null;
 
   return (
-    <div className="flex items-center justify-between py-1.5">
-      <div className="flex items-center gap-2">
-        <span
-          className={`text-xs ${
-            unknown
-              ? "text-weavrn-muted"
-              : met
-                ? "text-green-400"
-                : "text-red-400"
-          }`}
-        >
-          {unknown ? "-" : met ? "✓" : "✗"}
+    <div className="py-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-xs ${
+              unknown
+                ? "text-weavrn-muted"
+                : met
+                  ? "text-green-400"
+                  : "text-red-400"
+            }`}
+          >
+            {unknown ? "-" : met ? "✓" : "✗"}
+          </span>
+          <span className="text-sm text-weavrn-muted">{label}</span>
+        </div>
+        <span className="text-xs font-mono text-weavrn-muted">
+          {threshold.toLocaleString()}
         </span>
-        <span className="text-sm text-weavrn-muted">{label}</span>
       </div>
-      <span className="text-xs font-mono text-weavrn-muted">
-        {threshold.toLocaleString()}
-      </span>
+      {currentLabel && (
+        <div className="flex items-center gap-2 mt-0.5 ml-4">
+          <span className="text-xs text-weavrn-muted/60">{currentLabel}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -110,6 +119,11 @@ export default function MiningRules({
                 label="Min X followers"
                 threshold={stats.rules.min_x_followers}
                 userValue={followerCount}
+                currentLabel={
+                  followerCount != null
+                    ? `Current followers: ${followerCount.toLocaleString()}`
+                    : undefined
+                }
               />
               <RuleRow
                 label="Min YouTube subscribers"
