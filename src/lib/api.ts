@@ -93,6 +93,7 @@ export interface BlockReward {
   merkle_block: boolean;
   claimed: boolean;
   claim_tx_hash: string | null;
+  block_share_pct: number | null;
   created_at: string;
 }
 

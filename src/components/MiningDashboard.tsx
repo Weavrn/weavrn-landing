@@ -641,8 +641,11 @@ export default function MiningDashboard({
                       Block {br.block_number}
                     </span>
                     <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; score{" "}
+                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
                       {br.delta_score}
+                      {br.block_share_pct != null && (
+                        <> &mdash; {br.block_share_pct}% of block</>
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
