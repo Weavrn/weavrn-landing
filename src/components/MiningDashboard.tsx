@@ -14,10 +14,12 @@ import {
   markClaimed,
   getMerkleProof,
   markMerkleClaimed,
+  getMiningStats,
   type Submission,
   type RewardsResponse,
   type BlockReward,
   type Profile,
+  type MiningStatsResponse,
 } from "@/lib/api";
 import {
   claimReward,
@@ -103,6 +105,7 @@ export default function MiningDashboard({
   const [verificationHandle, setVerificationHandle] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [data, setData] = useState<RewardsResponse | null>(null);
+  const [miningStats, setMiningStats] = useState<MiningStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -121,12 +124,14 @@ export default function MiningDashboard({
 
   const fetchData = useCallback(async () => {
     try {
-      const [rewards, p] = await Promise.all([
+      const [rewards, p, stats] = await Promise.all([
         getRewards(walletAddress),
         getProfile(walletAddress),
+        getMiningStats().catch(() => null),
       ]);
       setData(rewards);
       setProfile(p);
+      if (stats) setMiningStats(stats);
       if (p.x_handle) {
         setXHandle(p.x_handle);
         setVerificationCode(null);
@@ -542,6 +547,36 @@ export default function MiningDashboard({
           </div>
         </div>
       </div>
+
+      {/* Pool cards */}
+      {miningStats?.pools && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="glow-card rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold text-white">X Pool</span>
+              <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.x.pct}%</span>
+            </div>
+            <div className="text-lg font-bold gradient-text font-mono">
+              {parseFloat(miningStats.pools.x.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
+            </div>
+            <div className="text-[10px] text-weavrn-muted font-mono mt-1">
+              {miningStats.pools.x.miners} miner{miningStats.pools.x.miners !== 1 ? "s" : ""} this block
+            </div>
+          </div>
+          <div className="glow-card rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold text-white">YouTube Pool</span>
+              <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.youtube.pct}%</span>
+            </div>
+            <div className="text-lg font-bold gradient-text font-mono">
+              {parseFloat(miningStats.pools.youtube.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
+            </div>
+            <div className="text-[10px] text-weavrn-muted font-mono mt-1">
+              {miningStats.pools.youtube.miners} miner{miningStats.pools.youtube.miners !== 1 ? "s" : ""} this block
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Current block banner */}
       {data?.current_block && (

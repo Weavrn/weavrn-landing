@@ -940,6 +940,10 @@ export interface MiningStatsResponse {
   total_miners: number;
   total_blocks_settled: number;
   total_wvrn_distributed: string;
+  pools?: {
+    x: { pct: number; emission: string; miners: number };
+    youtube: { pct: number; emission: string; miners: number };
+  };
   active_miners_this_block: number;
   rules: {
     min_engagement_score: number;
