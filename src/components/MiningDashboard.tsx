@@ -1002,6 +1002,20 @@ export default function MiningDashboard({
           onUpdate={fetchData}
         />
       )}
+
+      {/* Mining rules disclaimer */}
+      {hasAnyHandle && (
+        <div className="border border-weavrn-border/30 rounded-xl p-5 text-xs text-weavrn-muted/70 space-y-3">
+          <h4 className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Social Mining Rules</h4>
+          <div className="space-y-2 leading-relaxed">
+            <p><span className="text-weavrn-muted">Eligibility.</span> Your X account must have at least 50 followers. Posts must mention weavrn, $WVRN, #WVRN, @weavrn, or weavrn.com to qualify. Only posts created after you link your account are eligible.</p>
+            <p><span className="text-weavrn-muted">Scoring.</span> Engagement score = (likes &times; 1) + (retweets &times; 3) + (replies &times; 2) + (views &times; 0.01). Effective score uses diminishing returns: sqrt(score) &times; 100. Posts must reach a minimum engagement score of 10 to qualify.</p>
+            <p><span className="text-weavrn-muted">Rewards.</span> Block emission is divided proportionally by effective score. No single user can earn more than 50% of a block&apos;s emission. A maximum of 10 qualifying posts per user are counted per block.</p>
+            <p><span className="text-weavrn-muted">Anti-gaming.</span> Duplicate content is detected and flagged — only the original post earns rewards. A velocity cap limits sudden engagement spikes: deltas are capped at 10&times; the rolling average of your last 5 blocks. First-block deltas are capped at 500. Deleted posts stop earning immediately.</p>
+            <p><span className="text-weavrn-muted">Claims.</span> Rewards are committed on-chain via merkle roots. You can claim earned WVRN at any time by submitting a merkle proof to the MerkleRewards contract. Unclaimed rewards do not expire.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
