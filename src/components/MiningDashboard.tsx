@@ -1003,6 +1003,32 @@ export default function MiningDashboard({
         />
       )}
 
+      {/* Community links */}
+      {hasAnyHandle && (
+        <div className="glow-card rounded-xl p-5">
+          <h4 className="text-sm font-semibold text-white mb-3">Join the Community</h4>
+          <p className="text-xs text-weavrn-muted mb-4">Connect with other miners, get support, and stay updated on new features.</p>
+          <div className="flex gap-3">
+            <a
+              href="https://t.me/+tJgAQDo46bA4MDkx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-[#229ED9]/10 text-[#229ED9] border border-[#229ED9]/20 hover:bg-[#229ED9]/20"
+            >
+              Telegram
+            </a>
+            <a
+              href="https://discord.gg/VgUHVuCW4D"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 hover:bg-[#5865F2]/20"
+            >
+              Discord
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Mining rules disclaimer */}
       {hasAnyHandle && (
         <div className="border border-weavrn-border/30 rounded-xl p-5 text-xs text-weavrn-muted/70 space-y-3">
