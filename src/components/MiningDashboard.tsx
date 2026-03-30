@@ -35,6 +35,7 @@ import ScoreBreakdown from "./ScoreBreakdown";
 import YouTubeVerification from "./YouTubeVerification";
 import PlatformFilter from "./PlatformFilter";
 import MiningRules from "./MiningRules";
+import { features } from "@/lib/features";
 
 interface MiningDashboardProps {
   walletAddress: string;
@@ -399,7 +400,7 @@ export default function MiningDashboard({
   }
 
   // State A: No handle linked on either platform, no pending verification
-  const hasAnyHandle = xHandle || profile?.yt_handle;
+  const hasAnyHandle = xHandle || (features.youtube && profile?.yt_handle);
   if (!hasAnyHandle && !verificationCode) {
     return (
       <div className="max-w-md mx-auto space-y-6">
@@ -429,14 +430,16 @@ export default function MiningDashboard({
           </form>
           {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
         </div>
-        <YouTubeVerification
-          walletAddress={walletAddress}
-          signer={signer}
-          ytHandle={profile?.yt_handle ?? null}
-          ytVerificationCode={profile?.yt_verification_code ?? null}
-          ytVerificationHandle={profile?.yt_verification_handle ?? null}
-          onUpdate={fetchData}
-        />
+        {features.youtube && (
+          <YouTubeVerification
+            walletAddress={walletAddress}
+            signer={signer}
+            ytHandle={profile?.yt_handle ?? null}
+            ytVerificationCode={profile?.yt_verification_code ?? null}
+            ytVerificationHandle={profile?.yt_verification_handle ?? null}
+            onUpdate={fetchData}
+          />
+        )}
       </div>
     );
   }
@@ -550,32 +553,52 @@ export default function MiningDashboard({
 
       {/* Pool cards */}
       {miningStats?.pools && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="glow-card rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-semibold text-white">X Pool</span>
-              <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.x.pct}%</span>
+        features.youtube ? (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glow-card rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-semibold text-white">X Pool</span>
+                <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.x.pct}%</span>
+              </div>
+              <div className="text-lg font-bold gradient-text font-mono">
+                {parseFloat(miningStats.pools.x.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
+              </div>
+              <div className="text-[10px] text-weavrn-muted font-mono mt-1">
+                {miningStats.pools.x.miners} miner{miningStats.pools.x.miners !== 1 ? "s" : ""} this block
+              </div>
             </div>
-            <div className="text-lg font-bold gradient-text font-mono">
-              {parseFloat(miningStats.pools.x.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
-            </div>
-            <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-              {miningStats.pools.x.miners} miner{miningStats.pools.x.miners !== 1 ? "s" : ""} this block
+            <div className="glow-card rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-semibold text-white">YouTube Pool</span>
+                <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.youtube.pct}%</span>
+              </div>
+              <div className="text-lg font-bold gradient-text font-mono">
+                {parseFloat(miningStats.pools.youtube.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
+              </div>
+              <div className="text-[10px] text-weavrn-muted font-mono mt-1">
+                {miningStats.pools.youtube.miners} miner{miningStats.pools.youtube.miners !== 1 ? "s" : ""} this block
+              </div>
             </div>
           </div>
+        ) : (
           <div className="glow-card rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-semibold text-white">YouTube Pool</span>
-              <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.youtube.pct}%</span>
-            </div>
-            <div className="text-lg font-bold gradient-text font-mono">
-              {parseFloat(miningStats.pools.youtube.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
-            </div>
-            <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-              {miningStats.pools.youtube.miners} miner{miningStats.pools.youtube.miners !== 1 ? "s" : ""} this block
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-semibold text-white">This Block</span>
+                </div>
+                <div className="text-xl font-bold gradient-text font-mono">
+                  {parseFloat(miningStats.current_emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
+                </div>
+                <div className="text-[10px] text-weavrn-muted font-mono mt-1">up for grabs</div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">{miningStats.pools.x.miners}</div>
+                <div className="text-[10px] text-weavrn-muted font-mono">miner{miningStats.pools.x.miners !== 1 ? "s" : ""} competing</div>
+              </div>
             </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Current block banner */}
@@ -598,8 +621,8 @@ export default function MiningDashboard({
                     </button>
                   </>
                 )}
-                {xHandle && profile?.yt_handle && <span className="mx-2 text-weavrn-border">|</span>}
-                {profile?.yt_handle && (
+                {features.youtube && xHandle && profile?.yt_handle && <span className="mx-2 text-weavrn-border">|</span>}
+                {features.youtube && profile?.yt_handle && (
                   <span className="text-weavrn-muted">YT @{profile.yt_handle}</span>
                 )}
               </p>
@@ -617,7 +640,7 @@ export default function MiningDashboard({
       {/* Mining rules */}
       <MiningRules
         followerCount={profile?.x_follower_count}
-        subscriberCount={profile?.yt_subscriber_count}
+        subscriberCount={features.youtube ? profile?.yt_subscriber_count : undefined}
       />
 
       {/* Block Rewards */}
@@ -753,7 +776,7 @@ export default function MiningDashboard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
-            <PlatformFilter value={platformFilter} onChange={setPlatformFilter} />
+            {features.youtube && <PlatformFilter value={platformFilter} onChange={setPlatformFilter} />}
             <div className="flex items-center gap-1">
               <FilterTab
                 value="active"
@@ -992,7 +1015,7 @@ export default function MiningDashboard({
       )}
 
       {/* YouTube verification (if X is linked but YT isn't) */}
-      {xHandle && !profile?.yt_handle && (
+      {features.youtube && xHandle && !profile?.yt_handle && (
         <YouTubeVerification
           walletAddress={walletAddress}
           signer={signer}

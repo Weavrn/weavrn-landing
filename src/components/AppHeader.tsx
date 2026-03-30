@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { JsonRpcSigner } from "ethers";
 import WalletConnect from "./WalletConnect";
+import { features } from "@/lib/features";
 
 interface Props {
   onConnect?: (addr: string, signer: JsonRpcSigner) => void;
@@ -13,9 +14,9 @@ interface Props {
 }
 
 const NAV_LINKS = [
-  { label: "Agents", href: "/agents" },
-  { label: "Marketplace", href: "/marketplace" },
-  { label: "Dashboard", href: "/dashboard" },
+  ...(features.agents ? [{ label: "Agents", href: "/agents" }] : []),
+  ...(features.marketplace ? [{ label: "Marketplace", href: "/marketplace" }] : []),
+  ...(features.dashboard ? [{ label: "Dashboard", href: "/dashboard" }] : []),
   { label: "Mining", href: "/mine" },
 ];
 
