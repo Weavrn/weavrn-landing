@@ -17,7 +17,7 @@ const NAV_LINKS = [
   ...(features.agents ? [{ label: "Agents", href: "/agents" }] : []),
   ...(features.marketplace ? [{ label: "Marketplace", href: "/marketplace" }] : []),
   ...(features.dashboard ? [{ label: "Dashboard", href: "/dashboard" }] : []),
-  { label: "Mining", href: "/mine" },
+  ...(features.mining ? [{ label: "Mining", href: "/mine" }] : []),
 ];
 
 export default function AppHeader({ onConnect, onDisconnect, address, showWallet = true }: Props) {
