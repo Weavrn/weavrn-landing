@@ -679,7 +679,7 @@ export default function MiningDashboard({
                       {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
                       {br.delta_score}
                       {br.block_share_pct != null && (
-                        <> &mdash; {br.block_share_pct}% of block</>
+                        <> &mdash; {br.block_share_pct}% share</>
                       )}
                     </span>
                   </div>
