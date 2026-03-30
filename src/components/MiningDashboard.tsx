@@ -988,7 +988,7 @@ export default function MiningDashboard({
 
       {/* Earnings chart — only show when there's data */}
       {blockRewards.length > 0 && (
-        <EarningsChart walletAddress={walletAddress} />
+        <EarningsChart walletAddress={walletAddress} refreshKey={blockRewards.length} />
       )}
 
       {/* YouTube verification (if X is linked but YT isn't) */}

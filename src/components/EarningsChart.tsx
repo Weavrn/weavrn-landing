@@ -6,6 +6,7 @@ import type { EarningsBlock } from "@/lib/api";
 
 interface Props {
   walletAddress: string;
+  refreshKey?: number;
 }
 
 const CHART_HEIGHT = 140;
@@ -17,7 +18,7 @@ const fmtWvrn = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-export default function EarningsChart({ walletAddress }: Props) {
+export default function EarningsChart({ walletAddress, refreshKey }: Props) {
   const [blocks, setBlocks] = useState<EarningsBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -36,7 +37,7 @@ export default function EarningsChart({ walletAddress }: Props) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshKey]);
 
   const earnings = useMemo(
     () => blocks.map((b) => parseFloat(b.reward_amount ?? "0")),
