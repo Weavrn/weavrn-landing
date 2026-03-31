@@ -13,7 +13,6 @@ import {
   unlinkHandle,
   markClaimed,
   getMerkleProof,
-  markMerkleClaimed,
   getMiningStats,
   type Submission,
   type RewardsResponse,
@@ -282,10 +281,7 @@ export default function MiningDashboard({
     setError(null);
     try {
       const proofData = await getMerkleProof(walletAddress, br.block_number);
-      const txHash = await claimMerkleReward(signer, br.block_number, proofData.amount, proofData.proof);
-      await markMerkleClaimed(signer, walletAddress, br.block_number, txHash).catch(() => {
-        setError("Claimed on-chain but failed to update dashboard. Please refresh.");
-      });
+      await claimMerkleReward(signer, br.block_number, proofData.amount, proofData.proof);
       await fetchData();
     } catch (err: unknown) {
       setError((err as Error).message);
@@ -378,10 +374,7 @@ export default function MiningDashboard({
         const amounts = proofs.map((p) => p.amount);
         const proofArrays = proofs.map((p) => p.proof);
 
-        const txHash = await batchClaimMerkleRewards(signer, blockNumbers, amounts, proofArrays);
-        for (const br of claimableMerkle) {
-          await markMerkleClaimed(signer, walletAddress, br.block_number, txHash).catch(() => {});
-        }
+        await batchClaimMerkleRewards(signer, blockNumbers, amounts, proofArrays);
       }
       await fetchData();
     } catch (err: unknown) {
