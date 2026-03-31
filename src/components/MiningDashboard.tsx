@@ -707,7 +707,7 @@ export default function MiningDashboard({
                       </span>
                     )}
                     {/* Tx link */}
-                    {(br.merkle_block ? br.claim_tx_hash : sub?.tx_hash) && (
+                    {((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)?.startsWith("0x")) && (
                       <a
                         href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
                         target="_blank"
