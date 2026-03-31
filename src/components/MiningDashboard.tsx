@@ -317,6 +317,7 @@ export default function MiningDashboard({
   const filteredRewards = useMemo(() => {
     if (rewardFilter === "claimable") {
       return blockRewards.filter((br) => {
+        if (br.merkle_block) return !br.claimed;
         const sub = submissions.find((s) => s.id === br.submission_id);
         return sub?.status !== "claimed";
       });
