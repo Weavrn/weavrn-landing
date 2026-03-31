@@ -1169,9 +1169,9 @@ export function getMerkleProof(wallet: string, blockNumber: number) {
 }
 
 export async function markMerkleClaimed(signer: import("ethers").JsonRpcSigner, wallet: string, blockNumber: number, txHash: string) {
-  // Session token in header handles auth — no extra signature needed
+  const auth = await authBody(signer, wallet, "claim-merkle");
   return apiFetch(`/claim/merkle`, {
     method: "POST",
-    body: JSON.stringify({ block_number: blockNumber, tx_hash: txHash, wallet_address: wallet.toLowerCase() }),
+    body: JSON.stringify({ block_number: blockNumber, tx_hash: txHash, ...auth }),
   });
 }
