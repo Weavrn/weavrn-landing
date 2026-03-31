@@ -136,7 +136,7 @@ export default function MiningDashboard({
   const fetchData = useCallback(async () => {
     try {
       const [rewards, p, stats] = await Promise.all([
-        getRewards(walletAddress, { page: rewardsPageRef.current, limit: 1, filter: rewardFilterRef.current }),
+        getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current }),
         getProfile(walletAddress),
         getMiningStats().catch(() => null),
       ]);
@@ -171,7 +171,7 @@ export default function MiningDashboard({
   // Fetches only block rewards (no profile/stats). Used on page/filter changes and after claiming.
   const fetchRewards = useCallback(async () => {
     try {
-      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 1, filter: rewardFilterRef.current });
+      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current });
       setData(rewards);
       const pg = rewards.pagination ?? null;
       setRewardsPagination(pg);
