@@ -94,7 +94,15 @@ export interface BlockReward {
   claimed: boolean;
   claim_tx_hash: string | null;
   block_share_pct: number | null;
+  share_bps: number | null;
   created_at: string;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
 }
 
 export interface CurrentBlock {
@@ -111,6 +119,7 @@ export interface RewardsResponse {
   tracked_posts: TrackedPost[];
   block_rewards: BlockReward[];
   submissions: Submission[];
+  pagination?: Pagination;
 }
 
 export interface Profile {
@@ -202,8 +211,18 @@ async function authBody(signer: JsonRpcSigner, wallet: string, action: string) {
   return { wallet_address: wallet.toLowerCase(), signature, timestamp };
 }
 
-export function getRewards(wallet: string) {
-  return apiFetch<RewardsResponse>(`/rewards/${wallet.toLowerCase()}`);
+export function getRewards(
+  wallet: string,
+  params?: { page?: number; limit?: number; filter?: "all" | "unclaimed" },
+) {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.filter) qs.set("filter", params.filter);
+  const qstr = qs.toString();
+  return apiFetch<RewardsResponse>(
+    `/rewards/${wallet.toLowerCase()}${qstr ? `?${qstr}` : ""}`,
+  );
 }
 
 export function refreshPosts(wallet: string) {

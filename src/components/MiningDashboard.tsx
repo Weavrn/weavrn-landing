@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
 
 const fmtWvrn = (n: number) => Number(n.toFixed(2)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,6 +17,7 @@ import {
   type Submission,
   type RewardsResponse,
   type BlockReward,
+  type Pagination,
   type Profile,
   type MiningStatsResponse,
 } from "@/lib/api";
@@ -48,7 +49,7 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
-type RewardFilter = "claimable" | "all";
+type RewardFilter = "all" | "unclaimed";
 type PostFilter = "active" | "all";
 type PostSort = "newest" | "oldest" | "earned";
 
@@ -117,19 +118,35 @@ export default function MiningDashboard({
   const [refreshing, setRefreshing] = useState(false);
   const [refreshCooldown, setRefreshCooldown] = useState(0);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
-  const [rewardFilter, setRewardFilter] = useState<RewardFilter>("claimable");
+  const [rewardFilter, setRewardFilter] = useState<RewardFilter>("unclaimed");
+  const [rewardsPage, setRewardsPage] = useState(1);
+  const [rewardsPagination, setRewardsPagination] = useState<Pagination | null>(null);
+  const [rewardsTotalAll, setRewardsTotalAll] = useState<number | null>(null);
+  const [rewardsTotalUnclaimed, setRewardsTotalUnclaimed] = useState<number | null>(null);
   const [postFilter, setPostFilter] = useState<PostFilter>("active");
+
+  // Refs so stable callbacks always see current page/filter without being recreated
+  const rewardsPageRef = useRef(rewardsPage);
+  const rewardFilterRef = useRef(rewardFilter);
+  rewardsPageRef.current = rewardsPage;
+  rewardFilterRef.current = rewardFilter;
   const [postSort, setPostSort] = useState<PostSort>("newest");
   const [platformFilter, setPlatformFilter] = useState<"all" | "x" | "youtube">("all");
 
   const fetchData = useCallback(async () => {
     try {
       const [rewards, p, stats] = await Promise.all([
-        getRewards(walletAddress),
+        getRewards(walletAddress, { page: rewardsPageRef.current, limit: 1, filter: rewardFilterRef.current }),
         getProfile(walletAddress),
         getMiningStats().catch(() => null),
       ]);
       setData(rewards);
+      const pg = rewards.pagination ?? null;
+      setRewardsPagination(pg);
+      if (pg) {
+        if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
+        else setRewardsTotalUnclaimed(pg.total);
+      }
       setProfile(p);
       if (stats) setMiningStats(stats);
       if (p.x_handle) {
@@ -149,11 +166,35 @@ export default function MiningDashboard({
     } finally {
       setLoading(false);
     }
-  }, [walletAddress]);
+  }, [walletAddress]); // stable — reads page/filter via refs
+
+  // Fetches only block rewards (no profile/stats). Used on page/filter changes and after claiming.
+  const fetchRewards = useCallback(async () => {
+    try {
+      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 1, filter: rewardFilterRef.current });
+      setData(rewards);
+      const pg = rewards.pagination ?? null;
+      setRewardsPagination(pg);
+      if (pg) {
+        if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
+        else setRewardsTotalUnclaimed(pg.total);
+      }
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    }
+  }, [walletAddress]); // stable — reads page/filter via refs
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Re-fetch rewards (only) when page or filter changes, skip the initial mount.
+  const didMountRewards = useRef(false);
+  useEffect(() => {
+    if (!didMountRewards.current) { didMountRewards.current = true; return; }
+    fetchRewards();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rewardsPage, rewardFilter]);
 
   useEffect(() => {
     if (!data?.current_block) return;
@@ -267,7 +308,7 @@ export default function MiningDashboard({
       await markClaimed(signer, walletAddress, sub.on_chain_id, txHash).catch(() => {
         setError("Claimed on-chain but failed to update dashboard. Please refresh.");
       });
-      await fetchData();
+      await fetchRewards();
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -282,7 +323,7 @@ export default function MiningDashboard({
     try {
       const proofData = await getMerkleProof(walletAddress, br.block_number);
       await claimMerkleReward(signer, br.block_number, proofData.share_bps, proofData.proof);
-      await fetchData();
+      await fetchRewards();
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -312,26 +353,6 @@ export default function MiningDashboard({
       return legacyAmount + merkleAmount;
     },
     [claimableSubs, claimableMerkle],
-  );
-
-  const filteredRewards = useMemo(() => {
-    if (rewardFilter === "claimable") {
-      return blockRewards.filter((br) => {
-        if (br.merkle_block) return !br.claimed;
-        const sub = submissions.find((s) => s.id === br.submission_id);
-        return sub?.status !== "claimed";
-      });
-    }
-    return blockRewards;
-  }, [blockRewards, submissions, rewardFilter]);
-
-  const claimedCount = useMemo(
-    () => blockRewards.filter((br) => {
-      if (br.merkle_block) return br.claimed;
-      const sub = submissions.find((s) => s.id === br.submission_id);
-      return sub?.status === "claimed";
-    }).length,
-    [blockRewards, submissions],
   );
 
   const filteredPosts = useMemo(() => {
@@ -377,7 +398,7 @@ export default function MiningDashboard({
 
         await batchClaimMerkleRewards(signer, blockNumbers, shareBpsArr, proofArrays);
       }
-      await fetchData();
+      await fetchRewards();
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -644,18 +665,18 @@ export default function MiningDashboard({
             <h3 className="text-lg font-bold text-white">Block Rewards</h3>
             <div className="flex items-center gap-1">
               <FilterTab
-                value="claimable"
+                value="unclaimed"
                 current={rewardFilter}
                 label="Unclaimed"
-                count={blockRewards.length - claimedCount}
-                onClick={setRewardFilter}
+                count={rewardsTotalUnclaimed ?? undefined}
+                onClick={(v) => { setRewardFilter(v); setRewardsPage(1); }}
               />
               <FilterTab
                 value="all"
                 current={rewardFilter}
                 label="All"
-                count={blockRewards.length}
-                onClick={setRewardFilter}
+                count={rewardsTotalAll ?? undefined}
+                onClick={(v) => { setRewardFilter(v); setRewardsPage(1); }}
               />
             </div>
           </div>
@@ -671,97 +692,122 @@ export default function MiningDashboard({
             </button>
           )}
         </div>
-        {blockRewards.length === 0 ? (
-          <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No block rewards yet. Rewards are calculated when each block closes.
-          </div>
-        ) : filteredRewards.length === 0 ? (
-          <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            All rewards claimed. Switch to &quot;All&quot; to view history.
-          </div>
+        {(rewardsPagination?.total ?? blockRewards.length) === 0 ? (
+          rewardFilter === "unclaimed" ? (
+            <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+              All rewards claimed. Switch to &quot;All&quot; to view history.
+            </div>
+          ) : (
+            <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
+              No block rewards yet. Rewards are calculated when each block closes.
+            </div>
+          )
         ) : (
-          <div className="space-y-2">
-            {filteredRewards.map((br) => {
-              const sub = submissions.find((s) => s.id === br.submission_id);
-              return (
-                <div
-                  key={br.id}
-                  className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-white font-mono text-xs">
-                      Block {br.block_number}
-                    </span>
-                    <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
-                      {br.delta_score}
-                      {br.block_share_pct != null && (
-                        <> &mdash; {br.block_share_pct}% share</>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* Reward amount */}
-                    {(br.merkle_block ? br.reward_amount : sub?.reward_amount) != null && (
-                      <span className="text-weavrn-muted font-mono text-xs">
-                        {fmtWvrn(parseFloat((br.merkle_block ? br.reward_amount : sub?.reward_amount) || "0"))} WVRN
+          <>
+            <div className="space-y-2">
+              {blockRewards.map((br) => {
+                const sub = submissions.find((s) => s.id === br.submission_id);
+                return (
+                  <div
+                    key={br.id}
+                    className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
+                  >
+                    <div className="flex items-center gap-4">
+                      <span className="text-white font-mono text-xs">
+                        Block {br.block_number}
                       </span>
-                    )}
-                    {/* Tx link */}
-                    {((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)?.startsWith("0x")) && (
-                      <a
-                        href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
-                      >
-                        tx
-                      </a>
-                    )}
-                    {/* Merkle claim button */}
-                    {br.merkle_block && !br.claimed && br.reward_amount && signer && (
-                      <button
-                        onClick={() => handleMerkleClaim(br)}
-                        disabled={claimingId === br.id || claimingAll}
-                        className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
-                      >
-                        {claimingId === br.id ? "Claiming..." : "Claim"}
-                      </button>
-                    )}
-                    {/* Legacy claim button */}
-                    {!br.merkle_block && sub &&
-                      sub.status === "approved" &&
-                      sub.on_chain_id != null &&
-                      signer && (
+                      <span className="text-weavrn-muted font-mono text-xs">
+                        {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
+                        {br.delta_score}
+                        {br.block_share_pct != null && (
+                          <> &mdash; {br.block_share_pct}% share</>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {/* Reward amount */}
+                      {(br.merkle_block ? br.reward_amount : sub?.reward_amount) != null && (
+                        <span className="text-weavrn-muted font-mono text-xs">
+                          {fmtWvrn(parseFloat((br.merkle_block ? br.reward_amount : sub?.reward_amount) || "0"))} WVRN
+                        </span>
+                      )}
+                      {/* Tx link */}
+                      {((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)?.startsWith("0x")) && (
+                        <a
+                          href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
+                        >
+                          tx
+                        </a>
+                      )}
+                      {/* Merkle claim button */}
+                      {br.merkle_block && !br.claimed && br.reward_amount && signer && (
                         <button
-                          onClick={() => handleClaim(sub)}
-                          disabled={claimingId === sub.id || claimingAll}
+                          onClick={() => handleMerkleClaim(br)}
+                          disabled={claimingId === br.id || claimingAll}
                           className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
                         >
-                          {claimingId === sub.id ? "Claiming..." : "Claim"}
+                          {claimingId === br.id ? "Claiming..." : "Claim"}
                         </button>
                       )}
-                    {/* Status badge */}
-                    {br.merkle_block ? (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                        br.claimed ? STATUS_STYLES.claimed : STATUS_STYLES.approved
-                      }`}>
-                        {br.claimed ? "claimed" : "claimable"}
-                      </span>
-                    ) : sub && (
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                          STATUS_STYLES[sub.status] || STATUS_STYLES.pending
-                        }`}
-                      >
-                        {sub.status}
-                      </span>
-                    )}
+                      {/* Legacy claim button */}
+                      {!br.merkle_block && sub &&
+                        sub.status === "approved" &&
+                        sub.on_chain_id != null &&
+                        signer && (
+                          <button
+                            onClick={() => handleClaim(sub)}
+                            disabled={claimingId === sub.id || claimingAll}
+                            className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
+                          >
+                            {claimingId === sub.id ? "Claiming..." : "Claim"}
+                          </button>
+                        )}
+                      {/* Status badge */}
+                      {br.merkle_block ? (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                          br.claimed ? STATUS_STYLES.claimed : STATUS_STYLES.approved
+                        }`}>
+                          {br.claimed ? "claimed" : "claimable"}
+                        </span>
+                      ) : sub && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                            STATUS_STYLES[sub.status] || STATUS_STYLES.pending
+                          }`}
+                        >
+                          {sub.status}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            {rewardsPagination && rewardsPagination.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  onClick={() => setRewardsPage((p) => p - 1)}
+                  disabled={rewardsPage === 1}
+                  className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="text-xs font-mono text-weavrn-muted">
+                  {rewardsPage} / {rewardsPagination.total_pages}
+                </span>
+                <button
+                  onClick={() => setRewardsPage((p) => p + 1)}
+                  disabled={rewardsPage === rewardsPagination.total_pages}
+                  className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
