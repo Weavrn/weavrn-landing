@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { JsonRpcSigner } from "ethers";
 import {
   startYouTubeVerification,
@@ -17,7 +17,7 @@ interface Props {
   onUpdate: () => void;
 }
 
-export default function YouTubeVerification({
+export default memo(function YouTubeVerification({
   walletAddress,
   signer,
   ytHandle,
@@ -185,4 +185,4 @@ export default function YouTubeVerification({
       {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
     </div>
   );
-}
+});

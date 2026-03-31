@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { getMiningStats } from "@/lib/api";
+import { memo, useState } from "react";
 import type { MiningStatsResponse } from "@/lib/api";
 
 interface Props {
   followerCount?: number | null;
   subscriberCount?: number | null;
+  rules?: MiningStatsResponse["rules"] | null;
 }
 
 function RuleRow({
@@ -36,7 +36,7 @@ function RuleRow({
                   : "text-red-400"
             }`}
           >
-            {unknown ? "-" : met ? "✓" : "✗"}
+            {unknown ? "-" : met ? "\u2713" : "\u2717"}
           </span>
           <span className="text-sm text-weavrn-muted">{label}</span>
         </div>
@@ -53,30 +53,12 @@ function RuleRow({
   );
 }
 
-export default function MiningRules({
+export default memo(function MiningRules({
   followerCount,
   subscriberCount,
+  rules,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [stats, setStats] = useState<MiningStatsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchStats = useCallback(async () => {
-    if (stats) return;
-    setLoading(true);
-    try {
-      const res = await getMiningStats();
-      setStats(res);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [stats]);
-
-  useEffect(() => {
-    if (open) fetchStats();
-  }, [open, fetchStats]);
 
   return (
     <div className="glow-card rounded-xl">
@@ -104,20 +86,16 @@ export default function MiningRules({
 
       {open && (
         <div className="px-4 pb-4 border-t border-weavrn-border/30 pt-3">
-          {loading ? (
-            <div className="text-center py-4 text-weavrn-muted text-xs">
-              Loading...
-            </div>
-          ) : stats ? (
+          {rules ? (
             <div className="space-y-0.5">
               <RuleRow
                 label="Min engagement score"
-                threshold={stats.rules.min_engagement_score}
+                threshold={rules.min_engagement_score}
                 userValue={null}
               />
               <RuleRow
                 label="Min X followers"
-                threshold={stats.rules.min_x_followers}
+                threshold={rules.min_x_followers}
                 userValue={followerCount}
                 currentLabel={
                   followerCount != null
@@ -127,17 +105,17 @@ export default function MiningRules({
               />
               <RuleRow
                 label="Min YouTube subscribers"
-                threshold={stats.rules.min_yt_subscribers}
+                threshold={rules.min_yt_subscribers}
                 userValue={subscriberCount}
               />
             </div>
           ) : (
             <div className="text-center py-4 text-weavrn-muted text-xs">
-              Failed to load rules.
+              Rules not available.
             </div>
           )}
         </div>
       )}
     </div>
   );
-}
+});
