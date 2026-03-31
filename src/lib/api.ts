@@ -1159,6 +1159,7 @@ export function setMockAutoIncrement(adminKey: string, config: Partial<MockAutoI
 export interface MerkleProofResponse {
   block_number: number;
   wallet: string;
+  share_bps: number;
   amount: string;
   proof: string[];
   merkle_root: string;
@@ -1168,10 +1169,4 @@ export function getMerkleProof(wallet: string, blockNumber: number) {
   return apiFetch<MerkleProofResponse>(`/rewards/${wallet.toLowerCase()}/proof/${blockNumber}`);
 }
 
-export async function markMerkleClaimed(signer: import("ethers").JsonRpcSigner, wallet: string, blockNumber: number, txHash: string) {
-  const auth = await authBody(signer, wallet, "claim-merkle");
-  return apiFetch(`/claim/merkle`, {
-    method: "POST",
-    body: JSON.stringify({ block_number: blockNumber, tx_hash: txHash, ...auth }),
-  });
-}
+

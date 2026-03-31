@@ -5,7 +5,6 @@ import type { JsonRpcSigner } from "ethers";
 import {
   markClaimed,
   getMerkleProof,
-  markMerkleClaimed,
   type Submission,
   type BlockReward,
 } from "@/lib/api";
@@ -162,22 +161,12 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
     setSectionError(null);
     try {
       const proofData = await getMerkleProof(walletAddress, br.block_number);
-      const txHash = await claimMerkleReward(
+      await claimMerkleReward(
         signer,
         br.block_number,
-        proofData.amount,
+        proofData.share_bps,
         proofData.proof,
       );
-      await markMerkleClaimed(
-        signer,
-        walletAddress,
-        br.block_number,
-        txHash,
-      ).catch(() => {
-        setSectionError(
-          "Claimed on-chain but failed to update dashboard. Please refresh.",
-        );
-      });
       await onDataRefresh();
     } catch (err: unknown) {
       setSectionError((err as Error).message);
@@ -210,23 +199,15 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
           ),
         );
         const blockNumbers = proofs.map((p) => p.block_number);
-        const amounts = proofs.map((p) => p.amount);
+        const shareBpsArr = proofs.map((p) => p.share_bps);
         const proofArrays = proofs.map((p) => p.proof);
 
-        const txHash = await batchClaimMerkleRewards(
+        await batchClaimMerkleRewards(
           signer,
           blockNumbers,
-          amounts,
+          shareBpsArr,
           proofArrays,
         );
-        for (const br of claimableMerkle) {
-          await markMerkleClaimed(
-            signer,
-            walletAddress,
-            br.block_number,
-            txHash,
-          ).catch(() => {});
-        }
       }
       await onDataRefresh();
     } catch (err: unknown) {

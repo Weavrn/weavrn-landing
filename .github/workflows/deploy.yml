@@ -1,11 +1,11 @@
 name: CI & Deploy
 on:
   push:
-    branches: [develop, main]
+    branches: [develop, qa, main]
 jobs:
   ci:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'qa' && 'qa' || 'development' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,6 +24,11 @@ jobs:
           NEXT_PUBLIC_ESCROW_ROUTER_ADDRESS: ${{ vars.ESCROW_ROUTER_ADDRESS }}
           NEXT_PUBLIC_USAGE_INCENTIVES_ADDRESS: ${{ vars.USAGE_INCENTIVES_ADDRESS }}
           NEXT_PUBLIC_MERKLE_REWARDS_ADDRESS: ${{ vars.MERKLE_REWARDS_ADDRESS }}
+          NEXT_PUBLIC_FEATURE_MINING: ${{ vars.FEATURE_MINING }}
+          NEXT_PUBLIC_FEATURE_MARKETPLACE: ${{ vars.FEATURE_MARKETPLACE }}
+          NEXT_PUBLIC_FEATURE_YOUTUBE: ${{ vars.FEATURE_YOUTUBE }}
+          NEXT_PUBLIC_FEATURE_AGENTS: ${{ vars.FEATURE_AGENTS }}
+          NEXT_PUBLIC_FEATURE_DASHBOARD: ${{ vars.FEATURE_DASHBOARD }}
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
@@ -40,7 +45,7 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           HOST: ${{ secrets.DROPLET_IP }}
-          TARGET: /opt/${{ github.ref_name == 'main' && 'prod' || 'dev' }}/weavrn-landing/out/
+          TARGET: /opt/${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'qa' && 'qa' || 'dev' }}/weavrn-landing/out/
         run: |
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/deploy_key
@@ -55,7 +60,7 @@ jobs:
       - name: Notify Slack
         run: |
           RESULT="${{ needs.deploy.result }}"
-          ENV="${{ github.ref_name == 'main' && 'production' || 'develop' }}"
+          ENV="${{ github.ref_name == 'main' && 'production' || github.ref_name == 'qa' && 'qa' || 'develop' }}"
           if [ "$RESULT" = "success" ]; then
             EMOJI=":white_check_mark:"
             STATUS="succeeded"

@@ -8,6 +8,7 @@ import {
   verifyHandle,
   unlinkHandle,
 } from "@/lib/api";
+import { features } from "@/lib/features";
 
 import { useMiningData } from "@/hooks/useMiningData";
 
@@ -181,7 +182,7 @@ export default function MiningDashboard({
   }
 
   // --- State A: No handle linked, no pending verification ---
-  const hasAnyHandle = xHandle || profile?.yt_handle;
+  const hasAnyHandle = xHandle || (features.youtube && profile?.yt_handle);
   if (!hasAnyHandle && !verificationCode) {
     return (
       <div className="max-w-md mx-auto space-y-6">
@@ -211,14 +212,16 @@ export default function MiningDashboard({
           </form>
           {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
         </div>
-        <YouTubeVerification
-          walletAddress={walletAddress}
-          signer={signer}
-          ytHandle={profile?.yt_handle ?? null}
-          ytVerificationCode={profile?.yt_verification_code ?? null}
-          ytVerificationHandle={profile?.yt_verification_handle ?? null}
-          onUpdate={refreshData}
-        />
+        {features.youtube && (
+          <YouTubeVerification
+            walletAddress={walletAddress}
+            signer={signer}
+            ytHandle={profile?.yt_handle ?? null}
+            ytVerificationCode={profile?.yt_verification_code ?? null}
+            ytVerificationHandle={profile?.yt_verification_handle ?? null}
+            onUpdate={refreshData}
+          />
+        )}
       </div>
     );
   }
@@ -292,7 +295,13 @@ export default function MiningDashboard({
         balance={walletSummary?.balance || "0"}
       />
 
-      {miningStats?.pools && <PoolCards pools={miningStats.pools} />}
+      {miningStats?.pools && (
+        <PoolCards
+          pools={miningStats.pools}
+          currentEmission={miningStats.current_emission}
+          showYouTube={features.youtube}
+        />
+      )}
 
       {currentBlock && (
         <BlockBanner
@@ -331,7 +340,7 @@ export default function MiningDashboard({
         />
       )}
 
-      {xHandle && !profile?.yt_handle && (
+      {features.youtube && xHandle && !profile?.yt_handle && (
         <YouTubeVerification
           walletAddress={walletAddress}
           signer={signer}
@@ -340,6 +349,44 @@ export default function MiningDashboard({
           ytVerificationHandle={profile?.yt_verification_handle ?? null}
           onUpdate={refreshData}
         />
+      )}
+
+      {hasAnyHandle && (
+        <div className="glow-card rounded-xl p-5">
+          <h4 className="text-sm font-semibold text-white mb-3">Join the Community</h4>
+          <p className="text-xs text-weavrn-muted mb-4">Connect with other miners, get support, and stay updated on new features.</p>
+          <div className="flex gap-3">
+            <a
+              href="https://t.me/+tJgAQDo46bA4MDkx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-[#229ED9]/10 text-[#229ED9] border border-[#229ED9]/20 hover:bg-[#229ED9]/20"
+            >
+              Telegram
+            </a>
+            <a
+              href="https://discord.gg/VgUHVuCW4D"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold text-center transition-all bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 hover:bg-[#5865F2]/20"
+            >
+              Discord
+            </a>
+          </div>
+        </div>
+      )}
+
+      {hasAnyHandle && (
+        <div className="border border-weavrn-border/30 rounded-xl p-5 text-xs text-weavrn-muted/70 space-y-3">
+          <h4 className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Social Mining Rules</h4>
+          <div className="space-y-2 leading-relaxed">
+            <p><span className="text-weavrn-muted">Eligibility.</span> Your X account must have at least 50 followers. Posts must mention weavrn, $WVRN, #WVRN, @weavrn, weavrn.com, or weavrn.ai to qualify. Only posts created after you link your account are eligible.</p>
+            <p><span className="text-weavrn-muted">Scoring.</span> Engagement score = (likes &times; 1) + (retweets &times; 3) + (replies &times; 2) + (views &times; 0.01). Effective score uses diminishing returns: sqrt(score) &times; 100. Posts must reach a minimum engagement score of 10 to qualify.</p>
+            <p><span className="text-weavrn-muted">Rewards.</span> Block emission is divided proportionally by effective score. No single user can earn more than 50% of a block&apos;s emission. A maximum of 10 qualifying posts per user are counted per block.</p>
+            <p><span className="text-weavrn-muted">Anti-gaming.</span> Duplicate content is detected and flagged — only the original post earns rewards. A velocity cap limits sudden engagement spikes: deltas are capped at 10&times; the rolling average of your last 5 blocks. First-block deltas are capped at 500. Deleted posts stop earning immediately.</p>
+            <p><span className="text-weavrn-muted">Claims.</span> Rewards are committed on-chain via merkle roots. You can claim earned WVRN at any time by submitting a merkle proof to the MerkleRewards contract. Unclaimed rewards do not expire.</p>
+          </div>
+        </div>
       )}
     </div>
   );
