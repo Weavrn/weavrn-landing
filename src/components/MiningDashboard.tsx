@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { JsonRpcSigner } from "ethers";
 
 const fmtWvrn = (n: number) => Number(n.toFixed(2)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,6 +19,7 @@ import {
   type RewardsResponse,
   type BlockReward,
   type Pagination,
+  type TrackedPostsPagination,
   type Profile,
   type MiningStatsResponse,
 } from "@/lib/api";
@@ -51,7 +53,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 type RewardFilter = "all" | "unclaimed";
 type PostFilter = "active" | "all";
-type PostSort = "newest" | "oldest" | "earned";
+type PostSort = "newest" | "oldest" | "earned" | "engagement";
+type PostPlatform = "all" | "x" | "youtube";
 
 function formatCountdown(endTimestamp: number): string {
   const remaining = endTimestamp - Math.floor(Date.now() / 1000);
@@ -100,6 +103,10 @@ export default function MiningDashboard({
   walletAddress,
   signer,
 }: MiningDashboardProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [xHandle, setXHandle] = useState<string | null>(null);
   const [handleInput, setHandleInput] = useState("");
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
@@ -123,30 +130,96 @@ export default function MiningDashboard({
   const [rewardsPagination, setRewardsPagination] = useState<Pagination | null>(null);
   const [rewardsTotalAll, setRewardsTotalAll] = useState<number | null>(null);
   const [rewardsTotalUnclaimed, setRewardsTotalUnclaimed] = useState<number | null>(null);
-  const [postFilter, setPostFilter] = useState<PostFilter>("active");
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [trackedPostsPagination, setTrackedPostsPagination] = useState<TrackedPostsPagination | null>(null);
+  const [postsTotalActive, setPostsTotalActive] = useState<number | null>(null);
+  const [postsTotalAll, setPostsTotalAll] = useState<number | null>(null);
 
-  // Refs so stable callbacks always see current page/filter without being recreated
+  // Posts params from URL
+  const postsPage = Math.max(1, parseInt(searchParams.get("posts_page") ?? "1", 10));
+  const postsSort = (searchParams.get("posts_sort") as PostSort) ?? "newest";
+  const postsStatus = (searchParams.get("posts_status") as PostFilter) ?? "active";
+  const postsPlatform = (searchParams.get("posts_platform") as PostPlatform) ?? "all";
+
+  // Refs so stable callbacks always see current values without being recreated
   const rewardsPageRef = useRef(rewardsPage);
   const rewardFilterRef = useRef(rewardFilter);
   rewardsPageRef.current = rewardsPage;
   rewardFilterRef.current = rewardFilter;
-  const [postSort, setPostSort] = useState<PostSort>("newest");
-  const [platformFilter, setPlatformFilter] = useState<"all" | "x" | "youtube">("all");
+  const postsPageRef = useRef(postsPage);
+  const postsSortRef = useRef(postsSort);
+  const postsStatusRef = useRef(postsStatus);
+  const postsPlatformRef = useRef(postsPlatform);
+  postsPageRef.current = postsPage;
+  postsSortRef.current = postsSort;
+  postsStatusRef.current = postsStatus;
+  postsPlatformRef.current = postsPlatform;
+
+  // Posts URL param update helpers
+  const updatePostsParams = useCallback(
+    (updates: Partial<Record<string, string | null>>, resetPage = true) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (resetPage) params.delete("posts_page");
+      for (const [k, v] of Object.entries(updates)) {
+        if (v === null || v === undefined) params.delete(k);
+        else params.set(k, v);
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router, pathname],
+  );
+
+  const handlePostsStatusChange = useCallback(
+    (v: PostFilter) => updatePostsParams({ posts_status: v === "active" ? null : v }),
+    [updatePostsParams],
+  );
+
+  const handlePostsSortChange = useCallback(
+    (v: PostSort) => updatePostsParams({ posts_sort: v === "newest" ? null : v }),
+    [updatePostsParams],
+  );
+
+  const handlePostsPlatformChange = useCallback(
+    (v: PostPlatform) => updatePostsParams({ posts_platform: v === "all" ? null : v }),
+    [updatePostsParams],
+  );
+
+  const handlePostsPageChange = useCallback(
+    (newPage: number) => updatePostsParams({ posts_page: newPage <= 1 ? null : String(newPage) }, false),
+    [updatePostsParams],
+  );
+
+  const applyRewardsResponse = useCallback((rewards: RewardsResponse) => {
+    setData(rewards);
+    const pg = rewards.pagination ?? null;
+    setRewardsPagination(pg);
+    if (pg) {
+      if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
+      else setRewardsTotalUnclaimed(pg.total);
+    }
+    const tpp = rewards.tracked_posts_pagination ?? null;
+    setTrackedPostsPagination(tpp);
+    if (tpp) {
+      if (postsStatusRef.current === "all") setPostsTotalAll(tpp.total);
+      else setPostsTotalActive(tpp.total);
+    }
+  }, []); // stable — reads filter via refs
+
+  const getPostsParams = useCallback(() => ({
+    posts_page: postsPageRef.current > 1 ? postsPageRef.current : undefined,
+    posts_sort: postsSortRef.current !== "newest" ? postsSortRef.current : undefined,
+    posts_status: postsStatusRef.current !== "active" ? postsStatusRef.current : undefined,
+    posts_platform: postsPlatformRef.current !== "all" ? postsPlatformRef.current as "x" | "youtube" : undefined,
+  }), []); // stable — reads via refs
 
   const fetchData = useCallback(async () => {
     try {
       const [rewards, p, stats] = await Promise.all([
-        getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current }),
+        getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current, ...getPostsParams() }),
         getProfile(walletAddress),
         getMiningStats().catch(() => null),
       ]);
-      setData(rewards);
-      const pg = rewards.pagination ?? null;
-      setRewardsPagination(pg);
-      if (pg) {
-        if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
-        else setRewardsTotalUnclaimed(pg.total);
-      }
+      applyRewardsResponse(rewards);
       setProfile(p);
       if (stats) setMiningStats(stats);
       if (p.x_handle) {
@@ -166,23 +239,30 @@ export default function MiningDashboard({
     } finally {
       setLoading(false);
     }
-  }, [walletAddress]); // stable — reads page/filter via refs
+  }, [walletAddress, applyRewardsResponse, getPostsParams]); // stable — reads page/filter via refs
 
   // Fetches only block rewards (no profile/stats). Used on page/filter changes and after claiming.
   const fetchRewards = useCallback(async () => {
     try {
-      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current });
-      setData(rewards);
-      const pg = rewards.pagination ?? null;
-      setRewardsPagination(pg);
-      if (pg) {
-        if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
-        else setRewardsTotalUnclaimed(pg.total);
-      }
+      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current, ...getPostsParams() });
+      applyRewardsResponse(rewards);
     } catch (err: unknown) {
       setError((err as Error).message);
     }
-  }, [walletAddress]); // stable — reads page/filter via refs
+  }, [walletAddress, applyRewardsResponse, getPostsParams]); // stable — reads page/filter via refs
+
+  // Fetches with posts params only (block rewards included but not the primary trigger).
+  const fetchTrackedPosts = useCallback(async () => {
+    setPostsLoading(true);
+    try {
+      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current, ...getPostsParams() });
+      applyRewardsResponse(rewards);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [walletAddress, applyRewardsResponse, getPostsParams]);
 
   useEffect(() => {
     fetchData();
@@ -195,6 +275,14 @@ export default function MiningDashboard({
     fetchRewards();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rewardsPage, rewardFilter]);
+
+  // Re-fetch tracked posts when posts URL params change, skip the initial mount.
+  const didMountPosts = useRef(false);
+  useEffect(() => {
+    if (!didMountPosts.current) { didMountPosts.current = true; return; }
+    fetchTrackedPosts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postsPage, postsSort, postsStatus, postsPlatform]);
 
   useEffect(() => {
     if (!data?.current_block) return;
@@ -355,25 +443,6 @@ export default function MiningDashboard({
     [claimableSubs, claimableMerkle],
   );
 
-  const filteredPosts = useMemo(() => {
-    let posts = trackedPosts;
-    if (platformFilter !== "all") {
-      posts = posts.filter((p) => p.platform === platformFilter);
-    }
-    if (postFilter === "active") {
-      posts = posts.filter((p) => !p.deleted_at && !p.flagged);
-    }
-    if (postSort === "oldest") {
-      return [...posts].reverse();
-    }
-    if (postSort === "earned") {
-      return [...posts].sort((a, b) => b.estimated_wvrn - a.estimated_wvrn);
-    }
-    return posts;
-  }, [trackedPosts, postFilter, postSort, platformFilter]);
-
-  const inactiveCount = trackedPosts.filter((p) => p.deleted_at || p.flagged).length;
-
   const handleClaimAll = async () => {
     if (!signer) return;
     setClaimingAll(true);
@@ -525,7 +594,7 @@ export default function MiningDashboard({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="glow-card rounded-xl p-4 text-center">
           <div className="text-xl font-bold text-white">
-            {trackedPosts.length}
+            {trackedPostsPagination?.total ?? trackedPosts.length}
           </div>
           <div className="text-[10px] text-weavrn-muted font-mono mt-1">
             Tracked Posts
@@ -816,35 +885,34 @@ export default function MiningDashboard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
-            {features.youtube && <PlatformFilter value={platformFilter} onChange={setPlatformFilter} />}
+            {features.youtube && <PlatformFilter value={postsPlatform} onChange={handlePostsPlatformChange} />}
             <div className="flex items-center gap-1">
               <FilterTab
                 value="active"
-                current={postFilter}
+                current={postsStatus}
                 label="Active"
-                count={trackedPosts.length - inactiveCount}
-                onClick={setPostFilter}
+                count={postsStatus === "active" ? (postsTotalActive ?? undefined) : undefined}
+                onClick={handlePostsStatusChange}
               />
-              {inactiveCount > 0 && (
-                <FilterTab
-                  value="all"
-                  current={postFilter}
-                  label="All"
-                  count={trackedPosts.length}
-                  onClick={setPostFilter}
-                />
-              )}
+              <FilterTab
+                value="all"
+                current={postsStatus}
+                label="All"
+                count={postsStatus === "all" ? (postsTotalAll ?? undefined) : undefined}
+                onClick={handlePostsStatusChange}
+              />
             </div>
           </div>
           <div className="flex items-center gap-2">
             <select
-              value={postSort}
-              onChange={(e) => setPostSort(e.target.value as PostSort)}
+              value={postsSort}
+              onChange={(e) => handlePostsSortChange(e.target.value as PostSort)}
               className="px-2 py-1 text-xs font-mono bg-transparent border border-weavrn-border rounded-lg text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 cursor-pointer"
             >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
               <option value="earned">Top Earned</option>
+              <option value="engagement">Engagement Score</option>
             </select>
             <button
               onClick={handleRefresh}
@@ -859,18 +927,21 @@ export default function MiningDashboard({
             </button>
           </div>
         </div>
-        {trackedPosts.length === 0 ? (
+        {(trackedPostsPagination?.total ?? trackedPosts.length) === 0 && !postsLoading ? (
           <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No posts discovered yet. Post about Weavrn on X or YouTube and they&apos;ll
-            appear here automatically.
-          </div>
-        ) : filteredPosts.length === 0 ? (
-          <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No matching posts. Try changing filters.
+            {postsStatus === "active" && (postsTotalAll ?? 0) > 0
+              ? "No active posts. Switch to \"All\" to see inactive posts."
+              : "No posts discovered yet. Post about Weavrn on X or YouTube and they\u2019ll appear here automatically."}
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredPosts.map((p) => {
+          <div className="relative">
+            {postsLoading && (
+              <div className="absolute inset-0 bg-weavrn-dark/60 rounded-xl flex items-center justify-center z-10">
+                <span className="text-xs font-mono text-weavrn-muted">Loading...</span>
+              </div>
+            )}
+            <div className="space-y-3">
+            {trackedPosts.map((p) => {
               const isExpanded = expandedPostId === p.id;
               const isYouTube = p.platform === "youtube";
               return (
@@ -1045,6 +1116,28 @@ export default function MiningDashboard({
                 </div>
               );
             })}
+            </div>
+            {trackedPostsPagination && trackedPostsPagination.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  onClick={() => handlePostsPageChange(postsPage - 1)}
+                  disabled={postsPage === 1 || postsLoading}
+                  className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <span className="text-xs font-mono text-weavrn-muted">
+                  {postsPage} / {trackedPostsPagination.total_pages}
+                </span>
+                <button
+                  onClick={() => handlePostsPageChange(postsPage + 1)}
+                  disabled={postsPage === trackedPostsPagination.total_pages || postsLoading}
+                  className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

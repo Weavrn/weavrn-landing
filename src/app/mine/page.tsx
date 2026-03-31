@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, Suspense } from "react";
 import { JsonRpcSigner } from "ethers";
 import AppHeader from "@/components/AppHeader";
 import MiningDashboard from "@/components/MiningDashboard";
@@ -50,7 +50,9 @@ export default function MinePage() {
                 Your posts are discovered and scored automatically
               </p>
             </div>
-            <MiningDashboard walletAddress={address} signer={signer} />
+            <Suspense>
+              <MiningDashboard walletAddress={address} signer={signer} />
+            </Suspense>
           </div>
         )}
       </div>
