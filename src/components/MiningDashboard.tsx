@@ -281,7 +281,7 @@ export default function MiningDashboard({
     setError(null);
     try {
       const proofData = await getMerkleProof(walletAddress, br.block_number);
-      await claimMerkleReward(signer, br.block_number, proofData.amount, proofData.proof);
+      await claimMerkleReward(signer, br.block_number, proofData.share_bps, proofData.proof);
       await fetchData();
     } catch (err: unknown) {
       setError((err as Error).message);
@@ -371,10 +371,10 @@ export default function MiningDashboard({
           claimableMerkle.map((br) => getMerkleProof(walletAddress, br.block_number))
         );
         const blockNumbers = proofs.map((p) => p.block_number);
-        const amounts = proofs.map((p) => p.amount);
+        const shareBpsArr = proofs.map((p) => p.share_bps);
         const proofArrays = proofs.map((p) => p.proof);
 
-        await batchClaimMerkleRewards(signer, blockNumbers, amounts, proofArrays);
+        await batchClaimMerkleRewards(signer, blockNumbers, shareBpsArr, proofArrays);
       }
       await fetchData();
     } catch (err: unknown) {

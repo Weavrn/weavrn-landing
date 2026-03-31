@@ -1159,6 +1159,7 @@ export function setMockAutoIncrement(adminKey: string, config: Partial<MockAutoI
 export interface MerkleProofResponse {
   block_number: number;
   wallet: string;
+  share_bps: number;
   amount: string;
   proof: string[];
   merkle_root: string;

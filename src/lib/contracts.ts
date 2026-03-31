@@ -675,7 +675,7 @@ const MERKLE_REWARDS_ABI = [
   {
     inputs: [
       { name: "blockNumber", type: "uint256" },
-      { name: "amount", type: "uint256" },
+      { name: "shareBps", type: "uint256" },
       { name: "proof", type: "bytes32[]" },
     ],
     name: "claim",
@@ -686,7 +686,7 @@ const MERKLE_REWARDS_ABI = [
   {
     inputs: [
       { name: "blockNumbers", type: "uint256[]" },
-      { name: "amounts", type: "uint256[]" },
+      { name: "shareBpsArr", type: "uint256[]" },
       { name: "proofs", type: "bytes32[][]" },
     ],
     name: "batchClaim",
@@ -699,11 +699,11 @@ const MERKLE_REWARDS_ABI = [
 export async function claimMerkleReward(
   signer: JsonRpcSigner,
   blockNumber: number,
-  amount: string,
+  shareBps: number,
   proof: string[],
 ): Promise<string> {
   const contract = new Contract(MERKLE_REWARDS_ADDRESS, MERKLE_REWARDS_ABI, signer);
-  const tx = await contract.claim(blockNumber, amount, proof);
+  const tx = await contract.claim(blockNumber, shareBps, proof);
   const receipt = await tx.wait();
   return receipt.hash;
 }
@@ -711,11 +711,11 @@ export async function claimMerkleReward(
 export async function batchClaimMerkleRewards(
   signer: JsonRpcSigner,
   blockNumbers: number[],
-  amounts: string[],
+  shareBpsArr: number[],
   proofs: string[][],
 ): Promise<string> {
   const contract = new Contract(MERKLE_REWARDS_ADDRESS, MERKLE_REWARDS_ABI, signer);
-  const tx = await contract.batchClaim(blockNumbers, amounts, proofs);
+  const tx = await contract.batchClaim(blockNumbers, shareBpsArr, proofs);
   const receipt = await tx.wait();
   return receipt.hash;
 }
