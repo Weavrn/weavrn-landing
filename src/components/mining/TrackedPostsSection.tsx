@@ -2,7 +2,7 @@
 
 import { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { getRewards, type TrackedPost, type TrackedPostsPagination } from "@/lib/api";
+import { getRewards, type TrackedPost, type TrackedPostsPagination, type PostBlockHistory } from "@/lib/api";
 import ScoreBreakdown from "../ScoreBreakdown";
 import PlatformFilter from "../PlatformFilter";
 import RefreshButton from "./RefreshButton";
@@ -76,6 +76,46 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
   const [trackedPosts, setTrackedPosts] = useState<TrackedPost[]>(initialPosts);
   const [postsPagination, setPostsPagination] = useState<TrackedPostsPagination | null>(null);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
+  const [historySortCol, setHistorySortCol] = useState<keyof PostBlockHistory | null>(null);
+  const [historySortDir, setHistorySortDir] = useState<"asc" | "desc">("asc");
+
+  // Reset block history sort when expanded post changes
+  useEffect(() => {
+    setHistorySortCol(null);
+    setHistorySortDir("asc");
+  }, [expandedPostId]);
+
+  const handleHistorySort = (col: keyof PostBlockHistory) => {
+    if (historySortCol === col) {
+      setHistorySortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setHistorySortCol(col);
+      setHistorySortDir("asc");
+    }
+  };
+
+  const SortTh = ({ col, label, align = "right", className = "" }: {
+    col: keyof PostBlockHistory;
+    label: string;
+    align?: "left" | "right";
+    className?: string;
+  }) => {
+    const active = historySortCol === col;
+    return (
+      <th
+        className={`py-1.5 ${align === "left" ? "pr-3 text-left" : "px-2 text-right"} ${className}`}
+        aria-sort={active ? (historySortDir === "asc" ? "ascending" : "descending") : undefined}
+      >
+        <button
+          onClick={() => handleHistorySort(col)}
+          className={`hover:text-white transition-colors ${active ? "text-white" : ""}`}
+        >
+          {label}
+          {active && <span className="ml-0.5">{historySortDir === "asc" ? "\u2191" : "\u2193"}</span>}
+        </button>
+      </th>
+    );
+  };
 
   // Refs for stable callbacks
   const pageRef = useRef(postsPage);
@@ -323,36 +363,23 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                           <table className="w-full text-[11px] font-mono">
                             <thead>
                               <tr className="text-weavrn-muted border-b border-weavrn-border/20">
-                                <th className="text-left py-1.5 pr-3">
-                                  Block
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Likes
-                                </th>
-                                {!isYouTube && (
-                                  <th className="text-right py-1.5 px-2">
-                                    RTs
-                                  </th>
-                                )}
-                                <th className="text-right py-1.5 px-2">
-                                  {isYouTube ? "Comments" : "Replies"}
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Views
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Score
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Delta
-                                </th>
-                                <th className="text-right py-1.5 pl-2">
-                                  WVRN
-                                </th>
+                                <SortTh col="block_number" label="Block" align="left" />
+                                <SortTh col="likes" label="Likes" />
+                                {!isYouTube && <SortTh col="retweets" label="RTs" />}
+                                <SortTh col="replies" label={isYouTube ? "Comments" : "Replies"} />
+                                <SortTh col="views" label="Views" />
+                                <SortTh col="raw_score" label="Score" />
+                                <SortTh col="delta" label="Delta" />
+                                <SortTh col="earned" label="WVRN" className="pl-2" />
                               </tr>
                             </thead>
                             <tbody>
-                              {p.block_history.map((b) => (
+                              {[...p.block_history].sort((a, b) => {
+                                if (historySortCol == null) return a.block_number - b.block_number;
+                                const av = a[historySortCol];
+                                const bv = b[historySortCol];
+                                return historySortDir === "asc" ? av - bv : bv - av;
+                              }).map((b) => (
                                 <tr
                                   key={b.block_number}
                                   className="text-weavrn-muted/80 border-b border-weavrn-border/10"
