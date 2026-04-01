@@ -121,6 +121,7 @@ export default function MiningDashboard({
   const [postFilter, setPostFilter] = useState<PostFilter>("active");
   const [postSort, setPostSort] = useState<PostSort>("newest");
   const [platformFilter, setPlatformFilter] = useState<"all" | "x" | "youtube">("all");
+  const [expandedRewardId, setExpandedRewardId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -352,6 +353,42 @@ export default function MiningDashboard({
   }, [trackedPosts, postFilter, postSort, platformFilter]);
 
   const inactiveCount = trackedPosts.filter((p) => p.deleted_at || p.flagged).length;
+
+  // Per-post breakdown for expanded block reward row
+  const expandedBreakdown = useMemo(() => {
+    if (expandedRewardId == null) return null;
+    const br = blockRewards.find((r) => r.id === expandedRewardId);
+    if (!br) return null;
+
+    const rewardAmount = br.reward_amount;
+    const totalReward = rewardAmount ? parseFloat(rewardAmount) : null;
+
+    const posts = trackedPosts
+      .map((post) => {
+        const history = post.block_history.find(
+          (h) => h.block_number === br.block_number && h.delta > 0,
+        );
+        if (!history) return null;
+        return { post, history };
+      })
+      .filter((x): x is { post: typeof trackedPosts[number]; history: typeof trackedPosts[number]["block_history"][number] } => x != null)
+      .sort((a, b) => b.history.earned - a.history.earned);
+
+    return { posts, totalReward, blockNumber: br.block_number };
+  }, [expandedRewardId, blockRewards, trackedPosts]);
+
+  // Clear expansion when the row leaves the filtered list
+  useEffect(() => {
+    if (expandedRewardId == null) return;
+    if (!filteredRewards.some((br) => br.id === expandedRewardId)) {
+      setExpandedRewardId(null);
+    }
+  }, [expandedRewardId, filteredRewards]);
+
+  const handleRewardRowClick = (br: BlockReward) => {
+    if (br.post_count === 0) return;
+    setExpandedRewardId((prev) => (prev === br.id ? null : br.id));
+  };
 
   const handleClaimAll = async () => {
     if (!signer) return;
@@ -683,81 +720,173 @@ export default function MiningDashboard({
           <div className="space-y-2">
             {filteredRewards.map((br) => {
               const sub = submissions.find((s) => s.id === br.submission_id);
+              const isExpanded = expandedRewardId === br.id;
+              const expandable = br.post_count > 0;
               return (
                 <div
                   key={br.id}
-                  className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
+                  className={`rounded-xl border bg-weavrn-surface/30 text-sm ${
+                    isExpanded ? "border-weavrn-border" : "border-weavrn-border/50"
+                  }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <span className="text-white font-mono text-xs">
-                      Block {br.block_number}
-                    </span>
-                    <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
-                      {br.delta_score}
-                      {br.block_share_pct != null && (
-                        <> &mdash; {br.block_share_pct}% share</>
+                  {/* Row header */}
+                  <div
+                    onClick={() => handleRewardRowClick(br)}
+                    className={`flex items-center justify-between p-4 transition-colors ${
+                      expandable ? "cursor-pointer hover:bg-weavrn-surface/60" : ""
+                    } ${isExpanded ? "bg-weavrn-surface/50" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {expandable && (
+                        <svg
+                          className={`w-3 h-3 text-weavrn-muted flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                       )}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* Reward amount */}
-                    {(br.merkle_block ? br.reward_amount : sub?.reward_amount) != null && (
-                      <span className="text-weavrn-muted font-mono text-xs">
-                        {fmtWvrn(parseFloat((br.merkle_block ? br.reward_amount : sub?.reward_amount) || "0"))} WVRN
+                      <span className="text-white font-mono text-xs">
+                        Block {br.block_number}
                       </span>
-                    )}
-                    {/* Tx link */}
-                    {((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)?.startsWith("0x")) && (
-                      <a
-                        href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
-                      >
-                        tx
-                      </a>
-                    )}
-                    {/* Merkle claim button */}
-                    {br.merkle_block && !br.claimed && br.reward_amount && signer && (
-                      <button
-                        onClick={() => handleMerkleClaim(br)}
-                        disabled={claimingId === br.id || claimingAll}
-                        className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
-                      >
-                        {claimingId === br.id ? "Claiming..." : "Claim"}
-                      </button>
-                    )}
-                    {/* Legacy claim button */}
-                    {!br.merkle_block && sub &&
-                      sub.status === "approved" &&
-                      sub.on_chain_id != null &&
-                      signer && (
+                      <span className="text-weavrn-muted font-mono text-xs">
+                        {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
+                        {br.delta_score}
+                        {br.block_share_pct != null && (
+                          <> &mdash; {br.block_share_pct}% share</>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {/* Reward amount */}
+                      {(br.merkle_block ? br.reward_amount : sub?.reward_amount) != null && (
+                        <span className="text-weavrn-muted font-mono text-xs">
+                          {fmtWvrn(parseFloat((br.merkle_block ? br.reward_amount : sub?.reward_amount) || "0"))} WVRN
+                        </span>
+                      )}
+                      {/* Tx link */}
+                      {((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)?.startsWith("0x")) && (
+                        <a
+                          href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          tx
+                        </a>
+                      )}
+                      {/* Merkle claim button */}
+                      {br.merkle_block && !br.claimed && br.reward_amount && signer && (
                         <button
-                          onClick={() => handleClaim(sub)}
-                          disabled={claimingId === sub.id || claimingAll}
+                          onClick={(e) => { e.stopPropagation(); handleMerkleClaim(br); }}
+                          disabled={claimingId === br.id || claimingAll}
                           className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
                         >
-                          {claimingId === sub.id ? "Claiming..." : "Claim"}
+                          {claimingId === br.id ? "Claiming..." : "Claim"}
                         </button>
                       )}
-                    {/* Status badge */}
-                    {br.merkle_block ? (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                        br.claimed ? STATUS_STYLES.claimed : STATUS_STYLES.approved
-                      }`}>
-                        {br.claimed ? "claimed" : "claimable"}
-                      </span>
-                    ) : sub && (
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                          STATUS_STYLES[sub.status] || STATUS_STYLES.pending
-                        }`}
-                      >
-                        {sub.status}
-                      </span>
-                    )}
+                      {/* Legacy claim button */}
+                      {!br.merkle_block && sub &&
+                        sub.status === "approved" &&
+                        sub.on_chain_id != null &&
+                        signer && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleClaim(sub); }}
+                            disabled={claimingId === sub.id || claimingAll}
+                            className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
+                          >
+                            {claimingId === sub.id ? "Claiming..." : "Claim"}
+                          </button>
+                        )}
+                      {/* Status badge */}
+                      {br.merkle_block ? (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                          br.claimed ? STATUS_STYLES.claimed : STATUS_STYLES.approved
+                        }`}>
+                          {br.claimed ? "claimed" : "claimable"}
+                        </span>
+                      ) : sub && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                            STATUS_STYLES[sub.status] || STATUS_STYLES.pending
+                          }`}
+                        >
+                          {sub.status}
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Per-post breakdown */}
+                  {isExpanded && expandedBreakdown && (
+                    <div className="px-4 pb-4 border-t border-weavrn-border/30">
+                      {expandedBreakdown.posts.length === 0 ? (
+                        <p className="text-xs text-weavrn-muted text-center py-3">
+                          No post data for this block
+                        </p>
+                      ) : (
+                        <div className="space-y-1.5 pt-3">
+                          {expandedBreakdown.posts.map(({ post, history }) => {
+                            const pct = expandedBreakdown.totalReward && expandedBreakdown.totalReward > 0
+                              ? (history.earned / expandedBreakdown.totalReward) * 100
+                              : null;
+                            return (
+                              <div
+                                key={post.id}
+                                className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-xs ${
+                                  post.deleted_at || post.flagged || post.deactivated
+                                    ? "opacity-50"
+                                    : ""
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="text-[10px] font-mono text-weavrn-muted/60 flex-shrink-0">
+                                    {post.platform === "youtube" ? "YT" : "X"}
+                                  </span>
+                                  <span className="text-white/90 truncate max-w-[200px]">
+                                    {post.text
+                                      ? post.text.length > 60
+                                        ? post.text.slice(0, 60) + "..."
+                                        : post.text
+                                      : post.post_url}
+                                  </span>
+                                  {post.deleted_at && (
+                                    <span className="text-[10px] font-mono text-red-400 flex-shrink-0">deleted</span>
+                                  )}
+                                  {post.flagged && !post.deleted_at && (
+                                    <span className="text-[10px] font-mono text-orange-400 flex-shrink-0">flagged</span>
+                                  )}
+                                  {post.deactivated && !post.deleted_at && !post.flagged && (
+                                    <span className="text-[10px] font-mono text-weavrn-muted flex-shrink-0">inactive</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                  <span className="text-[11px] text-weavrn-muted font-mono">
+                                    delta {history.delta}
+                                  </span>
+                                  {expandedBreakdown.totalReward != null && (
+                                    <>
+                                      <span className="text-xs text-weavrn-accent font-mono">
+                                        {fmtWvrn(history.earned)} WVRN
+                                      </span>
+                                      {pct != null && (
+                                        <span className="text-[10px] text-weavrn-muted font-mono w-[40px] text-right">
+                                          {pct.toFixed(1)}%
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
