@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect } from "react";
-import type { TrackedPost } from "@/lib/api";
+import { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { getRewards, type TrackedPost, type TrackedPostsPagination } from "@/lib/api";
 import ScoreBreakdown from "../ScoreBreakdown";
 import PlatformFilter from "../PlatformFilter";
 import RefreshButton from "./RefreshButton";
@@ -13,7 +14,8 @@ const fmtWvrn = (n: number) =>
   });
 
 type PostFilter = "active" | "all";
-type PostSort = "newest" | "oldest" | "earned";
+type PostSort = "newest" | "oldest" | "earned" | "engagement";
+type PostPlatform = "all" | "x" | "youtube";
 
 function FilterTab({
   value,
@@ -57,82 +59,113 @@ interface TrackedPostsSectionProps {
 }
 
 const TrackedPostsSection = memo(function TrackedPostsSection({
-  trackedPosts,
+  trackedPosts: initialPosts,
   walletAddress,
   onDataRefresh,
 }: TrackedPostsSectionProps) {
-  const [postFilter, setPostFilter] = useState<PostFilter>("active");
-  const [postSort, setPostSort] = useState<PostSort>("newest");
-  const [platformFilter, setPlatformFilter] = useState<
-    "all" | "x" | "youtube"
-  >("all");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Read initial state from URL
+  const postsPage = Math.max(1, parseInt(searchParams.get("posts_page") ?? "1", 10));
+  const postSort = (searchParams.get("posts_sort") as PostSort) ?? "newest";
+  const postFilter = (searchParams.get("posts_status") as PostFilter) ?? "active";
+  const platformFilter = (searchParams.get("posts_platform") as PostPlatform) ?? "all";
+
+  const [trackedPosts, setTrackedPosts] = useState<TrackedPost[]>(initialPosts);
+  const [postsPagination, setPostsPagination] = useState<TrackedPostsPagination | null>(null);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
+
+  // Refs for stable callbacks
+  const pageRef = useRef(postsPage);
+  const sortRef = useRef(postSort);
+  const filterRef = useRef(postFilter);
+  const platformRef = useRef(platformFilter);
+  pageRef.current = postsPage;
+  sortRef.current = postSort;
+  filterRef.current = postFilter;
+  platformRef.current = platformFilter;
+
+  // Sync initial data from parent
+  useEffect(() => { setTrackedPosts(initialPosts); }, [initialPosts]);
+
+  const updateParams = useCallback((updates: Record<string, string | null>, resetPage = true) => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, val] of Object.entries(updates)) {
+      if (val === null) params.delete(key);
+      else params.set(key, val);
+    }
+    if (resetPage) params.delete("posts_page");
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [searchParams, router, pathname]);
+
+  const fetchPosts = useCallback(async () => {
+    try {
+      const rewards = await getRewards(walletAddress, {
+        posts_page: pageRef.current,
+        posts_sort: sortRef.current !== "newest" ? sortRef.current : undefined,
+        posts_status: filterRef.current !== "active" ? filterRef.current : undefined,
+        posts_platform: platformRef.current !== "all" ? platformRef.current as "x" | "youtube" : undefined,
+      });
+      setTrackedPosts(rewards.tracked_posts);
+      setPostsPagination(rewards.tracked_posts_pagination ?? null);
+    } catch {
+      // Silently fail — parent data is still displayed
+    }
+  }, [walletAddress]);
+
+  // Re-fetch when URL params change (skip initial mount)
+  const didMount = useRef(false);
+  useEffect(() => {
+    if (!didMount.current) { didMount.current = true; return; }
+    fetchPosts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postsPage, postSort, postFilter, platformFilter]);
 
   // Reset expanded post if it disappeared from data
   useEffect(() => {
-    if (
-      expandedPostId != null &&
-      !trackedPosts.some((p) => p.id === expandedPostId)
-    ) {
+    if (expandedPostId != null && !trackedPosts.some((p) => p.id === expandedPostId)) {
       setExpandedPostId(null);
     }
   }, [trackedPosts, expandedPostId]);
 
-  const filteredPosts = useMemo(() => {
-    let posts = trackedPosts;
-    if (platformFilter !== "all") {
-      posts = posts.filter((p) => p.platform === platformFilter);
-    }
-    if (postFilter === "active") {
-      posts = posts.filter((p) => !p.deleted_at && !p.flagged);
-    }
-    if (postSort === "oldest") {
-      return [...posts].reverse();
-    }
-    if (postSort === "earned") {
-      return [...posts].sort((a, b) => b.estimated_wvrn - a.estimated_wvrn);
-    }
-    return posts;
-  }, [trackedPosts, postFilter, postSort, platformFilter]);
-
-  const inactiveCount = trackedPosts.filter(
-    (p) => p.deleted_at || p.flagged,
-  ).length;
+  const inactiveCount = trackedPosts.filter((p) => p.deleted_at || p.flagged).length;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
-          <PlatformFilter value={platformFilter} onChange={setPlatformFilter} />
+          <PlatformFilter value={platformFilter} onChange={(v) => updateParams({ posts_platform: v === "all" ? null : v })} />
           <div className="flex items-center gap-1">
             <FilterTab
               value="active"
               current={postFilter}
               label="Active"
-              count={trackedPosts.length - inactiveCount}
-              onClick={setPostFilter}
+              count={postsPagination && postFilter === "active" ? postsPagination.total : trackedPosts.length - inactiveCount}
+              onClick={(v) => updateParams({ posts_status: v === "active" ? null : v })}
             />
-            {inactiveCount > 0 && (
-              <FilterTab
-                value="all"
-                current={postFilter}
-                label="All"
-                count={trackedPosts.length}
-                onClick={setPostFilter}
-              />
-            )}
+            <FilterTab
+              value="all"
+              current={postFilter}
+              label="All"
+              count={postsPagination && postFilter === "all" ? postsPagination.total : trackedPosts.length}
+              onClick={(v) => updateParams({ posts_status: v === "active" ? null : v })}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={postSort}
-            onChange={(e) => setPostSort(e.target.value as PostSort)}
+            onChange={(e) => updateParams({ posts_sort: e.target.value === "newest" ? null : e.target.value })}
             className="px-2 py-1 text-xs font-mono bg-transparent border border-weavrn-border rounded-lg text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 cursor-pointer"
           >
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
             <option value="earned">Top Earned</option>
+            <option value="engagement">Engagement</option>
           </select>
           <RefreshButton
             walletAddress={walletAddress}
@@ -143,16 +176,14 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
 
       {trackedPosts.length === 0 ? (
         <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-          No posts discovered yet. Post about Weavrn on X or YouTube and
-          they&apos;ll appear here automatically.
-        </div>
-      ) : filteredPosts.length === 0 ? (
-        <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-          No matching posts. Try changing filters.
+          {postFilter === "active" && platformFilter === "all"
+            ? "No posts discovered yet. Post about Weavrn on X or YouTube and they'll appear here automatically."
+            : "No matching posts. Try changing filters."}
         </div>
       ) : (
+        <>
         <div className="space-y-3">
-          {filteredPosts.map((p) => {
+          {trackedPosts.map((p) => {
             const isExpanded = expandedPostId === p.id;
             const isYouTube = p.platform === "youtube";
             return (
@@ -380,6 +411,28 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
             );
           })}
         </div>
+        {postsPagination && postsPagination.total_pages > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <button
+              onClick={() => updateParams({ posts_page: postsPage > 2 ? String(postsPage - 1) : null }, false)}
+              disabled={postsPage === 1}
+              className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="text-xs font-mono text-weavrn-muted">
+              {postsPage} / {postsPagination.total_pages}
+            </span>
+            <button
+              onClick={() => updateParams({ posts_page: String(postsPage + 1) }, false)}
+              disabled={postsPage === postsPagination.total_pages}
+              className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   );
