@@ -1,217 +1,94 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 
-const fmtWvrn = (n: number) => Number(n.toFixed(2)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 import {
-  getRewards,
-  getProfile,
-  refreshPosts,
   startVerification,
   verifyHandle,
   unlinkHandle,
-  markClaimed,
-  getMerkleProof,
-  getMiningStats,
-  type Submission,
-  type RewardsResponse,
-  type BlockReward,
-  type Pagination,
-  type Profile,
-  type MiningStatsResponse,
 } from "@/lib/api";
-import {
-  claimReward,
-  batchClaimRewards,
-  claimMerkleReward,
-  batchClaimMerkleRewards,
-  addTokenToWallet,
-  getExplorerTxUrl,
-} from "@/lib/contracts";
+import { features } from "@/lib/features";
+
+import { useMiningData } from "@/hooks/useMiningData";
 
 import EarningsChart from "./EarningsChart";
-import ScoreBreakdown from "./ScoreBreakdown";
 import YouTubeVerification from "./YouTubeVerification";
-import PlatformFilter from "./PlatformFilter";
 import MiningRules from "./MiningRules";
-import { features } from "@/lib/features";
+import StatsGrid from "./mining/StatsGrid";
+import PoolCards from "./mining/PoolCards";
+import BlockBanner from "./mining/BlockBanner";
+import BlockRewardsSection from "./mining/BlockRewardsSection";
+import TrackedPostsSection from "./mining/TrackedPostsSection";
 
 interface MiningDashboardProps {
   walletAddress: string;
   signer: JsonRpcSigner | null;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  approved: "bg-weavrn-accent/10 text-weavrn-accent border-weavrn-accent/20",
-  claimed: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  rejected: "bg-red-500/10 text-red-400 border-red-500/20",
-};
-
-type RewardFilter = "all" | "unclaimed";
-type PostFilter = "active" | "all";
-type PostSort = "newest" | "oldest" | "earned";
-
-function formatCountdown(endTimestamp: number): string {
-  const remaining = endTimestamp - Math.floor(Date.now() / 1000);
-  if (remaining <= 0) return "Closing...";
-  const hours = Math.floor(remaining / 3600);
-  const minutes = Math.floor((remaining % 3600) / 60);
-  const seconds = remaining % 60;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-}
-
-function FilterTab<T extends string>({
-  value,
-  current,
-  label,
-  count,
-  onClick,
-}: {
-  value: T;
-  current: T;
-  label: string;
-  count?: number;
-  onClick: (v: T) => void;
-}) {
-  const active = value === current;
-  return (
-    <button
-      onClick={() => onClick(value)}
-      className={`px-3 py-1 text-xs font-mono rounded-lg transition-colors ${
-        active
-          ? "bg-weavrn-surface text-white border border-weavrn-border"
-          : "text-weavrn-muted hover:text-white"
-      }`}
-    >
-      {label}
-      {count != null && count > 0 && (
-        <span className={`ml-1.5 ${active ? "text-weavrn-accent" : "text-weavrn-muted/50"}`}>
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}
-
 export default function MiningDashboard({
   walletAddress,
   signer,
 }: MiningDashboardProps) {
+  // --- Data from hook (stable slices) ---
+  const {
+    currentBlock,
+    blockRewards,
+    trackedPosts,
+    submissions,
+    walletSummary,
+    profile,
+    miningStats,
+    historyRefreshKey,
+    isInitialLoad,
+    error,
+    setError,
+    refreshData,
+  } = useMiningData(walletAddress);
+
+  // --- Verification flow state (only used in States A/B early returns) ---
   const [xHandle, setXHandle] = useState<string | null>(null);
   const [handleInput, setHandleInput] = useState("");
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
   const [verificationHandle, setVerificationHandle] = useState<string | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [data, setData] = useState<RewardsResponse | null>(null);
-  const [miningStats, setMiningStats] = useState<MiningStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [claimingId, setClaimingId] = useState<number | null>(null);
-  const [claimingAll, setClaimingAll] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState("");
   const [copied, setCopied] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshCooldown, setRefreshCooldown] = useState(0);
-  const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
-  const [rewardFilter, setRewardFilter] = useState<RewardFilter>("unclaimed");
-  const [rewardsPage, setRewardsPage] = useState(1);
-  const [rewardsPagination, setRewardsPagination] = useState<Pagination | null>(null);
-  const [rewardsTotalAll, setRewardsTotalAll] = useState<number | null>(null);
-  const [rewardsTotalUnclaimed, setRewardsTotalUnclaimed] = useState<number | null>(null);
-  const [postFilter, setPostFilter] = useState<PostFilter>("active");
 
-  // Refs so stable callbacks always see current page/filter without being recreated
-  const rewardsPageRef = useRef(rewardsPage);
-  const rewardFilterRef = useRef(rewardFilter);
-  rewardsPageRef.current = rewardsPage;
-  rewardFilterRef.current = rewardFilter;
-  const [postSort, setPostSort] = useState<PostSort>("newest");
-  const [platformFilter, setPlatformFilter] = useState<"all" | "x" | "youtube">("all");
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [rewards, p, stats] = await Promise.all([
-        getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current }),
-        getProfile(walletAddress),
-        getMiningStats().catch(() => null),
-      ]);
-      setData(rewards);
-      const pg = rewards.pagination ?? null;
-      setRewardsPagination(pg);
-      if (pg) {
-        if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
-        else setRewardsTotalUnclaimed(pg.total);
+  // --- Derive verification state from profile slice ---
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.x_handle) {
+      setXHandle((prev) => (prev === profile.x_handle ? prev : profile.x_handle));
+      setVerificationCode(null);
+      setVerificationHandle(null);
+    } else if (profile.verification_code && profile.verification_handle) {
+      const expired =
+        profile.verification_expires_at &&
+        new Date(profile.verification_expires_at) < new Date();
+      if (!expired) {
+        setVerificationCode((prev) =>
+          prev === profile.verification_code ? prev : profile.verification_code,
+        );
+        setVerificationHandle((prev) =>
+          prev === profile.verification_handle ? prev : profile.verification_handle,
+        );
       }
-      setProfile(p);
-      if (stats) setMiningStats(stats);
-      if (p.x_handle) {
-        setXHandle(p.x_handle);
-        setVerificationCode(null);
-        setVerificationHandle(null);
-      } else if (p.verification_code && p.verification_handle) {
-        const expired = p.verification_expires_at
-          && new Date(p.verification_expires_at) < new Date();
-        if (!expired) {
-          setVerificationCode(p.verification_code);
-          setVerificationHandle(p.verification_handle);
-        }
-      }
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
     }
-  }, [walletAddress]); // stable — reads page/filter via refs
+  }, [profile]);
 
-  // Fetches only block rewards (no profile/stats). Used on page/filter changes and after claiming.
-  const fetchRewards = useCallback(async () => {
-    try {
-      const rewards = await getRewards(walletAddress, { page: rewardsPageRef.current, limit: 10, filter: rewardFilterRef.current });
-      setData(rewards);
-      const pg = rewards.pagination ?? null;
-      setRewardsPagination(pg);
-      if (pg) {
-        if (rewardFilterRef.current === "all") setRewardsTotalAll(pg.total);
-        else setRewardsTotalUnclaimed(pg.total);
-      }
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    }
-  }, [walletAddress]); // stable — reads page/filter via refs
+  // --- Compute unclaimedAmount for StatsGrid from stable slices ---
+  const unclaimedAmount = useMemo(() => {
+    const legacyAmount = submissions
+      .filter((s) => s.status === "approved" && s.on_chain_id != null)
+      .reduce((sum, s) => sum + parseFloat(s.reward_amount || "0"), 0);
+    const merkleAmount = blockRewards
+      .filter((br) => br.merkle_block && br.reward_amount && !br.claimed)
+      .reduce((sum, br) => sum + parseFloat(br.reward_amount || "0"), 0);
+    return legacyAmount + merkleAmount;
+  }, [submissions, blockRewards]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Re-fetch rewards (only) when page or filter changes, skip the initial mount.
-  const didMountRewards = useRef(false);
-  useEffect(() => {
-    if (!didMountRewards.current) { didMountRewards.current = true; return; }
-    fetchRewards();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rewardsPage, rewardFilter]);
-
-  useEffect(() => {
-    if (!data?.current_block) return;
-    const update = () => {
-      const remaining = data.current_block.end_time - Math.floor(Date.now() / 1000);
-      if (remaining <= 0) {
-        setCountdown("Closing...");
-        fetchData();
-        return;
-      }
-      setCountdown(formatCountdown(data.current_block.end_time));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [data?.current_block, fetchData]);
-
+  // --- Verification handlers ---
   const handleStartVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = handleInput.replace(/^@/, "").trim();
@@ -219,7 +96,10 @@ export default function MiningDashboard({
     setSubmitting(true);
     setError(null);
     try {
-      if (!signer) { setError("Wallet not connected"); return; }
+      if (!signer) {
+        setError("Wallet not connected");
+        return;
+      }
       const res = await startVerification(signer, walletAddress, cleaned);
       setVerificationCode(res.code);
       setVerificationHandle(cleaned);
@@ -235,12 +115,15 @@ export default function MiningDashboard({
     setVerifying(true);
     setError(null);
     try {
-      if (!signer) { setError("Wallet not connected"); return; }
+      if (!signer) {
+        setError("Wallet not connected");
+        return;
+      }
       const p = await verifyHandle(signer, walletAddress);
       setXHandle(p.x_handle);
       setVerificationCode(null);
       setVerificationHandle(null);
-      await fetchData();
+      await refreshData();
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
@@ -248,10 +131,13 @@ export default function MiningDashboard({
     }
   };
 
-  const handleUnlink = async () => {
+  const handleUnlink = useCallback(async () => {
     setError(null);
     try {
-      if (!signer) { setError("Wallet not connected"); return; }
+      if (!signer) {
+        setError("Wallet not connected");
+        return;
+      }
       await unlinkHandle(signer, walletAddress);
       setXHandle(null);
       setVerificationCode(null);
@@ -259,32 +145,7 @@ export default function MiningDashboard({
     } catch (err: unknown) {
       setError((err as Error).message);
     }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setError(null);
-    try {
-      await refreshPosts(walletAddress);
-      await fetchData();
-      setRefreshCooldown(300);
-    } catch (err: unknown) {
-      const msg = (err as Error).message;
-      const match = msg.match(/Try again in (\d+)s/);
-      if (match) setRefreshCooldown(parseInt(match[1]));
-      setError(msg);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (refreshCooldown <= 0) return;
-    const interval = setInterval(() => {
-      setRefreshCooldown((c) => (c <= 1 ? 0 : c - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [refreshCooldown]);
+  }, [signer, walletAddress, setError]);
 
   const handleCancelVerification = () => {
     setVerificationCode(null);
@@ -299,122 +160,28 @@ export default function MiningDashboard({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleClaim = async (sub: Submission) => {
-    if (!signer || sub.on_chain_id == null) return;
-    setClaimingId(sub.id);
-    setError(null);
-    try {
-      const txHash = await claimReward(signer, sub.on_chain_id);
-      await markClaimed(signer, walletAddress, sub.on_chain_id, txHash).catch(() => {
-        setError("Claimed on-chain but failed to update dashboard. Please refresh.");
-      });
-      await fetchRewards();
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    } finally {
-      setClaimingId(null);
-    }
-  };
-
-  const handleMerkleClaim = async (br: BlockReward) => {
-    if (!signer || !br.reward_amount) return;
-    setClaimingId(br.id);
-    setError(null);
-    try {
-      const proofData = await getMerkleProof(walletAddress, br.block_number);
-      await claimMerkleReward(signer, br.block_number, proofData.share_bps, proofData.proof);
-      await fetchRewards();
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    } finally {
-      setClaimingId(null);
-    }
-  };
-
-  // Derived data
-  const submissions = data?.submissions ?? [];
-  const blockRewards = data?.block_rewards ?? [];
-  const trackedPosts = data?.tracked_posts ?? [];
-
-  const claimableSubs = useMemo(
-    () => submissions.filter((s) => s.status === "approved" && s.on_chain_id != null),
-    [submissions],
-  );
-
-  const claimableMerkle = useMemo(
-    () => blockRewards.filter((br) => br.merkle_block && br.reward_amount && !br.claimed),
-    [blockRewards],
-  );
-
-  const unclaimedAmount = useMemo(
-    () => {
-      const legacyAmount = claimableSubs.reduce((sum, s) => sum + parseFloat(s.reward_amount || "0"), 0);
-      const merkleAmount = claimableMerkle.reduce((sum, br) => sum + parseFloat(br.reward_amount || "0"), 0);
-      return legacyAmount + merkleAmount;
-    },
-    [claimableSubs, claimableMerkle],
-  );
-
-  const filteredPosts = useMemo(() => {
-    let posts = trackedPosts;
-    if (platformFilter !== "all") {
-      posts = posts.filter((p) => p.platform === platformFilter);
-    }
-    if (postFilter === "active") {
-      posts = posts.filter((p) => !p.deleted_at && !p.flagged);
-    }
-    if (postSort === "oldest") {
-      return [...posts].reverse();
-    }
-    if (postSort === "earned") {
-      return [...posts].sort((a, b) => b.estimated_wvrn - a.estimated_wvrn);
-    }
-    return posts;
-  }, [trackedPosts, postFilter, postSort, platformFilter]);
-
-  const inactiveCount = trackedPosts.filter((p) => p.deleted_at || p.flagged).length;
-
-  const handleClaimAll = async () => {
-    if (!signer) return;
-    setClaimingAll(true);
-    setError(null);
-    try {
-      // Legacy claims
-      if (claimableSubs.length > 0) {
-        const onChainIds = claimableSubs.map((s) => s.on_chain_id!);
-        const txHash = await batchClaimRewards(signer, onChainIds);
-        for (const sub of claimableSubs) {
-          await markClaimed(signer, walletAddress, sub.on_chain_id!, txHash).catch(() => {});
-        }
-      }
-      // Merkle claims — batch into single transaction
-      if (claimableMerkle.length > 0) {
-        const proofs = await Promise.all(
-          claimableMerkle.map((br) => getMerkleProof(walletAddress, br.block_number))
-        );
-        const blockNumbers = proofs.map((p) => p.block_number);
-        const shareBpsArr = proofs.map((p) => p.share_bps);
-        const proofArrays = proofs.map((p) => p.proof);
-
-        await batchClaimMerkleRewards(signer, blockNumbers, shareBpsArr, proofArrays);
-      }
-      await fetchRewards();
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    } finally {
-      setClaimingAll(false);
-    }
-  };
-
-  if (loading) {
+  // --- Initial load ---
+  if (isInitialLoad) {
     return (
       <div className="text-center py-20 text-weavrn-muted text-sm">
-        Loading...
+        {error ? (
+          <div className="space-y-4">
+            <p className="text-red-400">{error}</p>
+            <button
+              onClick={() => { setError(null); refreshData(); }}
+              className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold transition-all"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          "Loading..."
+        )}
       </div>
     );
   }
 
-  // State A: No handle linked on either platform, no pending verification
+  // --- State A: No handle linked, no pending verification ---
   const hasAnyHandle = xHandle || (features.youtube && profile?.yt_handle);
   if (!hasAnyHandle && !verificationCode) {
     return (
@@ -452,14 +219,14 @@ export default function MiningDashboard({
             ytHandle={profile?.yt_handle ?? null}
             ytVerificationCode={profile?.yt_verification_code ?? null}
             ytVerificationHandle={profile?.yt_verification_handle ?? null}
-            onUpdate={fetchData}
+            onUpdate={refreshData}
           />
         )}
       </div>
     );
   }
 
-  // State B: Pending X verification
+  // --- State B: Pending X verification ---
   if (!xHandle && verificationCode) {
     return (
       <div className="max-w-md mx-auto">
@@ -506,7 +273,7 @@ export default function MiningDashboard({
     );
   }
 
-  // State C: Verified — main dashboard
+  // --- State C: Verified — main dashboard ---
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       {error && (
@@ -521,540 +288,58 @@ export default function MiningDashboard({
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="glow-card rounded-xl p-4 text-center">
-          <div className="text-xl font-bold text-white">
-            {trackedPosts.length}
-          </div>
-          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-            Tracked Posts
-          </div>
-        </div>
-        <div className="glow-card rounded-xl p-4 text-center">
-          <div className="text-xl font-bold gradient-text">
-            {Math.floor(parseFloat(data?.total_earned || "0")).toLocaleString()}
-          </div>
-          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-            Total Earned
-          </div>
-        </div>
-        <div className="glow-card rounded-xl p-4 text-center">
-          <div className={`text-xl font-bold ${unclaimedAmount > 0 ? "text-weavrn-accent" : "text-white"}`}>
-            {Math.floor(unclaimedAmount).toLocaleString()}
-          </div>
-          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-            Unclaimed
-          </div>
-        </div>
-        <div className="glow-card rounded-xl p-4 text-center">
-          <div className="text-xl font-bold text-white">
-            {parseFloat(data?.balance || "0").toLocaleString(undefined, {
-              maximumFractionDigits: 0,
-            })}
-          </div>
-          <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-            Balance
-            <button
-              onClick={addTokenToWallet}
-              className="ml-1 text-weavrn-accent/60 hover:text-weavrn-accent transition-colors"
-              title="Add WVRN to wallet"
-            >
-              +
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Pool cards */}
-      {miningStats?.pools && (
-        features.youtube ? (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="glow-card rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-semibold text-white">X Pool</span>
-                <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.x.pct}%</span>
-              </div>
-              <div className="text-lg font-bold gradient-text font-mono">
-                {parseFloat(miningStats.pools.x.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
-              </div>
-              <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-                {miningStats.pools.x.miners} miner{miningStats.pools.x.miners !== 1 ? "s" : ""} this block
-              </div>
-            </div>
-            <div className="glow-card rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-semibold text-white">YouTube Pool</span>
-                <span className="text-[10px] text-weavrn-muted font-mono">{miningStats.pools.youtube.pct}%</span>
-              </div>
-              <div className="text-lg font-bold gradient-text font-mono">
-                {parseFloat(miningStats.pools.youtube.emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
-              </div>
-              <div className="text-[10px] text-weavrn-muted font-mono mt-1">
-                {miningStats.pools.youtube.miners} miner{miningStats.pools.youtube.miners !== 1 ? "s" : ""} this block
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="glow-card rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-semibold text-white">This Block</span>
-                </div>
-                <div className="text-xl font-bold gradient-text font-mono">
-                  {parseFloat(miningStats.current_emission).toLocaleString(undefined, { maximumFractionDigits: 0 })} WVRN
-                </div>
-                <div className="text-[10px] text-weavrn-muted font-mono mt-1">up for grabs</div>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-white">{miningStats.pools.x.miners}</div>
-                <div className="text-[10px] text-weavrn-muted font-mono">miner{miningStats.pools.x.miners !== 1 ? "s" : ""} competing</div>
-              </div>
-            </div>
-          </div>
-        )
-      )}
-
-      {/* Current block banner */}
-      {data?.current_block && (
-        <div className="glow-card rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-white">
-                Block {data.current_block.number}
-              </h3>
-              <p className="text-sm text-weavrn-muted mt-1">
-                {xHandle && (
-                  <>
-                    @{xHandle}
-                    <button
-                      onClick={handleUnlink}
-                      className="ml-2 text-xs text-weavrn-muted/50 hover:text-red-400 transition-colors"
-                    >
-                      change
-                    </button>
-                  </>
-                )}
-                {features.youtube && xHandle && profile?.yt_handle && <span className="mx-2 text-weavrn-border">|</span>}
-                {features.youtube && profile?.yt_handle && (
-                  <span className="text-weavrn-muted">YT @{profile.yt_handle}</span>
-                )}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold gradient-text">{countdown}</div>
-              <div className="text-xs text-weavrn-muted font-mono mt-0.5">
-                until close
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mining rules */}
-      <MiningRules
-        followerCount={profile?.x_follower_count}
-        subscriberCount={features.youtube ? profile?.yt_subscriber_count : undefined}
+      <StatsGrid
+        postCount={trackedPosts.length}
+        totalEarned={walletSummary?.total_earned || "0"}
+        unclaimedAmount={unclaimedAmount}
+        balance={walletSummary?.balance || "0"}
       />
 
-      {/* Block Rewards */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-white">Block Rewards</h3>
-            <div className="flex items-center gap-1">
-              <FilterTab
-                value="unclaimed"
-                current={rewardFilter}
-                label="Unclaimed"
-                count={rewardsTotalUnclaimed ?? undefined}
-                onClick={(v) => { setRewardFilter(v); setRewardsPage(1); }}
-              />
-              <FilterTab
-                value="all"
-                current={rewardFilter}
-                label="All"
-                count={rewardsTotalAll ?? undefined}
-                onClick={(v) => { setRewardFilter(v); setRewardsPage(1); }}
-              />
-            </div>
-          </div>
-          {(claimableSubs.length + claimableMerkle.length) > 1 && signer && (
-            <button
-              onClick={handleClaimAll}
-              disabled={claimingAll || claimingId != null}
-              className="px-4 py-1.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
-            >
-              {claimingAll
-                ? "Claiming..."
-                : `Claim All (${fmtWvrn(unclaimedAmount)} WVRN)`}
-            </button>
-          )}
-        </div>
-        {(rewardsPagination?.total ?? blockRewards.length) === 0 ? (
-          rewardFilter === "unclaimed" ? (
-            <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-              All rewards claimed. Switch to &quot;All&quot; to view history.
-            </div>
-          ) : (
-            <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-              No block rewards yet. Rewards are calculated when each block closes.
-            </div>
-          )
-        ) : (
-          <>
-            <div className="space-y-2">
-              {blockRewards.map((br) => {
-                const sub = submissions.find((s) => s.id === br.submission_id);
-                return (
-                  <div
-                    key={br.id}
-                    className="flex items-center justify-between p-4 rounded-xl border border-weavrn-border/50 bg-weavrn-surface/30 hover:bg-weavrn-surface/60 transition-colors text-sm"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-white font-mono text-xs">
-                        Block {br.block_number}
-                      </span>
-                      <span className="text-weavrn-muted font-mono text-xs">
-                        {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta{" "}
-                        {br.delta_score}
-                        {br.block_share_pct != null && (
-                          <> &mdash; {br.block_share_pct}% share</>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {/* Reward amount */}
-                      {(br.merkle_block ? br.reward_amount : sub?.reward_amount) != null && (
-                        <span className="text-weavrn-muted font-mono text-xs">
-                          {fmtWvrn(parseFloat((br.merkle_block ? br.reward_amount : sub?.reward_amount) || "0"))} WVRN
-                        </span>
-                      )}
-                      {/* Tx link */}
-                      {((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)?.startsWith("0x")) && (
-                        <a
-                          href={getExplorerTxUrl((br.merkle_block ? br.claim_tx_hash : sub?.tx_hash)!)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-weavrn-muted/50 hover:text-weavrn-muted font-mono text-[10px]"
-                        >
-                          tx
-                        </a>
-                      )}
-                      {/* Merkle claim button */}
-                      {br.merkle_block && !br.claimed && br.reward_amount && signer && (
-                        <button
-                          onClick={() => handleMerkleClaim(br)}
-                          disabled={claimingId === br.id || claimingAll}
-                          className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
-                        >
-                          {claimingId === br.id ? "Claiming..." : "Claim"}
-                        </button>
-                      )}
-                      {/* Legacy claim button */}
-                      {!br.merkle_block && sub &&
-                        sub.status === "approved" &&
-                        sub.on_chain_id != null &&
-                        signer && (
-                          <button
-                            onClick={() => handleClaim(sub)}
-                            disabled={claimingId === sub.id || claimingAll}
-                            className="px-3 py-1 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded text-[10px] font-semibold transition-all disabled:opacity-50"
-                          >
-                            {claimingId === sub.id ? "Claiming..." : "Claim"}
-                          </button>
-                        )}
-                      {/* Status badge */}
-                      {br.merkle_block ? (
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                          br.claimed ? STATUS_STYLES.claimed : STATUS_STYLES.approved
-                        }`}>
-                          {br.claimed ? "claimed" : "claimable"}
-                        </span>
-                      ) : sub && (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                            STATUS_STYLES[sub.status] || STATUS_STYLES.pending
-                          }`}
-                        >
-                          {sub.status}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {rewardsPagination && rewardsPagination.total_pages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-4">
-                <button
-                  onClick={() => setRewardsPage((p) => p - 1)}
-                  disabled={rewardsPage === 1}
-                  className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Prev
-                </button>
-                <span className="text-xs font-mono text-weavrn-muted">
-                  {rewardsPage} / {rewardsPagination.total_pages}
-                </span>
-                <button
-                  onClick={() => setRewardsPage((p) => p + 1)}
-                  disabled={rewardsPage === rewardsPagination.total_pages}
-                  className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Tracked Posts */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-white">Tracked Posts</h3>
-            {features.youtube && <PlatformFilter value={platformFilter} onChange={setPlatformFilter} />}
-            <div className="flex items-center gap-1">
-              <FilterTab
-                value="active"
-                current={postFilter}
-                label="Active"
-                count={trackedPosts.length - inactiveCount}
-                onClick={setPostFilter}
-              />
-              {inactiveCount > 0 && (
-                <FilterTab
-                  value="all"
-                  current={postFilter}
-                  label="All"
-                  count={trackedPosts.length}
-                  onClick={setPostFilter}
-                />
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={postSort}
-              onChange={(e) => setPostSort(e.target.value as PostSort)}
-              className="px-2 py-1 text-xs font-mono bg-transparent border border-weavrn-border rounded-lg text-weavrn-muted focus:outline-none focus:border-weavrn-accent/50 cursor-pointer"
-            >
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="earned">Top Earned</option>
-            </select>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing || refreshCooldown > 0}
-              className="px-3 py-1.5 text-xs font-mono border border-weavrn-border rounded-lg hover:border-weavrn-accent/50 hover:text-weavrn-accent text-weavrn-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {refreshing
-                ? "Scanning..."
-                : refreshCooldown > 0
-                  ? `${Math.floor(refreshCooldown / 60)}:${String(refreshCooldown % 60).padStart(2, "0")}`
-                  : "Refresh"}
-            </button>
-          </div>
-        </div>
-        {trackedPosts.length === 0 ? (
-          <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No posts discovered yet. Post about Weavrn on X or YouTube and they&apos;ll
-            appear here automatically.
-          </div>
-        ) : filteredPosts.length === 0 ? (
-          <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
-            No matching posts. Try changing filters.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredPosts.map((p) => {
-              const isExpanded = expandedPostId === p.id;
-              const isYouTube = p.platform === "youtube";
-              return (
-                <div
-                  key={p.id}
-                  className={`rounded-xl border bg-weavrn-surface/30 text-sm ${
-                    p.deleted_at || p.flagged
-                      ? "border-red-500/20 opacity-60"
-                      : "border-weavrn-border/50"
-                  }`}
-                >
-                  <div
-                    className="p-4 cursor-pointer hover:bg-weavrn-surface/50 transition-colors rounded-xl"
-                    onClick={() => setExpandedPostId(isExpanded ? null : p.id)}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        <svg
-                          className={`w-3 h-3 text-weavrn-muted flex-shrink-0 mt-0.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div className="min-w-0 flex-1">
-                          {p.text ? (
-                            <p className="text-sm text-white/90 leading-snug line-clamp-2">
-                              {p.text}
-                            </p>
-                          ) : (
-                            <a
-                              href={p.post_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-weavrn-accent hover:text-weavrn-accent-hover transition-colors font-mono text-xs"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {p.post_url}
-                            </a>
-                          )}
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-mono text-weavrn-muted/60">
-                              {isYouTube ? "YouTube" : "X"}
-                            </span>
-                            {p.text && (
-                              <a
-                                href={p.post_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-weavrn-accent/60 hover:text-weavrn-accent transition-colors font-mono text-[10px]"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                view
-                              </a>
-                            )}
-                            {p.deleted_at && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">
-                                deleted
-                              </span>
-                            )}
-                            {p.flagged && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                                {p.flag_reason === "duplicate content" ? "duplicate" : "flagged"}
-                              </span>
-                            )}
-                            {p.block_history.length === 1 && p.block_history[0].delta === 0 && !p.deleted_at && !p.flagged && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                baseline
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        {p.estimated_wvrn > 0 && (
-                          <span className="text-xs font-mono text-weavrn-accent font-medium">
-                            {fmtWvrn(p.estimated_wvrn)} WVRN
-                          </span>
-                        )}
-                        <span className="text-[10px] text-weavrn-muted font-mono">
-                          Block {p.discovered_in_block}
-                        </span>
-                      </div>
-                    </div>
-                    {p.raw_score != null && (
-                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-weavrn-border/30">
-                        <span className="text-[11px] text-weavrn-muted font-mono">
-                          {p.likes ?? 0} likes
-                        </span>
-                        {!isYouTube && (
-                          <span className="text-[11px] text-weavrn-muted font-mono">
-                            {p.retweets ?? 0} RTs
-                          </span>
-                        )}
-                        <span className="text-[11px] text-weavrn-muted font-mono">
-                          {p.replies ?? 0} {isYouTube ? "comments" : "replies"}
-                        </span>
-                        <span className="text-[11px] text-weavrn-muted font-mono">
-                          {(p.views ?? 0).toLocaleString()} views
-                        </span>
-                        <span className="ml-auto text-[11px] font-mono text-weavrn-muted">
-                          score {p.raw_score}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {isExpanded && (
-                    <div className="px-4 pb-4 space-y-3">
-                      {/* Score breakdown */}
-                      {p.raw_score != null && (
-                        <ScoreBreakdown
-                          likes={p.likes ?? 0}
-                          retweets={p.retweets ?? 0}
-                          replies={p.replies ?? 0}
-                          views={p.views ?? 0}
-                          platform={p.platform || "x"}
-                        />
-                      )}
-                      {/* Block history table */}
-                      <div className="border-t border-weavrn-border/30 pt-3">
-                        {p.block_history.length === 0 ? (
-                          <p className="text-xs text-weavrn-muted text-center py-3">
-                            No block history yet
-                          </p>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-[11px] font-mono">
-                              <thead>
-                                <tr className="text-weavrn-muted border-b border-weavrn-border/20">
-                                  <th className="text-left py-1.5 pr-3">Block</th>
-                                  <th className="text-right py-1.5 px-2">Likes</th>
-                                  {!isYouTube && <th className="text-right py-1.5 px-2">RTs</th>}
-                                  <th className="text-right py-1.5 px-2">{isYouTube ? "Comments" : "Replies"}</th>
-                                  <th className="text-right py-1.5 px-2">Views</th>
-                                  <th className="text-right py-1.5 px-2">Score</th>
-                                  <th className="text-right py-1.5 px-2">Delta</th>
-                                  <th className="text-right py-1.5 pl-2">WVRN</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {p.block_history.map((b) => (
-                                  <tr key={b.block_number} className="text-weavrn-muted/80 border-b border-weavrn-border/10">
-                                    <td className="py-1.5 pr-3 text-white">{b.block_number}</td>
-                                    <td className="text-right py-1.5 px-2">{b.likes}</td>
-                                    {!isYouTube && <td className="text-right py-1.5 px-2">{b.retweets}</td>}
-                                    <td className="text-right py-1.5 px-2">{b.replies}</td>
-                                    <td className="text-right py-1.5 px-2">{b.views.toLocaleString()}</td>
-                                    <td className="text-right py-1.5 px-2">{b.raw_score}</td>
-                                    <td className="text-right py-1.5 px-2">{b.delta}</td>
-                                    <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                      {fmtWvrn(b.earned)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                              <tfoot>
-                                <tr className="border-t border-weavrn-border/30 text-white font-medium">
-                                  <td className="py-1.5 pr-3" colSpan={isYouTube ? 6 : 7}>Total</td>
-                                  <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                    {fmtWvrn(p.estimated_wvrn)}
-                                  </td>
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Earnings chart — only show when there's data */}
-      {blockRewards.length > 0 && (
-        <EarningsChart walletAddress={walletAddress} refreshKey={blockRewards.length} />
+      {miningStats?.pools && (
+        <PoolCards
+          pools={miningStats.pools}
+          currentEmission={miningStats.current_emission}
+          showYouTube={features.youtube}
+        />
       )}
 
-      {/* YouTube verification (if X is linked but YT isn't) */}
+      {currentBlock && (
+        <BlockBanner
+          currentBlock={currentBlock}
+          xHandle={xHandle}
+          ytHandle={profile?.yt_handle ?? null}
+          onUnlink={handleUnlink}
+          onBlockClose={refreshData}
+        />
+      )}
+
+      <MiningRules
+        followerCount={profile?.x_follower_count}
+        subscriberCount={profile?.yt_subscriber_count}
+        rules={miningStats?.rules}
+      />
+
+      <BlockRewardsSection
+        blockRewards={blockRewards}
+        submissions={submissions}
+        signer={signer}
+        walletAddress={walletAddress}
+        onDataRefresh={refreshData}
+      />
+
+      <TrackedPostsSection
+        trackedPosts={trackedPosts}
+        walletAddress={walletAddress}
+        onDataRefresh={refreshData}
+      />
+
+      {blockRewards.length > 0 && (
+        <EarningsChart
+          walletAddress={walletAddress}
+          historyRefreshKey={historyRefreshKey}
+        />
+      )}
+
       {features.youtube && xHandle && !profile?.yt_handle && (
         <YouTubeVerification
           walletAddress={walletAddress}
@@ -1062,11 +347,10 @@ export default function MiningDashboard({
           ytHandle={null}
           ytVerificationCode={profile?.yt_verification_code ?? null}
           ytVerificationHandle={profile?.yt_verification_handle ?? null}
-          onUpdate={fetchData}
+          onUpdate={refreshData}
         />
       )}
 
-      {/* Community links */}
       {hasAnyHandle && (
         <div className="glow-card rounded-xl p-5">
           <h4 className="text-sm font-semibold text-white mb-3">Join the Community</h4>
@@ -1092,7 +376,6 @@ export default function MiningDashboard({
         </div>
       )}
 
-      {/* Mining rules disclaimer */}
       {hasAnyHandle && (
         <div className="border border-weavrn-border/30 rounded-xl p-5 text-xs text-weavrn-muted/70 space-y-3">
           <h4 className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Social Mining Rules</h4>

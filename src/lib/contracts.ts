@@ -2,8 +2,7 @@ import { BrowserProvider, Contract, JsonRpcSigner, JsonRpcProvider } from "ether
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ethereum?: any;
+    ethereum?: any; // eslint-disable-line
   }
 }
 
