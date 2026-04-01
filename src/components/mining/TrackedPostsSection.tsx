@@ -116,10 +116,8 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
     }
   }, [walletAddress]);
 
-  // Re-fetch when URL params change (skip initial mount)
-  const didMount = useRef(false);
+  // Fetch on mount and when URL params change
   useEffect(() => {
-    if (!didMount.current) { didMount.current = true; return; }
     fetchPosts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postsPage, postSort, postFilter, platformFilter]);

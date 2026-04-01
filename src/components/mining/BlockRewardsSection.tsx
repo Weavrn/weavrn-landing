@@ -124,10 +124,8 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
     }
   }, [walletAddress]);
 
-  // Re-fetch when page or filter changes (skip initial mount)
-  const didMount = useRef(false);
+  // Fetch on mount and when page or filter changes
   useEffect(() => {
-    if (!didMount.current) { didMount.current = true; return; }
     fetchRewards();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rewardsPage, rewardFilter]);
