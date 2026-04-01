@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { memo, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getEarningsHistory } from "@/lib/api";
 import type { EarningsBlock } from "@/lib/api";
 
 interface Props {
   walletAddress: string;
-  refreshKey?: number;
+  historyRefreshKey?: number;
 }
 
 const CHART_HEIGHT = 140;
@@ -18,18 +18,25 @@ const fmtWvrn = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-export default function EarningsChart({ walletAddress, refreshKey }: Props) {
+export default memo(function EarningsChart({ walletAddress, historyRefreshKey }: Props) {
   const [blocks, setBlocks] = useState<EarningsBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const hasLoadedOnce = useRef(false);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // After initial load, skip showing the loading placeholder (stale-while-revalidate)
+    if (!hasLoadedOnce.current) {
+      setLoading(true);
+    }
     try {
       const res = await getEarningsHistory(walletAddress);
       setBlocks(res.blocks.slice(-30).reverse());
+      hasLoadedOnce.current = true;
     } catch {
-      setBlocks([]);
+      if (!hasLoadedOnce.current) {
+        setBlocks([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -37,7 +44,7 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, refreshKey]);
+  }, [fetchData, historyRefreshKey]);
 
   const earnings = useMemo(
     () => blocks.map((b) => parseFloat(b.reward_amount ?? "0")),
@@ -54,7 +61,7 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
 
   const totalEarned = cumulative.length > 0 ? cumulative[cumulative.length - 1] : 0;
 
-  if (loading) {
+  if (loading && !hasLoadedOnce.current) {
     return (
       <div className="glow-card rounded-2xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Earnings</h3>
@@ -148,4 +155,4 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
       </div>
     </div>
   );
-}
+});
