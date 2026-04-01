@@ -117,6 +117,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
   const filteredRewards = useMemo(() => {
     if (rewardFilter === "claimable") {
       return blockRewards.filter((br) => {
+        if (br.merkle_block) return !br.claimed;
         const sub = submissions.find((s) => s.id === br.submission_id);
         return sub?.status !== "claimed";
       });
@@ -310,7 +311,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
                   )}
                   {(br.merkle_block
                     ? br.claim_tx_hash
-                    : sub?.tx_hash) && (
+                    : sub?.tx_hash)?.startsWith("0x") && (
                     <a
                       href={getExplorerTxUrl(
                         (br.merkle_block
