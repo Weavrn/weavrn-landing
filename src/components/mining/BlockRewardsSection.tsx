@@ -73,6 +73,7 @@ interface BlockRewardsSectionProps {
   submissions: Submission[];
   signer: JsonRpcSigner | null;
   walletAddress: string;
+  totalUnclaimedWvrn: number;
   onDataRefresh: () => Promise<void>;
 }
 
@@ -83,6 +84,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
   submissions,
   signer,
   walletAddress,
+  totalUnclaimedWvrn,
   onDataRefresh,
 }: BlockRewardsSectionProps) {
   const [rewardFilter, setRewardFilter] = useState<RewardFilter>("unclaimed");
@@ -244,7 +246,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
             disabled={claimingAll || claimingId != null}
             className="px-4 py-1.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
           >
-            {claimingAll ? "Claiming..." : `Claim All (${fmtWvrn(unclaimedAmount)} WVRN)`}
+            {claimingAll ? "Claiming..." : `Claim All (${fmtWvrn(totalUnclaimedWvrn)} WVRN)`}
           </button>
         )}
       </div>

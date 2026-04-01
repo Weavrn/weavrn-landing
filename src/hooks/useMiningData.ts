@@ -17,6 +17,8 @@ import { stableUpdate } from "@/lib/stableUpdate";
 interface WalletSummary {
   balance: string;
   total_earned: string;
+  unclaimed_wvrn: number;
+  unclaimed_count: number;
 }
 
 export interface UseMiningDataReturn {
@@ -92,6 +94,8 @@ export function useMiningData(walletAddress: string): UseMiningDataReturn {
         const next = stableUpdate(prev, {
           balance: rewards.balance,
           total_earned: rewards.total_earned,
+          unclaimed_wvrn: rewards.unclaimed_wvrn ?? 0,
+          unclaimed_count: rewards.unclaimed_count ?? 0,
         });
         if (next !== prev) rewardDataChanged = true;
         return next;

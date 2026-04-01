@@ -125,6 +125,8 @@ export interface RewardsResponse {
   wallet: string;
   balance: string;
   total_earned: string;
+  unclaimed_wvrn: number;
+  unclaimed_count: number;
   current_block: CurrentBlock;
   tracked_posts: TrackedPost[];
   tracked_posts_pagination?: TrackedPostsPagination;

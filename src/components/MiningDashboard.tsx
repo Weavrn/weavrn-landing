@@ -77,16 +77,7 @@ export default function MiningDashboard({
     }
   }, [profile]);
 
-  // --- Compute unclaimedAmount for StatsGrid from stable slices ---
-  const unclaimedAmount = useMemo(() => {
-    const legacyAmount = submissions
-      .filter((s) => s.status === "approved" && s.on_chain_id != null)
-      .reduce((sum, s) => sum + parseFloat(s.reward_amount || "0"), 0);
-    const merkleAmount = blockRewards
-      .filter((br) => br.merkle_block && br.reward_amount && !br.claimed)
-      .reduce((sum, br) => sum + parseFloat(br.reward_amount || "0"), 0);
-    return legacyAmount + merkleAmount;
-  }, [submissions, blockRewards]);
+  const unclaimedAmount = walletSummary?.unclaimed_wvrn ?? 0;
 
   // --- Verification handlers ---
   const handleStartVerification = async (e: React.FormEvent) => {
@@ -324,6 +315,7 @@ export default function MiningDashboard({
         submissions={submissions}
         signer={signer}
         walletAddress={walletAddress}
+        totalUnclaimedWvrn={unclaimedAmount}
         onDataRefresh={refreshData}
       />
 
