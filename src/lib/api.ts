@@ -105,6 +105,16 @@ export interface Pagination {
   total_pages: number;
 }
 
+export interface TrackedPostsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  sort: string;
+  status: string;
+  platform: string;
+}
+
 export interface CurrentBlock {
   number: number;
   start_time: number;
@@ -117,6 +127,7 @@ export interface RewardsResponse {
   total_earned: string;
   current_block: CurrentBlock;
   tracked_posts: TrackedPost[];
+  tracked_posts_pagination?: TrackedPostsPagination;
   block_rewards: BlockReward[];
   submissions: Submission[];
   pagination?: Pagination;
@@ -213,12 +224,24 @@ async function authBody(signer: JsonRpcSigner, wallet: string, action: string) {
 
 export function getRewards(
   wallet: string,
-  params?: { page?: number; limit?: number; filter?: "all" | "unclaimed" },
+  params?: {
+    page?: number;
+    limit?: number;
+    filter?: "all" | "unclaimed";
+    posts_page?: number;
+    posts_sort?: "newest" | "oldest" | "earned" | "engagement";
+    posts_status?: "active" | "all";
+    posts_platform?: "x" | "youtube";
+  },
 ) {
   const qs = new URLSearchParams();
   if (params?.page) qs.set("page", String(params.page));
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.filter) qs.set("filter", params.filter);
+  if (params?.posts_page && params.posts_page > 1) qs.set("posts_page", String(params.posts_page));
+  if (params?.posts_sort && params.posts_sort !== "newest") qs.set("posts_sort", params.posts_sort);
+  if (params?.posts_status && params.posts_status !== "active") qs.set("posts_status", params.posts_status);
+  if (params?.posts_platform) qs.set("posts_platform", params.posts_platform);
   const qstr = qs.toString();
   return apiFetch<RewardsResponse>(
     `/rewards/${wallet.toLowerCase()}${qstr ? `?${qstr}` : ""}`,
