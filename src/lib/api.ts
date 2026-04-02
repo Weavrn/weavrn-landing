@@ -76,10 +76,21 @@ export interface TrackedPost {
   views: number | null;
   raw_score: number | null;
   estimated_wvrn: number;
-  block_history: PostBlockHistory[];
+  block_history: PostBlockHistory[]; // always [] from API — use block_history_total
+  block_history_total: number;
   flagged?: boolean;
   flag_reason?: string | null;
   posted_at?: string | null;
+}
+
+export interface PostBlockHistoryResponse {
+  post_id: number;
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  sort: string;
+  history: PostBlockHistory[];
 }
 
 export interface BlockReward {
@@ -247,6 +258,21 @@ export function getRewards(
   const qstr = qs.toString();
   return apiFetch<RewardsResponse>(
     `/rewards/${wallet.toLowerCase()}${qstr ? `?${qstr}` : ""}`,
+  );
+}
+
+export function getPostBlockHistory(
+  wallet: string,
+  postId: number,
+  params?: { page?: number; limit?: number; sort?: "newest" | "oldest" },
+) {
+  const qs = new URLSearchParams();
+  if (params?.page && params.page > 1) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.sort && params.sort !== "newest") qs.set("sort", params.sort);
+  const qstr = qs.toString();
+  return apiFetch<PostBlockHistoryResponse>(
+    `/rewards/${wallet.toLowerCase()}/posts/${postId}/history${qstr ? `?${qstr}` : ""}`,
   );
 }
 

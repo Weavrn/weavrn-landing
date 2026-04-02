@@ -1,8 +1,14 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { getRewards, type TrackedPost, type TrackedPostsPagination } from "@/lib/api";
+import {
+  getRewards,
+  getPostBlockHistory,
+  type TrackedPost,
+  type TrackedPostsPagination,
+  type PostBlockHistory,
+} from "@/lib/api";
 import ScoreBreakdown from "../ScoreBreakdown";
 import PlatformFilter from "../PlatformFilter";
 import RefreshButton from "./RefreshButton";
@@ -12,6 +18,122 @@ const fmtWvrn = (n: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+function PostHistoryPanel({
+  postId,
+  walletAddress,
+  isYouTube,
+  estimatedWvrn,
+}: {
+  postId: number;
+  walletAddress: string;
+  isYouTube: boolean;
+  estimatedWvrn: number;
+}) {
+  const [history, setHistory] = useState<PostBlockHistory[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchPage = useCallback(async (p: number) => {
+    setIsLoading(true);
+    try {
+      const res = await getPostBlockHistory(walletAddress, postId, { page: p });
+      setHistory(res.history);
+      setPage(res.page);
+      setTotalPages(res.total_pages);
+    } catch {
+      // treat 404 (post not owned / not found) as empty history
+    } finally {
+      setIsLoading(false);
+    }
+  }, [walletAddress, postId]);
+
+  useEffect(() => { fetchPage(1); }, [fetchPage]);
+
+  if (isLoading && history.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <svg className="w-4 h-4 animate-spin text-weavrn-accent" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (!isLoading && history.length === 0) {
+    return <p className="text-xs text-weavrn-muted text-center py-3">No block history yet</p>;
+  }
+
+  return (
+    <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0A0A0F]/60 rounded backdrop-blur-[1px]">
+          <svg className="w-4 h-4 animate-spin text-weavrn-accent" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] font-mono">
+          <thead>
+            <tr className="text-weavrn-muted border-b border-weavrn-border/20">
+              <th className="text-left py-1.5 pr-3">Block</th>
+              <th className="text-right py-1.5 px-2">Likes</th>
+              {!isYouTube && <th className="text-right py-1.5 px-2">RTs</th>}
+              <th className="text-right py-1.5 px-2">{isYouTube ? "Comments" : "Replies"}</th>
+              <th className="text-right py-1.5 px-2">Views</th>
+              <th className="text-right py-1.5 px-2">Score</th>
+              <th className="text-right py-1.5 px-2">Delta</th>
+              <th className="text-right py-1.5 pl-2">WVRN</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((b) => (
+              <tr key={b.block_number} className="text-weavrn-muted/80 border-b border-weavrn-border/10">
+                <td className="py-1.5 pr-3 text-white">{b.block_number}</td>
+                <td className="text-right py-1.5 px-2">{b.likes}</td>
+                {!isYouTube && <td className="text-right py-1.5 px-2">{b.retweets}</td>}
+                <td className="text-right py-1.5 px-2">{b.replies}</td>
+                <td className="text-right py-1.5 px-2">{b.views.toLocaleString()}</td>
+                <td className="text-right py-1.5 px-2">{b.raw_score}</td>
+                <td className="text-right py-1.5 px-2">{b.delta}</td>
+                <td className="text-right py-1.5 pl-2 text-weavrn-accent">{fmtWvrn(b.earned)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-weavrn-border/30 text-white font-medium">
+              <td className="py-1.5 pr-3" colSpan={isYouTube ? 6 : 7}>Total</td>
+              <td className="text-right py-1.5 pl-2 text-weavrn-accent">{fmtWvrn(estimatedWvrn)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-3">
+          <button
+            onClick={() => fetchPage(page - 1)}
+            disabled={page === 1 || isLoading}
+            className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Prev
+          </button>
+          <span className="text-xs font-mono text-weavrn-muted">{page} / {totalPages}</span>
+          <button
+            onClick={() => fetchPage(page + 1)}
+            disabled={page === totalPages || isLoading}
+            className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type PostFilter = "active" | "all";
 type PostSort = "newest" | "oldest" | "earned" | "engagement";
@@ -257,8 +379,8 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                                 : "flagged"}
                             </span>
                           )}
-                          {p.block_history.length === 1 &&
-                            p.block_history[0].delta === 0 &&
+                          {p.block_history_total === 1 &&
+                            p.estimated_wvrn === 0 &&
                             !p.deleted_at &&
                             !p.flagged && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -313,96 +435,16 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                         platform={p.platform || "x"}
                       />
                     )}
-                    <div className="border-t border-weavrn-border/30 pt-3">
-                      {p.block_history.length === 0 ? (
-                        <p className="text-xs text-weavrn-muted text-center py-3">
-                          No block history yet
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-[11px] font-mono">
-                            <thead>
-                              <tr className="text-weavrn-muted border-b border-weavrn-border/20">
-                                <th className="text-left py-1.5 pr-3">
-                                  Block
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Likes
-                                </th>
-                                {!isYouTube && (
-                                  <th className="text-right py-1.5 px-2">
-                                    RTs
-                                  </th>
-                                )}
-                                <th className="text-right py-1.5 px-2">
-                                  {isYouTube ? "Comments" : "Replies"}
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Views
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Score
-                                </th>
-                                <th className="text-right py-1.5 px-2">
-                                  Delta
-                                </th>
-                                <th className="text-right py-1.5 pl-2">
-                                  WVRN
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {p.block_history.map((b) => (
-                                <tr
-                                  key={b.block_number}
-                                  className="text-weavrn-muted/80 border-b border-weavrn-border/10"
-                                >
-                                  <td className="py-1.5 pr-3 text-white">
-                                    {b.block_number}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.likes}
-                                  </td>
-                                  {!isYouTube && (
-                                    <td className="text-right py-1.5 px-2">
-                                      {b.retweets}
-                                    </td>
-                                  )}
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.replies}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.views.toLocaleString()}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.raw_score}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.delta}
-                                  </td>
-                                  <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                    {fmtWvrn(b.earned)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t border-weavrn-border/30 text-white font-medium">
-                                <td
-                                  className="py-1.5 pr-3"
-                                  colSpan={isYouTube ? 6 : 7}
-                                >
-                                  Total
-                                </td>
-                                <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                  {fmtWvrn(p.estimated_wvrn)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-                    </div>
+                    {p.block_history_total > 0 && (
+                      <div className="border-t border-weavrn-border/30 pt-3">
+                        <PostHistoryPanel
+                          postId={p.id}
+                          walletAddress={walletAddress}
+                          isYouTube={isYouTube}
+                          estimatedWvrn={p.estimated_wvrn}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
