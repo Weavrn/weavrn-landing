@@ -38,7 +38,7 @@ function PostHistoryPanel({
   const fetchPage = useCallback(async (p: number) => {
     setIsLoading(true);
     try {
-      const res = await getPostBlockHistory(walletAddress, postId, { page: p });
+      const res = await getPostBlockHistory(walletAddress, postId, { page: p, limit: 10 });
       setHistory(res.history);
       setPage(res.page);
       setTotalPages(res.total_pages);
