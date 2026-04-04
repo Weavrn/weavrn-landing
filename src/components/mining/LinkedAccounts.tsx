@@ -20,31 +20,34 @@ const LinkedAccounts = memo(function LinkedAccounts({
   if (!hasAny) return null;
 
   return (
-    <div className="flex items-center gap-4 text-sm">
-      {xHandle && (
-        <div className="flex items-center gap-2">
-          <span className="text-weavrn-muted/60 text-xs">X</span>
-          <span className="text-white font-mono text-xs">@{xHandle}</span>
-          <button
-            onClick={onUnlinkX}
-            className="text-[10px] text-weavrn-muted/40 hover:text-red-400 transition-colors"
-          >
-            change
-          </button>
-        </div>
-      )}
-      {features.youtube && ytHandle && (
-        <div className="flex items-center gap-2">
-          <span className="text-weavrn-muted/60 text-xs">YouTube</span>
-          <span className="text-white font-mono text-xs">@{ytHandle}</span>
-          <button
-            onClick={onUnlinkYT}
-            className="text-[10px] text-weavrn-muted/40 hover:text-red-400 transition-colors"
-          >
-            change
-          </button>
-        </div>
-      )}
+    <div className="flex items-center justify-between rounded-xl border border-weavrn-border/30 bg-weavrn-surface/20 px-5 py-3">
+      <div className="flex items-center gap-6">
+        {xHandle && (
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-medium text-weavrn-muted/50 uppercase tracking-wider">X</span>
+            <span className="text-sm text-white">@{xHandle}</span>
+            <button
+              onClick={onUnlinkX}
+              className="text-xs text-weavrn-muted/40 hover:text-weavrn-accent transition-colors"
+            >
+              change
+            </button>
+          </div>
+        )}
+        {features.youtube && ytHandle && (
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-medium text-weavrn-muted/50 uppercase tracking-wider">YouTube</span>
+            <span className="text-sm text-white">@{ytHandle}</span>
+            <button
+              onClick={onUnlinkYT}
+              className="text-xs text-weavrn-muted/40 hover:text-weavrn-accent transition-colors"
+            >
+              change
+            </button>
+          </div>
+        )}
+      </div>
+      <span className="text-[10px] font-mono text-weavrn-muted/30 uppercase tracking-widest">Linked Accounts</span>
     </div>
   );
 });

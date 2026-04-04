@@ -292,6 +292,13 @@ export default function MiningDashboard({
         </div>
       )}
 
+      <LinkedAccounts
+        xHandle={xHandle}
+        ytHandle={profile?.yt_handle ?? null}
+        onUnlinkX={handleUnlink}
+        onUnlinkYT={handleUnlinkYT}
+      />
+
       <StatsGrid
         postCount={trackedPosts.length}
         totalEarned={walletSummary?.total_earned || "0"}
@@ -313,13 +320,6 @@ export default function MiningDashboard({
           onBlockClose={refreshData}
         />
       )}
-
-      <LinkedAccounts
-        xHandle={xHandle}
-        ytHandle={profile?.yt_handle ?? null}
-        onUnlinkX={handleUnlink}
-        onUnlinkYT={handleUnlinkYT}
-      />
 
       <MiningRules
         followerCount={profile?.x_follower_count}
