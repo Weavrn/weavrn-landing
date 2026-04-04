@@ -51,10 +51,7 @@ function AccountCard({
   return (
     <div className="glow-card rounded-xl p-4 flex flex-col justify-between min-h-[88px]">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className="text-xs font-medium text-weavrn-muted/60">{platform}</span>
-        </div>
+        {icon}
         <div className="flex items-center gap-2">
           {confirming ? (
             <>
