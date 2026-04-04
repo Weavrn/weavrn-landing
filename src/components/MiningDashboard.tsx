@@ -332,11 +332,11 @@ export default function MiningDashboard({
         />
       )}
 
-      {features.youtube && xHandle && !profile?.yt_handle && (
+      {features.youtube && xHandle && (
         <YouTubeVerification
           walletAddress={walletAddress}
           signer={signer}
-          ytHandle={null}
+          ytHandle={profile?.yt_handle ?? null}
           ytVerificationCode={profile?.yt_verification_code ?? null}
           ytVerificationHandle={profile?.yt_verification_handle ?? null}
           onUpdate={refreshData}
