@@ -204,15 +204,14 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         listing.escrow_strategy_address,
       );
 
-      // Retry linking — escrow indexer polls every 30s
-      for (let i = 0; i < 8; i++) {
-        try {
-          await linkJobEscrow(signer, walletAddress, job.id, escrowId);
-          break;
-        } catch {
-          if (i === 7) throw new Error("Escrow created on-chain but indexer hasn't picked it up yet. Try refreshing in 30 seconds.");
-          await new Promise(r => setTimeout(r, 5000));
-        }
+      // Wait for escrow indexer to pick up the on-chain escrow, then link once
+      await new Promise(r => setTimeout(r, 35000));
+      try {
+        await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+      } catch {
+        // One more attempt after waiting
+        await new Promise(r => setTimeout(r, 15000));
+        await linkJobEscrow(signer, walletAddress, job.id, escrowId);
       }
       setFundingJobId(null);
       setFundingDetails(null);
