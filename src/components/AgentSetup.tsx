@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner, parseEther } from "ethers";
-import { getAgentListings, createListing, deactivateListing } from "@/lib/api";
+import { getAgentListings, createListing, updateListing, deactivateListing } from "@/lib/api";
 import type { ServiceListing, InputField } from "@/lib/api";
 
 interface Props {
@@ -156,6 +156,15 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editDuration, setEditDuration] = useState("");
+  const [editInputFields, setEditInputFields] = useState<InputField[]>([]);
+  const [saving, setSaving] = useState(false);
+
   const fetchListings = useCallback(async () => {
     try {
       const res = await getAgentListings(agentWallet);
@@ -206,14 +215,96 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
         )}
       </div>
 
-      {listings.map(l => (
+      {listings.map(l => editingId === l.id ? (
+        <div key={l.id} className="p-4 rounded-lg bg-weavrn-dark border border-weavrn-accent/30 space-y-3 mb-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold">Editing: {l.title}</span>
+            <button onClick={() => setEditingId(null)} className="text-xs text-weavrn-muted hover:text-white">Cancel</button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Title</label>
+              <input value={editTitle} onChange={e => setEditTitle(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Price (ETH)</label>
+              <input value={editPrice} onChange={e => setEditPrice(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-weavrn-muted block mb-1">Description</label>
+            <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3} className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs text-weavrn-muted block mb-1">Estimated Duration</label>
+            <input value={editDuration} onChange={e => setEditDuration(e.target.value)} className={inputCls} />
+          </div>
+
+          {/* Input fields editor */}
+          <div className="border-t border-weavrn-border/50 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-weavrn-muted">Input Fields</label>
+              <button onClick={() => { if (editInputFields.length < 10) setEditInputFields([...editInputFields, emptyField()]); }} disabled={editInputFields.length >= 10}
+                className="text-[10px] px-2 py-1 rounded bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 disabled:opacity-30 transition-colors">
+                + Add Field
+              </button>
+            </div>
+            {editInputFields.length === 0 && <p className="text-[10px] text-weavrn-muted/50">No custom fields.</p>}
+            <div className="space-y-2">
+              {editInputFields.map((field, i) => (
+                <InputFieldEditor key={i} field={field}
+                  onChange={(updated) => { const next = [...editInputFields]; next[i] = updated; setEditInputFields(next); }}
+                  onRemove={() => setEditInputFields(editInputFields.filter((_, j) => j !== i))} />
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <button onClick={async () => {
+            if (!signer) return;
+            setSaving(true);
+            setError(null);
+            try {
+              const validFields = editInputFields.filter(f => f.name && f.label);
+              await updateListing(signer, ownerWallet, l.id, {
+                title: editTitle || undefined,
+                description: editDescription || undefined,
+                price_amount: editPrice || undefined,
+                estimated_duration: editDuration || undefined,
+                input_schema: validFields,
+              } as Partial<ServiceListing>);
+              setEditingId(null);
+              fetchListings();
+            } catch (err: unknown) {
+              setError((err as { message?: string }).message || "Update failed");
+            } finally {
+              setSaving(false);
+            }
+          }} disabled={saving} className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold disabled:opacity-50 transition-all">
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      ) : (
         <div key={l.id} className="flex items-center justify-between py-2 border-b border-weavrn-border/20 last:border-0">
           <div className="min-w-0">
             <p className="text-sm truncate">{l.title}</p>
-            <p className="text-[10px] text-weavrn-muted">{l.category} · {l.price_amount} {l.price_token} · {l.escrow_strategy.replace(/_/g, " ")}</p>
+            <p className="text-[10px] text-weavrn-muted">
+              {l.category} · {l.price_amount} {l.price_token} · {l.escrow_strategy.replace(/_/g, " ")}
+              {l.input_schema && Array.isArray(l.input_schema) && l.input_schema.length > 0 && ` · ${l.input_schema.length} fields`}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <a href={`/marketplace?id=${l.id}`} className="text-[10px] text-weavrn-accent hover:underline">View</a>
+            {signer && (
+              <button onClick={() => {
+                setEditingId(l.id);
+                setEditTitle(l.title);
+                setEditDescription(l.description || "");
+                setEditPrice(l.price_amount || "");
+                setEditDuration(l.estimated_duration || "");
+                setEditInputFields(l.input_schema && Array.isArray(l.input_schema) ? l.input_schema as InputField[] : []);
+              }} className="text-[10px] text-weavrn-muted hover:text-white">Edit</button>
+            )}
             {l.active && signer && (
               <button onClick={async () => { await deactivateListing(signer, ownerWallet, l.id); fetchListings(); }} className="text-[10px] text-red-400 hover:text-red-300">
                 Deactivate
