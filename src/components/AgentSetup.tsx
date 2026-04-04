@@ -222,13 +222,6 @@ export default function AgentSetup({ walletAddress, agentName, signer }: Props) 
     }
   };
 
-  const daysLeft = (expiresAt: string | null) => {
-    if (!expiresAt) return null;
-    const diff = new Date(expiresAt).getTime() - Date.now();
-    if (diff <= 0) return 0;
-    return Math.ceil(diff / (24 * 60 * 60 * 1000));
-  };
-
   return (
     <div className="glow-card rounded-xl p-6">
       <button
@@ -260,32 +253,24 @@ export default function AgentSetup({ walletAddress, agentName, signer }: Props) 
           {/* Existing agents */}
           {agents.length > 0 && (
             <div className="space-y-3">
-              {agents.map((a) => {
-                const days = daysLeft(a.expires_at);
-                const expired = days !== null && days <= 0;
-                return (
-                  <div key={a.id} className={`p-4 rounded-lg border ${expired ? "border-red-500/30 bg-red-500/5" : "border-weavrn-border bg-weavrn-dark"}`}>
+              {agents.map((a) => (
+                  <div key={a.id} className="p-4 rounded-lg border border-weavrn-border bg-weavrn-dark">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold">{a.wallet_address.slice(0, 10)}...</span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.tier === "managed" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"}`}>
                           {a.tier === "managed" ? "Managed" : "BYOK"}
                         </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.active && !expired ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-                          {expired ? "Expired" : a.active ? "Active" : "Paused"}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.active ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                          {a.active ? "Active" : "Paused"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {days !== null && !expired && (
-                          <span className="text-xs text-weavrn-muted">{days}d remaining</span>
-                        )}
-                        <button
-                          onClick={() => handleToggle(a.id, a.active)}
-                          className="text-xs text-weavrn-muted hover:text-white"
-                        >
-                          {a.active ? "Pause" : "Resume"}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleToggle(a.id, a.active)}
+                        className="text-xs text-weavrn-muted hover:text-white"
+                      >
+                        {a.active ? "Pause" : "Resume"}
+                      </button>
                     </div>
                     <div className="text-xs text-weavrn-muted mb-2">
                       {a.model_name} · {a.job_count || 0} jobs · created {new Date(a.created_at).toLocaleDateString()}
@@ -305,23 +290,15 @@ export default function AgentSetup({ walletAddress, agentName, signer }: Props) 
                         </div>
                       </div>
                     ) : (
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => { setEditing(a.id); setEditPrompt(a.system_prompt); }}
-                          className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover"
-                        >
-                          Edit prompt
-                        </button>
-                        {expired && (
-                          <button className="text-xs text-yellow-400 hover:text-yellow-300">
-                            Renew
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => { setEditing(a.id); setEditPrompt(a.system_prompt); }}
+                        className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover mt-2"
+                      >
+                        Edit prompt
+                      </button>
                     )}
                   </div>
-                );
-              })}
+              ))}
             </div>
           )}
 
@@ -350,7 +327,7 @@ export default function AgentSetup({ walletAddress, agentName, signer }: Props) 
                   >
                     <p className="text-sm font-semibold">Bring Your Own Key</p>
                     <p className="text-xs text-weavrn-muted mt-1">Use your own API key. We run the infrastructure.</p>
-                    <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal">/month</span></p>
+                    <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
                   </button>
                   <button
                     onClick={() => setTier("managed")}
@@ -358,7 +335,7 @@ export default function AgentSetup({ walletAddress, agentName, signer }: Props) 
                   >
                     <p className="text-sm font-semibold">Fully Managed</p>
                     <p className="text-xs text-weavrn-muted mt-1">We provide the AI. Just configure your agent.</p>
-                    <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.managed.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal">/month</span></p>
+                    <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.managed.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
                   </button>
                 </div>
               </div>
@@ -456,7 +433,7 @@ export default function AgentSetup({ walletAddress, agentName, signer }: Props) 
               </button>
 
               <p className="text-[10px] text-weavrn-muted text-center">
-                Payment goes to the Weavrn treasury. Your agent will be live for 30 days. Create a listing from My Listings below to start receiving jobs.
+                One-time setup fee covers on-chain registration and platform hosting. Create a listing from My Listings below to start receiving jobs.
               </p>
             </div>
           )}
