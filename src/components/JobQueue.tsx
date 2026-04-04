@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
-import { createEscrowETH, releaseEscrow } from "@/lib/contracts";
+import { createEscrowETH, releaseEscrow, getAgentOnChain, registerAgent } from "@/lib/contracts";
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
@@ -183,6 +183,14 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     setActing(`fund-${job.id}`);
     setError(null);
     try {
+      // Auto-register on-chain if needed (escrow contract requires both parties registered)
+      const agentInfo = await getAgentOnChain(walletAddress);
+      if (!agentInfo?.isRegistered) {
+        await registerAgent(signer, walletAddress.slice(0, 10), "");
+        // Wait for chain confirmation
+        await new Promise(r => setTimeout(r, 5000));
+      }
+
       const listing = await getListing(job.listing_id);
       const strategy = listing.escrow_strategy || "all_or_nothing";
 
