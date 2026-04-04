@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { features } from "@/lib/features";
 
 interface LinkedAccountsProps {
@@ -10,44 +10,98 @@ interface LinkedAccountsProps {
   onUnlinkYT: () => void;
 }
 
+function AccountCard({
+  platform,
+  handle,
+  onUnlink,
+}: {
+  platform: string;
+  handle: string;
+  onUnlink: () => void;
+}) {
+  const [confirming, setConfirming] = useState<"change" | "unlink" | null>(null);
+
+  const handleAction = (action: "change" | "unlink") => {
+    if (confirming === action) {
+      onUnlink();
+      setConfirming(null);
+    } else {
+      setConfirming(action);
+    }
+  };
+
+  return (
+    <div className="glow-card rounded-xl p-4 flex flex-col justify-between min-h-[88px]">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-mono text-weavrn-muted/40 uppercase tracking-widest">{platform}</span>
+        <div className="flex items-center gap-2">
+          {confirming ? (
+            <>
+              <span className="text-[10px] text-weavrn-muted/60">
+                {confirming === "unlink" ? "unlink?" : "relink?"}
+              </span>
+              <button
+                onClick={() => handleAction(confirming)}
+                className="text-[10px] text-red-400 hover:text-red-300 font-medium transition-colors"
+              >
+                confirm
+              </button>
+              <button
+                onClick={() => setConfirming(null)}
+                className="text-[10px] text-weavrn-muted/40 hover:text-weavrn-muted transition-colors"
+              >
+                cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => handleAction("change")}
+                className="text-[10px] text-weavrn-muted/40 hover:text-weavrn-accent transition-colors"
+              >
+                change
+              </button>
+              <button
+                onClick={() => handleAction("unlink")}
+                className="text-[10px] text-weavrn-muted/40 hover:text-red-400 transition-colors"
+              >
+                unlink
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      <span className="text-sm font-medium text-white mt-2">@{handle}</span>
+    </div>
+  );
+}
+
 const LinkedAccounts = memo(function LinkedAccounts({
   xHandle,
   ytHandle,
   onUnlinkX,
   onUnlinkYT,
 }: LinkedAccountsProps) {
-  const hasAny = xHandle || ytHandle;
+  const showYT = features.youtube;
+  const hasAny = xHandle || (showYT && ytHandle);
   if (!hasAny) return null;
 
   return (
-    <div className="flex items-center justify-between rounded-xl border border-weavrn-border/30 bg-weavrn-surface/20 px-5 py-3">
-      <div className="flex items-center gap-6">
-        {xHandle && (
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-medium text-weavrn-muted/50 uppercase tracking-wider">X</span>
-            <span className="text-sm text-white">@{xHandle}</span>
-            <button
-              onClick={onUnlinkX}
-              className="text-xs text-weavrn-muted/40 hover:text-weavrn-accent transition-colors"
-            >
-              change
-            </button>
-          </div>
-        )}
-        {features.youtube && ytHandle && (
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-medium text-weavrn-muted/50 uppercase tracking-wider">YouTube</span>
-            <span className="text-sm text-white">@{ytHandle}</span>
-            <button
-              onClick={onUnlinkYT}
-              className="text-xs text-weavrn-muted/40 hover:text-weavrn-accent transition-colors"
-            >
-              change
-            </button>
-          </div>
-        )}
-      </div>
-      <span className="text-[10px] font-mono text-weavrn-muted/30 uppercase tracking-widest">Linked Accounts</span>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {xHandle ? (
+        <div className="col-span-2">
+          <AccountCard platform="X" handle={xHandle} onUnlink={onUnlinkX} />
+        </div>
+      ) : (
+        <div className="col-span-2" />
+      )}
+      {showYT && ytHandle ? (
+        <div className="col-span-2">
+          <AccountCard platform="YouTube" handle={ytHandle} onUnlink={onUnlinkYT} />
+        </div>
+      ) : (
+        <div className="col-span-2" />
+      )}
     </div>
   );
 });
