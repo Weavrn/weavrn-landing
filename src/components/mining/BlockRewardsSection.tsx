@@ -281,8 +281,11 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
                   <div className="flex items-center gap-4">
                     <span className="text-white font-mono text-xs">Block {br.block_number}</span>
                     <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta {br.delta_score}
-                      {br.block_share_pct != null && <> &mdash; {br.block_share_pct}% of block</>}
+                      {br.x_post_count > 0 && <><span className="text-white/70">X</span> {br.x_post_count}p &Delta;{br.x_delta}</>}
+                      {br.x_post_count > 0 && br.yt_post_count > 0 && <span className="mx-1.5 text-weavrn-border">|</span>}
+                      {br.yt_post_count > 0 && <><span className="text-red-400/70">YT</span> {br.yt_post_count}p &Delta;{br.yt_delta}</>}
+                      {!br.x_post_count && !br.yt_post_count && <>{br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta {br.delta_score}</>}
+                      {br.block_share_pct != null && <> &mdash; {br.block_share_pct}%</>}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">

@@ -95,6 +95,10 @@ export interface BlockReward {
   claim_tx_hash: string | null;
   block_share_pct: number | null;
   share_bps: number | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
   created_at: string;
 }
 
@@ -968,6 +972,10 @@ export interface EarningsBlock {
   delta_score: number;
   post_count: number;
   reward_amount: string | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
 }
 
 export function getEarningsHistory(wallet: string, blocks = 20) {
