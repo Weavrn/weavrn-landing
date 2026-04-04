@@ -1,22 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { JsonRpcSigner, parseEther } from "ethers";
 
 interface Props {
   walletAddress: string;
   agentName: string;
+  signer: JsonRpcSigner | null;
 }
 
-const MODELS = [
-  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
-  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "custom", label: "Custom / Self-managed" },
-];
+interface HostedAgent {
+  id: number;
+  wallet_address: string;
+  model_name: string;
+  system_prompt: string;
+  max_tokens: number;
+  temperature: number;
+  tier: string;
+  active: boolean;
+  expires_at: string | null;
+  created_at: string;
+  job_count?: number;
+}
 
-const TEMPLATES: Record<string, { prompt: string; tags: string }> = {
+interface Pricing {
+  byok: { price_eth: string; description: string; period_days: number };
+  managed: { price_eth: string; description: string; period_days: number };
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+const TEMPLATES: Record<string, { name: string; prompt: string; model: string; temp: number }> = {
   code_review: {
+    name: "Code Review Agent",
     prompt: `You are a code review agent. When given a task:
 - Clone the repo if access is provided
 - Review for correctness, security, and maintainability
@@ -24,143 +40,193 @@ const TEMPLATES: Record<string, { prompt: string; tags: string }> = {
 - Suggest concrete fixes with code examples
 - Commit changes to the weavrn/job-{id} branch if applicable
 - Structure output as: summary, findings per file, suggested changes`,
-    tags: "code, review, security, typescript, javascript",
+    model: "claude-sonnet-4-5-20250929",
+    temp: 0.3,
   },
   research: {
+    name: "Research Agent",
     prompt: `You are a research analyst. When given a task:
 - Break the problem into sub-questions
 - Analyze from multiple angles with evidence
 - Structure output as: executive summary, methodology, findings, recommendations`,
-    tags: "research, analysis, data, report",
+    model: "claude-sonnet-4-5-20250929",
+    temp: 0.5,
   },
   solidity_audit: {
+    name: "Solidity Audit Agent",
     prompt: `You are a smart contract auditor. When given a task:
 - Review all .sol files for reentrancy, overflow, access control, and front-running
 - Verify OpenZeppelin usage patterns
 - Run forge build and forge test if available
 - Structure output as severity-classified findings with recommended fixes`,
-    tags: "solidity, audit, security, smart-contracts",
+    model: "claude-sonnet-4-5-20250929",
+    temp: 0.2,
   },
   custom: {
+    name: "",
     prompt: "",
-    tags: "",
+    model: "claude-haiku-4-5-20251001",
+    temp: 0.5,
   },
 };
 
-export default function AgentSetup({ walletAddress, agentName }: Props) {
+const MODELS = [
+  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+];
+
+async function signedFetch(signer: JsonRpcSigner, wallet: string, action: string, path: string, method: string, extra?: Record<string, unknown>) {
+  const timestamp = Date.now();
+  const message = `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
+  const signature = await signer.signMessage(message);
+  const body: Record<string, unknown> = { wallet_address: wallet.toLowerCase(), signature, timestamp, ...extra };
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export default function AgentSetup({ walletAddress, agentName, signer }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [agents, setAgents] = useState<HostedAgent[]>([]);
+  const [pricing, setPricing] = useState<Pricing | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Create form state
+  const [creating, setCreating] = useState(false);
+  const [tier, setTier] = useState<"managed" | "byok">("byok");
   const [template, setTemplate] = useState("code_review");
-  const [model, setModel] = useState("claude-sonnet-4-5-20250929");
+  const [agentNameInput, setAgentNameInput] = useState(TEMPLATES.code_review.name);
   const [systemPrompt, setSystemPrompt] = useState(TEMPLATES.code_review.prompt);
-  const [tags, setTags] = useState(TEMPLATES.code_review.tags);
-  const [autoAccept, setAutoAccept] = useState(true);
-  const [requireEscrow, setRequireEscrow] = useState(true);
-  const [pollInterval, setPollInterval] = useState(15);
-  const [copied, setCopied] = useState<"env" | "code" | null>(null);
+  const [model, setModel] = useState(TEMPLATES.code_review.model);
+  const [temp, setTemp] = useState(TEMPLATES.code_review.temp);
+  const [userApiKey, setUserApiKey] = useState("");
+  const [deploying, setDeploying] = useState(false);
+
+  // Edit state
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editPrompt, setEditPrompt] = useState("");
+
+  const fetchAgents = useCallback(async () => {
+    if (!signer) return;
+    try {
+      const timestamp = Date.now();
+      const message = `weavrn:list-hosted:${walletAddress.toLowerCase()}:${timestamp}`;
+      const signature = await signer.signMessage(message);
+      const params = new URLSearchParams({ wallet_address: walletAddress.toLowerCase(), signature, timestamp: String(timestamp) });
+      const res = await fetch(`${API_URL}/hosted-agents?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAgents(data.agents || []);
+      }
+    } catch { /* ignore */ }
+  }, [walletAddress, signer]);
+
+  const fetchPricing = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/hosted-agents/pricing`);
+      if (res.ok) setPricing(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (expanded) {
+      fetchAgents();
+      fetchPricing();
+    }
+  }, [expanded, fetchAgents, fetchPricing]);
 
   const handleTemplateChange = (t: string) => {
     setTemplate(t);
     if (TEMPLATES[t]) {
+      setAgentNameInput(TEMPLATES[t].name);
       setSystemPrompt(TEMPLATES[t].prompt);
-      setTags(TEMPLATES[t].tags);
+      setModel(TEMPLATES[t].model);
+      setTemp(TEMPLATES[t].temp);
     }
   };
 
-  const envFile = `# Weavrn Agent Configuration
-# Generated for ${agentName} (${walletAddress.slice(0, 10)}...)
+  const handleDeploy = async () => {
+    if (!signer) return;
+    setDeploying(true);
+    setError(null);
+    setSuccess(null);
 
-# Your agent's private key (the wallet registered on-chain)
-AGENT_PRIVATE_KEY=0x_YOUR_PRIVATE_KEY_HERE
+    try {
+      // Step 1: Send payment
+      const price = tier === "managed" ? pricing?.managed.price_eth : pricing?.byok.price_eth;
+      if (!price) throw new Error("Pricing not loaded");
 
-# Chain configuration
-CHAIN_ID=84532
-API_URL=https://dev-api.weavrn.com
+      const tx = await signer.sendTransaction({
+        to: "0x9bB50598DDa4557d54a62464DA30Efdb9ffC2d7c", // treasury/deployer
+        value: parseEther(price),
+      });
+      const receipt = await tx.wait();
+      if (!receipt) throw new Error("Payment transaction failed");
 
-# LLM configuration${model !== "custom" ? `\nMODEL=${model}` : ""}
-${model.startsWith("claude") ? "ANTHROPIC_API_KEY=sk-ant-..." : model.startsWith("gpt") ? "OPENAI_API_KEY=sk-..." : "# Configure your LLM provider"}
+      // Step 2: Create hosted agent via API
+      const result = await signedFetch(signer, walletAddress, "create-hosted-agent", "/hosted-agents", "POST", {
+        tier,
+        name: agentNameInput || agentName,
+        system_prompt: systemPrompt,
+        model_name: model,
+        max_tokens: 8192,
+        temperature: temp,
+        user_api_key: tier === "byok" ? userApiKey : undefined,
+        payment_tx: receipt.hash,
+      });
 
-# Agent behavior
-AUTO_ACCEPT=${autoAccept}
-REQUIRE_ESCROW=${requireEscrow}
-POLL_INTERVAL_MS=${pollInterval * 1000}
-`;
-
-  const codeFile = `import { ethers } from "ethers";
-import { AgentServer } from "@weavrn/sdk";
-${model.startsWith("claude") ? 'import Anthropic from "@anthropic-ai/sdk";\n' : ""}
-const provider = new ethers.JsonRpcProvider(
-  process.env.CHAIN_ID === "8453" ? "https://mainnet.base.org" : "https://sepolia.base.org"
-);
-const signer = new ethers.Wallet(process.env.AGENT_PRIVATE_KEY!, provider);
-${model.startsWith("claude") ? "const anthropic = new Anthropic();\n" : ""}
-const agent = new AgentServer({
-  signer,
-  chainId: Number(process.env.CHAIN_ID || "84532"),
-  apiUrl: process.env.API_URL || "https://dev-api.weavrn.com",
-  name: "${agentName}",
-  autoRegister: false,
-  autoAccept: ${autoAccept},
-  requireEscrow: ${requireEscrow},
-  pollIntervalMs: ${pollInterval * 1000},
-
-  async onJob(ctx) {
-    const userRequest = ctx.messages
-      .filter((m) => m.role === "user")
-      .map((m) => m.content)
-      .join("\\n\\n");
-
-    await ctx.sendMessage("Processing your request...");
-
-    // Clone repo if access was provisioned
-    let codeContext = "";
-    if (ctx.git) {
-      const dir = \`/tmp/weavrn-job-\${ctx.job.id}\`;
-      await ctx.git.clone(dir);
-      // Read relevant files for your use case
+      setSuccess(`Agent deployed at ${result.agent.wallet_address.slice(0, 10)}... — it will start processing jobs within 30 seconds.`);
+      setCreating(false);
+      fetchAgents();
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Deployment failed");
+    } finally {
+      setDeploying(false);
     }
+  };
 
-    ${model.startsWith("claude") ? `const response = await anthropic.messages.create({
-      model: process.env.MODEL || "${model}",
-      max_tokens: 8192,
-      system: \`${systemPrompt.replace(/`/g, "\\`").replace(/\$/g, "\\$")}\`,
-      messages: [{ role: "user", content: userRequest + (codeContext ? "\\n\\nCode:\\n" + codeContext : "") }],
-    });
+  const handleUpdate = async (agentId: number) => {
+    if (!signer) return;
+    try {
+      await signedFetch(signer, walletAddress, "update-hosted-agent", `/hosted-agents/${agentId}`, "PUT", {
+        system_prompt: editPrompt,
+      });
+      setEditing(null);
+      fetchAgents();
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Update failed");
+    }
+  };
 
-    const result = response.content[0].type === "text" ? response.content[0].text : "";` : `// Add your LLM call here
-    const result = "Implement your agent logic";`}
+  const handleToggle = async (agentId: number, active: boolean) => {
+    if (!signer) return;
+    try {
+      await signedFetch(signer, walletAddress, "update-hosted-agent", `/hosted-agents/${agentId}`, "PUT", {
+        active: !active,
+      });
+      fetchAgents();
+    } catch (err: unknown) {
+      setError((err as { message?: string }).message || "Toggle failed");
+    }
+  };
 
-    return {
-      type: "report",
-      content: result,
-      title: \`\${ctx.job.title}\`,
-    };
-  },
-
-  onError(err, jobId) {
-    console.error(\`[Job \${jobId}] Error:\`, err.message);
-  },
-});
-
-async function main() {
-  await agent.start();
-  console.log("${agentName} running — polling for jobs...");
-
-  const client = agent.getClient();
-  await client.updateProfile({
-    bio: "Self-hosted agent",
-    tags: [${tags.split(",").map((t) => `"${t.trim()}"`).join(", ")}],
-    availability: "available",
-    auto_accept: ${autoAccept},
-  });
-}
-
-main().catch(console.error);
-`;
-
-  const copyToClipboard = (text: string, type: "env" | "code") => {
-    navigator.clipboard.writeText(text);
-    setCopied(type);
-    setTimeout(() => setCopied(null), 2000);
+  const daysLeft = (expiresAt: string | null) => {
+    if (!expiresAt) return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (24 * 60 * 60 * 1000));
   };
 
   return (
@@ -170,152 +236,236 @@ main().catch(console.error);
         className="flex items-center justify-between w-full text-left"
       >
         <div>
-          <h3 className="text-lg font-semibold">Agent Setup</h3>
-          <p className="text-sm text-weavrn-muted">Configure and deploy your self-hosted agent</p>
+          <h3 className="text-lg font-semibold">Hosted Agents</h3>
+          <p className="text-sm text-weavrn-muted">Deploy and manage AI agents on the Weavrn platform</p>
         </div>
         <span className="text-weavrn-muted text-xl">{expanded ? "−" : "+"}</span>
       </button>
 
       {expanded && (
         <div className="mt-6 space-y-6">
-          {/* Template */}
-          <div>
-            <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Template</label>
-            <div className="flex gap-2 mt-2 flex-wrap">
-              {[
-                { key: "code_review", label: "Code Review" },
-                { key: "research", label: "Research" },
-                { key: "solidity_audit", label: "Solidity Audit" },
-                { key: "custom", label: "Custom" },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => handleTemplateChange(t.key)}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                    template === t.key
-                      ? "bg-weavrn-accent text-black"
-                      : "bg-weavrn-surface border border-weavrn-border text-weavrn-muted hover:text-white"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex justify-between">
+              {error}
+              <button onClick={() => setError(null)} className="text-xs hover:text-white ml-4">Dismiss</button>
             </div>
-          </div>
+          )}
+          {success && (
+            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-400 flex justify-between">
+              {success}
+              <button onClick={() => setSuccess(null)} className="text-xs hover:text-white ml-4">Dismiss</button>
+            </div>
+          )}
 
-          {/* Model */}
-          <div>
-            <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Model</label>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="mt-2 w-full bg-weavrn-dark border border-weavrn-border rounded-lg px-3 py-2 text-sm"
+          {/* Existing agents */}
+          {agents.length > 0 && (
+            <div className="space-y-3">
+              {agents.map((a) => {
+                const days = daysLeft(a.expires_at);
+                const expired = days !== null && days <= 0;
+                return (
+                  <div key={a.id} className={`p-4 rounded-lg border ${expired ? "border-red-500/30 bg-red-500/5" : "border-weavrn-border bg-weavrn-dark"}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{a.wallet_address.slice(0, 10)}...</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.tier === "managed" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"}`}>
+                          {a.tier === "managed" ? "Managed" : "BYOK"}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.active && !expired ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                          {expired ? "Expired" : a.active ? "Active" : "Paused"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {days !== null && !expired && (
+                          <span className="text-xs text-weavrn-muted">{days}d remaining</span>
+                        )}
+                        <button
+                          onClick={() => handleToggle(a.id, a.active)}
+                          className="text-xs text-weavrn-muted hover:text-white"
+                        >
+                          {a.active ? "Pause" : "Resume"}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-weavrn-muted mb-2">
+                      {a.model_name} · {a.job_count || 0} jobs · created {new Date(a.created_at).toLocaleDateString()}
+                    </div>
+
+                    {editing === a.id ? (
+                      <div className="space-y-2 mt-3">
+                        <textarea
+                          value={editPrompt}
+                          onChange={(e) => setEditPrompt(e.target.value)}
+                          rows={4}
+                          className="w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-xs font-mono resize-y"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleUpdate(a.id)} className="px-3 py-1 text-xs bg-weavrn-accent text-black rounded font-semibold">Save</button>
+                          <button onClick={() => setEditing(null)} className="px-3 py-1 text-xs text-weavrn-muted hover:text-white">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => { setEditing(a.id); setEditPrompt(a.system_prompt); }}
+                          className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover"
+                        >
+                          Edit prompt
+                        </button>
+                        {expired && (
+                          <button className="text-xs text-yellow-400 hover:text-yellow-300">
+                            Renew
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Create new agent */}
+          {!creating ? (
+            <button
+              onClick={() => setCreating(true)}
+              className="w-full py-3 border border-dashed border-weavrn-border rounded-lg text-sm text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors"
             >
-              {MODELS.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* System Prompt */}
-          <div>
-            <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">System Prompt</label>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              rows={6}
-              className="mt-2 w-full bg-weavrn-dark border border-weavrn-border rounded-lg px-3 py-2 text-sm font-mono resize-y"
-            />
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Tags (comma-separated)</label>
-            <input
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className="mt-2 w-full bg-weavrn-dark border border-weavrn-border rounded-lg px-3 py-2 text-sm"
-              placeholder="code, review, security"
-            />
-          </div>
-
-          {/* Behavior */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={autoAccept}
-                onChange={(e) => setAutoAccept(e.target.checked)}
-                className="rounded"
-              />
-              Auto-accept jobs
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={requireEscrow}
-                onChange={(e) => setRequireEscrow(e.target.checked)}
-                className="rounded"
-              />
-              Require escrow
-            </label>
-            <div>
-              <label className="text-xs text-weavrn-muted">Poll interval (seconds)</label>
-              <input
-                type="number"
-                value={pollInterval}
-                onChange={(e) => setPollInterval(Math.max(5, parseInt(e.target.value) || 15))}
-                min={5}
-                className="mt-1 w-full bg-weavrn-dark border border-weavrn-border rounded-lg px-3 py-1.5 text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Generated Config */}
-          <div className="border-t border-weavrn-border/50 pt-6 space-y-4">
-            <h4 className="text-sm font-semibold">Generated Configuration</h4>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono text-weavrn-muted">.env</span>
-                <button
-                  onClick={() => copyToClipboard(envFile, "env")}
-                  className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover"
-                >
-                  {copied === "env" ? "Copied!" : "Copy"}
-                </button>
+              + Deploy New Agent
+            </button>
+          ) : (
+            <div className="border border-weavrn-border rounded-lg p-5 space-y-5 bg-weavrn-dark/50">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Deploy New Agent</h4>
+                <button onClick={() => setCreating(false)} className="text-xs text-weavrn-muted hover:text-white">Cancel</button>
               </div>
-              <pre className="text-[11px] font-mono bg-black/40 rounded-lg p-4 overflow-x-auto max-h-48 text-green-300/80 whitespace-pre-wrap">
-                {envFile}
-              </pre>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono text-weavrn-muted">agent.ts</span>
-                <button
-                  onClick={() => copyToClipboard(codeFile, "code")}
-                  className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover"
-                >
-                  {copied === "code" ? "Copied!" : "Copy"}
-                </button>
+              {/* Tier selection */}
+              <div>
+                <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Hosting Tier</label>
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <button
+                    onClick={() => setTier("byok")}
+                    className={`p-4 rounded-lg border text-left transition-colors ${tier === "byok" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}
+                  >
+                    <p className="text-sm font-semibold">Bring Your Own Key</p>
+                    <p className="text-xs text-weavrn-muted mt-1">Use your own API key. We run the infrastructure.</p>
+                    <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal">/month</span></p>
+                  </button>
+                  <button
+                    onClick={() => setTier("managed")}
+                    className={`p-4 rounded-lg border text-left transition-colors ${tier === "managed" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}
+                  >
+                    <p className="text-sm font-semibold">Fully Managed</p>
+                    <p className="text-xs text-weavrn-muted mt-1">We provide the AI. Just configure your agent.</p>
+                    <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.managed.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal">/month</span></p>
+                  </button>
+                </div>
               </div>
-              <pre className="text-[11px] font-mono bg-black/40 rounded-lg p-4 overflow-x-auto max-h-64 text-green-300/80 whitespace-pre-wrap">
-                {codeFile}
-              </pre>
-            </div>
 
-            <div className="bg-weavrn-surface/50 rounded-lg p-4 text-sm text-weavrn-muted space-y-2">
-              <p className="font-semibold text-white">Quick Start</p>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Save both files to a new directory</li>
-                <li>Run <code className="text-weavrn-accent">npm init -y && npm install @weavrn/sdk ethers{model.startsWith("claude") ? " @anthropic-ai/sdk" : model.startsWith("gpt") ? " openai" : ""}</code></li>
-                <li>Fill in your private key and API key in <code className="text-weavrn-accent">.env</code></li>
-                <li>Run <code className="text-weavrn-accent">npx tsx agent.ts</code></li>
-                <li>Create a listing from the My Listings section below</li>
-              </ol>
+              {/* Template */}
+              <div>
+                <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Template</label>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {Object.entries(TEMPLATES).map(([key, t]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleTemplateChange(key)}
+                      className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                        template === key ? "bg-weavrn-accent text-black" : "bg-weavrn-surface border border-weavrn-border text-weavrn-muted hover:text-white"
+                      }`}
+                    >
+                      {key === "custom" ? "Custom" : t.name.replace(" Agent", "")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Agent Name</label>
+                <input
+                  value={agentNameInput}
+                  onChange={(e) => setAgentNameInput(e.target.value)}
+                  className="mt-2 w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-sm"
+                  placeholder="My Agent"
+                />
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Model</label>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="mt-2 w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-sm"
+                >
+                  {MODELS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* System Prompt */}
+              <div>
+                <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">System Prompt</label>
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  rows={6}
+                  className="mt-2 w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-sm font-mono resize-y"
+                />
+              </div>
+
+              {/* Temperature */}
+              <div>
+                <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Temperature: {temp}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={temp}
+                  onChange={(e) => setTemp(parseFloat(e.target.value))}
+                  className="mt-2 w-full"
+                />
+              </div>
+
+              {/* API Key (BYOK only) */}
+              {tier === "byok" && (
+                <div>
+                  <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Your API Key</label>
+                  <input
+                    type="password"
+                    value={userApiKey}
+                    onChange={(e) => setUserApiKey(e.target.value)}
+                    className="mt-2 w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-sm font-mono"
+                    placeholder={model.startsWith("claude") ? "sk-ant-..." : "sk-..."}
+                  />
+                  <p className="text-[10px] text-weavrn-muted mt-1">Encrypted at rest. Never visible after submission.</p>
+                </div>
+              )}
+
+              {/* Deploy button */}
+              <button
+                onClick={handleDeploy}
+                disabled={deploying || !signer || !systemPrompt || (tier === "byok" && !userApiKey)}
+                className="w-full py-3 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg font-semibold disabled:opacity-50 transition-all"
+              >
+                {deploying ? "Deploying..." : `Pay ${tier === "managed" ? pricing?.managed.price_eth || "..." : pricing?.byok.price_eth || "..."} ETH & Deploy`}
+              </button>
+
+              <p className="text-[10px] text-weavrn-muted text-center">
+                Payment goes to the Weavrn treasury. Your agent will be live for 30 days. Create a listing from My Listings below to start receiving jobs.
+              </p>
             </div>
-          </div>
+          )}
+
+          {agents.length === 0 && !creating && !loading && (
+            <p className="text-xs text-weavrn-muted text-center py-2">
+              No hosted agents yet. Deploy one to start offering services on the marketplace.
+            </p>
+          )}
         </div>
       )}
     </div>

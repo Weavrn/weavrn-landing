@@ -144,7 +144,7 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
 
       {agent && (
         <>
-          <AgentSetup walletAddress={walletAddress} agentName={agent.name} />
+          <AgentSetup walletAddress={walletAddress} agentName={agent.name} signer={signer} />
 
           <AgentStatsGrid stats={stats || { escrowVolume: "0", releasedVolume: "0", totalEscrows: 0, activeEscrows: 0, jobsCompleted: 0, avgRating: 0 }} />
 
