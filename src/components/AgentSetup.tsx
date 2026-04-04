@@ -417,6 +417,7 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
   const [model, setModel] = useState(TEMPLATES.code_review.model);
   const [temp, setTemp] = useState(TEMPLATES.code_review.temp);
   const [userApiKey, setUserApiKey] = useState("");
+  const [containerTimeout, setContainerTimeout] = useState(30);
   const [deploying, setDeploying] = useState(false);
 
   // Edit state
@@ -478,6 +479,7 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
         model_name: model,
         max_tokens: 8192,
         temperature: temp,
+        container_timeout: containerTimeout * 60,
         user_api_key: tier === "byok" ? userApiKey : undefined,
         payment_tx: receipt.hash,
       });
@@ -645,10 +647,18 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
             <textarea value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} rows={6} className="mt-1 w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-sm font-mono resize-y" />
           </div>
 
-          {/* Temperature */}
-          <div>
-            <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Temperature: {temp}</label>
-            <input type="range" min="0" max="1" step="0.1" value={temp} onChange={e => setTemp(parseFloat(e.target.value))} className="mt-1 w-full" />
+          {/* Temperature + Timeout */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Temperature: {temp}</label>
+              <input type="range" min="0" max="1" step="0.1" value={temp} onChange={e => setTemp(parseFloat(e.target.value))} className="mt-1 w-full" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Job Timeout (minutes)</label>
+              <input type="number" min={1} max={60} value={containerTimeout} onChange={e => setContainerTimeout(Math.min(60, Math.max(1, parseInt(e.target.value) || 30)))}
+                className="mt-1 w-full bg-black/30 border border-weavrn-border rounded-lg px-3 py-2 text-sm" />
+              <p className="text-[10px] text-weavrn-muted mt-1">Max time per job. 1-60 minutes.</p>
+            </div>
           </div>
 
           {/* BYOK API Key */}
