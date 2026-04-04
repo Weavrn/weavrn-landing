@@ -13,6 +13,7 @@ import EscrowList from "./EscrowList";
 import ProfileEditor from "./ProfileEditor";
 import JobQueue from "./JobQueue";
 import MyListings from "./MyListings";
+import AgentSetup from "./AgentSetup";
 
 interface Props {
   walletAddress: string;
@@ -143,6 +144,8 @@ export default function AgentDashboard({ walletAddress, signer }: Props) {
 
       {agent && (
         <>
+          <AgentSetup walletAddress={walletAddress} agentName={agent.name} />
+
           <AgentStatsGrid stats={stats || { escrowVolume: "0", releasedVolume: "0", totalEscrows: 0, activeEscrows: 0, jobsCompleted: 0, avgRating: 0 }} />
 
           <JobQueue
