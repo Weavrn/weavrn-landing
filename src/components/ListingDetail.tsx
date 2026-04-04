@@ -204,6 +204,9 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
     setLoading(true);
     try {
       const data = await getListing(id);
+      if (data.input_schema && typeof data.input_schema === "string") {
+        try { data.input_schema = JSON.parse(data.input_schema); } catch { data.input_schema = null; }
+      }
       setListing(data);
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Listing not found");
