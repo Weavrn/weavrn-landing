@@ -75,6 +75,60 @@ async function signedFetch(signer: JsonRpcSigner, wallet: string, action: string
   return res.json();
 }
 
+// ── Input Field Editor (from MyListings) ──
+
+const FIELD_TYPES: InputField["type"][] = ["text", "textarea", "select", "code", "url", "git_url", "file", "number"];
+
+function emptyField(): InputField {
+  return { name: "", label: "", type: "text", required: false };
+}
+
+function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; onChange: (f: InputField) => void; onRemove: () => void }) {
+  const cls = "w-full px-2 py-1.5 bg-weavrn-surface border border-weavrn-border rounded text-xs focus:outline-none focus:border-weavrn-accent/50";
+  return (
+    <div className="p-3 rounded-lg bg-weavrn-surface border border-weavrn-border/50 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-weavrn-muted uppercase tracking-wider">Field</span>
+        <button onClick={onRemove} className="text-[10px] text-red-400 hover:text-red-300">Remove</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Label</label>
+          <input value={field.label} onChange={(e) => { const label = e.target.value; const name = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); onChange({ ...field, label, name }); }} placeholder="GitHub Repository URL" className={cls} />
+        </div>
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Type</label>
+          <select value={field.type} onChange={(e) => onChange({ ...field, type: e.target.value as InputField["type"] })} className={cls}>
+            {FIELD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Placeholder</label>
+          <input value={field.placeholder || ""} onChange={(e) => onChange({ ...field, placeholder: e.target.value || undefined })} placeholder="Optional" className={cls} />
+        </div>
+        <label className="flex items-end gap-1.5 text-xs text-weavrn-muted cursor-pointer pb-1.5">
+          <input type="checkbox" checked={field.required} onChange={(e) => onChange({ ...field, required: e.target.checked })} className="rounded border-weavrn-border" />
+          Required
+        </label>
+      </div>
+      {field.type === "select" && (
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (comma-separated)</label>
+          <input value={field.options?.join(", ") || ""} onChange={(e) => onChange({ ...field, options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} placeholder="Option A, Option B" className={cls} />
+        </div>
+      )}
+      {field.type === "file" && (
+        <div>
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Accepted extensions</label>
+          <input value={field.accept?.join(", ") || ""} onChange={(e) => onChange({ ...field, accept: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} placeholder=".py, .ts, .json" className={cls} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Inline Listing Manager per Agent ──
 
 function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: string; ownerWallet: string; signer: JsonRpcSigner | null }) {
@@ -83,9 +137,12 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("code");
+  const [pricingType, setPricingType] = useState("fixed");
   const [priceAmount, setPriceAmount] = useState("0.00001");
   const [escrowStrategy, setEscrowStrategy] = useState("all_or_nothing");
   const [tags, setTags] = useState("");
+  const [estimatedDuration, setEstimatedDuration] = useState("");
+  const [inputFields, setInputFields] = useState<InputField[]>([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,20 +160,21 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
     setCreating(true);
     setError(null);
     try {
+      const validFields = inputFields.filter(f => f.name && f.label);
       await createListing(signer, ownerWallet, {
         title,
         description,
         category,
         tags: tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-        pricing_type: "fixed",
+        pricing_type: pricingType,
         price_amount: priceAmount || undefined,
         escrow_strategy: escrowStrategy,
+        estimated_duration: estimatedDuration || undefined,
+        input_schema: validFields.length > 0 ? validFields : undefined,
         agent_wallet: agentWallet,
       });
       setShowCreate(false);
-      setTitle("");
-      setDescription("");
-      setTags("");
+      setTitle(""); setDescription(""); setTags(""); setPriceAmount("0.00001"); setEstimatedDuration(""); setInputFields([]);
       fetchListings();
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Failed to create listing");
@@ -124,6 +182,8 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
       setCreating(false);
     }
   };
+
+  const inputCls = "w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50";
 
   return (
     <div className="mt-4 border-t border-weavrn-border/30 pt-4">
@@ -145,10 +205,7 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <a href={`/marketplace?id=${l.id}`} className="text-[10px] text-weavrn-accent hover:underline">View</a>
             {l.active && signer && (
-              <button
-                onClick={async () => { await deactivateListing(signer, ownerWallet, l.id); fetchListings(); }}
-                className="text-[10px] text-red-400 hover:text-red-300"
-              >
+              <button onClick={async () => { await deactivateListing(signer, ownerWallet, l.id); fetchListings(); }} className="text-[10px] text-red-400 hover:text-red-300">
                 Deactivate
               </button>
             )}
@@ -161,25 +218,80 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
       )}
 
       {showCreate && (
-        <div className="space-y-3 mt-2 p-3 rounded-lg bg-black/20 border border-weavrn-border/30">
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Listing title" className="w-full bg-black/30 border border-weavrn-border rounded px-3 py-2 text-sm" />
-          <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" rows={3} className="w-full bg-black/30 border border-weavrn-border rounded px-3 py-2 text-sm resize-y" />
-          <div className="grid grid-cols-3 gap-2">
-            <select value={category} onChange={e => setCategory(e.target.value)} className="bg-black/30 border border-weavrn-border rounded px-2 py-1.5 text-xs">
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input value={priceAmount} onChange={e => setPriceAmount(e.target.value)} placeholder="Price (ETH)" className="bg-black/30 border border-weavrn-border rounded px-2 py-1.5 text-xs" />
-            <select value={escrowStrategy} onChange={e => setEscrowStrategy(e.target.value)} className="bg-black/30 border border-weavrn-border rounded px-2 py-1.5 text-xs">
-              <option value="all_or_nothing">All or Nothing</option>
-              <option value="milestone">Milestone</option>
-              <option value="trickle">Trickle</option>
-            </select>
+        <div className="space-y-3 mt-2 p-4 rounded-lg bg-weavrn-dark border border-weavrn-border">
+          <div>
+            <label className="text-xs text-weavrn-muted block mb-1">Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Service title" className={inputCls} />
           </div>
-          <input value={tags} onChange={e => setTags(e.target.value)} placeholder="Tags (comma-separated)" className="w-full bg-black/30 border border-weavrn-border rounded px-3 py-1.5 text-xs" />
+          <div>
+            <label className="text-xs text-weavrn-muted block mb-1">Description</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="What this service does, expected inputs, deliverables..." className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Pricing</label>
+              <select value={pricingType} onChange={e => setPricingType(e.target.value)} className={inputCls}>
+                <option value="fixed">Fixed</option>
+                <option value="hourly">Hourly</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Price (ETH)</label>
+              <input value={priceAmount} onChange={e => setPriceAmount(e.target.value)} placeholder="0.001" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Escrow</label>
+              <select value={escrowStrategy} onChange={e => setEscrowStrategy(e.target.value)} className={inputCls}>
+                <option value="all_or_nothing">All or Nothing</option>
+                <option value="milestone">Milestone</option>
+                <option value="trickle">Trickle</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Tags (comma-separated)</label>
+              <input value={tags} onChange={e => setTags(e.target.value)} placeholder="ai, code, review" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-weavrn-muted block mb-1">Estimated Duration</label>
+              <input value={estimatedDuration} onChange={e => setEstimatedDuration(e.target.value)} placeholder="2 hours" className={inputCls} />
+            </div>
+          </div>
+
+          {/* Input Fields Builder */}
+          <div className="border-t border-weavrn-border/50 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-weavrn-muted">Input Fields (optional)</label>
+              <button onClick={() => { if (inputFields.length < 10) setInputFields([...inputFields, emptyField()]); }} disabled={inputFields.length >= 10}
+                className="text-[10px] px-2 py-1 rounded bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 disabled:opacity-30 transition-colors">
+                + Add Field
+              </button>
+            </div>
+            {inputFields.length === 0 && <p className="text-[10px] text-weavrn-muted/50">No custom fields. Requesters will see generic text inputs.</p>}
+            <div className="space-y-2">
+              {inputFields.map((field, i) => (
+                <InputFieldEditor key={i} field={field}
+                  onChange={(updated) => { const next = [...inputFields]; next[i] = updated; setInputFields(next); }}
+                  onRemove={() => setInputFields(inputFields.filter((_, j) => j !== i))} />
+              ))}
+            </div>
+          </div>
+
           {error && <p className="text-xs text-red-400">{error}</p>}
           <div className="flex gap-2">
-            <button onClick={handleCreate} disabled={creating || !title || !description} className="px-3 py-1.5 text-xs bg-weavrn-accent text-black rounded font-semibold disabled:opacity-50">{creating ? "Creating..." : "Create"}</button>
-            <button onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-xs text-weavrn-muted hover:text-white">Cancel</button>
+            <button onClick={handleCreate} disabled={creating || !title || !description}
+              className="px-4 py-2 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-sm font-semibold disabled:opacity-50 transition-all">
+              {creating ? "Creating..." : "Create Listing"}
+            </button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-weavrn-muted hover:text-white">Cancel</button>
           </div>
         </div>
       )}
