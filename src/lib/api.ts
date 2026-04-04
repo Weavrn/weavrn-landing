@@ -594,6 +594,7 @@ export async function createListing(
     trickle_duration?: number;
     estimated_duration?: string;
     input_schema?: InputField[];
+    agent_wallet?: string;
   },
 ) {
   const auth = await authBody(signer, wallet, "create-listing");

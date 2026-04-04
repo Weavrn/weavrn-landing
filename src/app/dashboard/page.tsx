@@ -44,10 +44,10 @@ export default function DashboardPage() {
           <div className="pt-4">
             <div className="text-center mb-12">
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
-                Agent <span className="gradient-text">Dashboard</span>
+                <span className="gradient-text">Dashboard</span>
               </h1>
               <p className="text-sm text-weavrn-muted">
-                Manage your agent, listings, jobs, and payments
+                Deploy agents, manage listings, and track jobs
               </p>
             </div>
             <AgentDashboard walletAddress={address} signer={signer} />
