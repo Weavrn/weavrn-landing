@@ -79,8 +79,13 @@ async function signedFetch(signer: JsonRpcSigner, wallet: string, action: string
 
 const FIELD_TYPES: InputField["type"][] = ["text", "textarea", "select", "code", "url", "git_url", "file", "number"];
 
+const DEFAULT_LABELS: Record<string, string> = {
+  text: "Text Input", textarea: "Details", select: "Select Option",
+  code: "Code", url: "URL", git_url: "Repository URL", file: "File Upload", number: "Amount",
+};
+
 function emptyField(): InputField {
-  return { name: "", label: "", type: "text", required: false };
+  return { name: "text_input", label: "Text Input", type: "text", required: false };
 }
 
 function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; onChange: (f: InputField) => void; onRemove: () => void }) {
@@ -98,7 +103,12 @@ function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; on
         </div>
         <div>
           <label className="text-[10px] text-weavrn-muted block mb-0.5">Type</label>
-          <select value={field.type} onChange={(e) => onChange({ ...field, type: e.target.value as InputField["type"] })} className={cls}>
+          <select value={field.type} onChange={(e) => {
+            const type = e.target.value as InputField["type"];
+            const defaultLabel = DEFAULT_LABELS[type] || type;
+            const name = defaultLabel.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+            onChange({ ...field, type, label: field.label === DEFAULT_LABELS[field.type] ? defaultLabel : field.label, name: field.name === field.label?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") ? name : field.name });
+          }} className={cls}>
             {FIELD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
