@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 type Platform = "all" | "x" | "youtube";
 
 interface Props {
@@ -7,13 +9,13 @@ interface Props {
   onChange: (v: Platform) => void;
 }
 
-const OPTIONS: { value: Platform; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "x", label: "X" },
-  { value: "youtube", label: "YouTube" },
-];
+const OPTIONS = [
+  { value: "all" as const, label: "All" },
+  { value: "x" as const, label: "X" },
+  { value: "youtube" as const, label: "YouTube" },
+] as const;
 
-export default function PlatformFilter({ value, onChange }: Props) {
+function PlatformFilter({ value, onChange }: Props) {
   return (
     <div className="flex items-center gap-1">
       {OPTIONS.map((opt) => {
@@ -35,3 +37,5 @@ export default function PlatformFilter({ value, onChange }: Props) {
     </div>
   );
 }
+
+export default memo(PlatformFilter);

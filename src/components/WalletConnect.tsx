@@ -25,24 +25,34 @@ export default function WalletConnect({
     if (tried.current || address) return;
     tried.current = true;
     if (!window.ethereum) return;
+    
     // eth_accounts doesn't prompt — returns [] if not connected
-    window.ethereum.request({ method: "eth_accounts" }).then(async (accounts: string[]) => {
-      if (accounts.length === 0) return;
-      try {
-        const switched = await checkAndSwitchChain();
-        if (!switched) return;
-        const { signer, address: addr } = await getProviderAndSigner();
-        onConnect(addr, signer);
-      } catch {
-        // silent fail on auto-connect
-      }
-    }).catch(() => {});
+    window.ethereum
+      .request({ method: "eth_accounts" })
+      .then(async (accounts: string[]) => {
+        if (accounts.length === 0) return;
+        try {
+          const switched = await checkAndSwitchChain();
+          if (!switched) return;
+          const { signer, address: addr } = await getProviderAndSigner();
+          onConnect(addr, signer);
+        } catch {
+          // silent fail on auto-connect
+        }
+      })
+      .catch(() => {
+        // ignore eth_accounts errors
+      });
   }, [address, onConnect]);
 
   // Listen for chain/account changes
   useEffect(() => {
     if (!window.ethereum) return;
-    const handleChainChanged = () => { window.location.reload(); };
+    
+    const handleChainChanged = () => {
+      window.location.reload();
+    };
+    
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts.length === 0) {
         clearSession();
@@ -51,8 +61,10 @@ export default function WalletConnect({
         window.location.reload();
       }
     };
+    
     window.ethereum.on("chainChanged", handleChainChanged);
     window.ethereum.on("accountsChanged", handleAccountsChanged);
+    
     return () => {
       window.ethereum?.removeListener("chainChanged", handleChainChanged);
       window.ethereum?.removeListener("accountsChanged", handleAccountsChanged);
@@ -100,8 +112,13 @@ export default function WalletConnect({
           onClick={async () => {
             await clearSession();
             try {
-              await window.ethereum?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
-            } catch { /* older MetaMask versions don't support this */ }
+              await window.ethereum?.request({
+                method: "wallet_revokePermissions",
+                params: [{ eth_accounts: {} }],
+              });
+            } catch {
+              // older MetaMask versions don't support this
+            }
             onDisconnect();
           }}
           data-testid="disconnect-btn"
@@ -123,9 +140,7 @@ export default function WalletConnect({
       >
         {connecting ? "Connecting..." : "Connect Wallet"}
       </button>
-      {error && (
-        <p className="text-xs text-red-400">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }

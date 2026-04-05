@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { JsonRpcSigner } from "ethers";
 import WalletConnect from "./WalletConnect";
 import { features } from "@/lib/features";
@@ -18,9 +18,9 @@ const NAV_LINKS = [
   ...(features.marketplace ? [{ label: "Marketplace", href: "/marketplace" }] : []),
   ...(features.dashboard ? [{ label: "Dashboard", href: "/dashboard" }] : []),
   ...(features.mining ? [{ label: "Mining", href: "/mine" }] : []),
-];
+] as const;
 
-export default function AppHeader({ onConnect, onDisconnect, address, showWallet = true }: Props) {
+function AppHeader({ onConnect, onDisconnect, address, showWallet = true }: Props) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -28,7 +28,7 @@ export default function AppHeader({ onConnect, onDisconnect, address, showWallet
     <header className="relative z-20 border-b border-weavrn-border/50 px-6 py-4 backdrop-blur-sm bg-weavrn-dark/80">
       <div className="max-w-5xl mx-auto flex items-center justify-between">
         <a href="/" className="flex items-center gap-2.5">
-          <img src="/icon.svg" alt="" className="w-7 h-7" />
+          <img src="/icon.svg" alt="Weavrn" className="w-7 h-7" />
           <span className="text-xl font-bold gradient-text">weavrn</span>
         </a>
 
@@ -48,14 +48,22 @@ export default function AppHeader({ onConnect, onDisconnect, address, showWallet
             </a>
           ))}
           {showWallet && onConnect && onDisconnect && (
-            <WalletConnect onConnect={onConnect} onDisconnect={onDisconnect} address={address ?? null} />
+            <WalletConnect
+              onConnect={onConnect}
+              onDisconnect={onDisconnect}
+              address={address ?? null}
+            />
           )}
         </div>
 
         {/* Mobile */}
         <div className="flex md:hidden items-center gap-3">
           {showWallet && onConnect && onDisconnect && (
-            <WalletConnect onConnect={onConnect} onDisconnect={onDisconnect} address={address ?? null} />
+            <WalletConnect
+              onConnect={onConnect}
+              onDisconnect={onDisconnect}
+              address={address ?? null}
+            />
           )}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -64,9 +72,19 @@ export default function AppHeader({ onConnect, onDisconnect, address, showWallet
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               {menuOpen ? (
-                <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M5 5L15 15M15 5L5 15"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               ) : (
-                <path d="M3 6H17M3 10H17M3 14H17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M3 6H17M3 10H17M3 14H17"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               )}
             </svg>
           </button>
@@ -95,3 +113,5 @@ export default function AppHeader({ onConnect, onDisconnect, address, showWallet
     </header>
   );
 }
+
+export default memo(AppHeader);
