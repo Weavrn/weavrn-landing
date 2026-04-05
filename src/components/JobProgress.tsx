@@ -17,7 +17,8 @@ export default function JobProgress({ job }: Props) {
   // Truncate activity for display
   const activity = ps.activity
     ? ps.activity.length > 60 ? ps.activity.slice(0, 57) + "..." : ps.activity
-    : stage === "preflight" ? "Reviewing request..." : "Starting...";
+    : stage === "preflight" ? "Reviewing request..."
+    : turn > 0 ? "Processing..." : "Starting...";
 
   return (
     <div className="mt-2 mb-1">
