@@ -639,7 +639,7 @@ export interface Job {
   deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
   deliverable_data: DeliverableData | null;
   processing_status?: {
-    stage: "preflight" | "container";
+    stage: "preflight" | "container" | "done";
     turn?: number;
     max_turns?: number;
     activity?: string;

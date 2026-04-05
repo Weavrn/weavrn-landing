@@ -6,7 +6,7 @@ interface Props {
 
 export default function JobProgress({ job }: Props) {
   const ps = job.processing_status;
-  if (!ps) return null;
+  if (!ps || !["preflight", "container"].includes(ps.stage)) return null;
   if (!["in_progress", "awaiting_input"].includes(job.status)) return null;
 
   const stage = ps.stage;
