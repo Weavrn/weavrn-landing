@@ -638,6 +638,13 @@ export interface Job {
   escrow_id: number | null;
   deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
   deliverable_data: DeliverableData | null;
+  processing_status?: {
+    stage: "preflight" | "container";
+    turn?: number;
+    max_turns?: number;
+    activity?: string;
+    updated_at?: number;
+  } | null;
   created_at: string;
   updated_at: string;
   queue_position?: number;

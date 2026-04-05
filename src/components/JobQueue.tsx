@@ -8,6 +8,7 @@ import { createEscrowETH, releaseEscrow, getAgentOnChain, registerAgent } from "
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
+import JobProgress from "./JobProgress";
 
 interface Props {
   walletAddress: string;
@@ -299,6 +300,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                     <span className="text-yellow-400 ml-2">Unfunded</span>
                   )}
                 </p>
+                <JobProgress job={j} />
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 {/* Fund button for unfunded in_progress jobs */}
