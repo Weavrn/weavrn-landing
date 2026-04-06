@@ -21,17 +21,19 @@ export default function WalletConnect({
 
   // Auto-connect on mount if MetaMask is already authorized
   const tried = useRef(false);
+  const connected = useRef(false);
   useEffect(() => {
     if (tried.current || address) return;
     tried.current = true;
     if (!window.ethereum) return;
-    // eth_accounts doesn't prompt — returns [] if not connected
     window.ethereum.request({ method: "eth_accounts" }).then(async (accounts: string[]) => {
-      if (accounts.length === 0) return;
+      if (accounts.length === 0 || connected.current) return;
       try {
         const switched = await checkAndSwitchChain();
-        if (!switched) return;
+        if (!switched || connected.current) return;
         const { signer, address: addr } = await getProviderAndSigner();
+        if (connected.current) return;
+        connected.current = true;
         onConnect(addr, signer);
       } catch {
         // silent fail on auto-connect
@@ -74,7 +76,10 @@ export default function WalletConnect({
         return;
       }
       const { signer, address: addr } = await getProviderAndSigner();
-      onConnect(addr, signer);
+      if (!connected.current) {
+        connected.current = true;
+        onConnect(addr, signer);
+      }
     } catch (err: unknown) {
       const e = err as { code?: number; message?: string };
       if (e.code === 4001) return; // user rejected
