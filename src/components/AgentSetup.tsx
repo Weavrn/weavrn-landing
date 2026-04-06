@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner, parseEther } from "ethers";
-import { getAgentListings, createListing, updateListing, deactivateListing } from "@/lib/api";
+import { getAgentListings, getAgentJobs, createListing, updateListing, deactivateListing } from "@/lib/api";
+import type { Job } from "@/lib/api";
 import type { ServiceListing, InputField } from "@/lib/api";
 
 interface Props {
@@ -400,6 +401,80 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
   );
 }
 
+// ── Compact Job List per Agent ──
+
+const JOB_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-500/10 text-yellow-400",
+  accepted: "bg-blue-500/10 text-blue-400",
+  in_progress: "bg-purple-500/10 text-purple-400",
+  awaiting_input: "bg-orange-500/10 text-orange-400",
+  delivered: "bg-cyan-500/10 text-cyan-400",
+  completed: "bg-green-500/10 text-green-400",
+  cancelled: "bg-weavrn-muted/10 text-weavrn-muted",
+  disputed: "bg-red-500/10 text-red-400",
+};
+
+const JOB_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending", accepted: "Accepted", in_progress: "In Progress",
+  awaiting_input: "Needs Input", delivered: "Delivered", completed: "Completed",
+  cancelled: "Cancelled", disputed: "Disputed",
+};
+
+function AgentJobs({ agentWallet }: { agentWallet: string }) {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getAgentJobs(agentWallet, 1, 5)
+      .then(res => { setJobs(res.jobs); setTotal(res.total); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [agentWallet]);
+
+  if (loading) return null;
+  if (total === 0) return (
+    <div className="mt-4 border-t border-weavrn-border/30 pt-4">
+      <span className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Jobs</span>
+      <p className="text-xs text-weavrn-muted py-2">No jobs yet.</p>
+    </div>
+  );
+
+  return (
+    <div className="mt-4 border-t border-weavrn-border/30 pt-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Recent Jobs ({total})</span>
+        <a href={`/dashboard/agent?wallet=${agentWallet}`} className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover">
+          View All
+        </a>
+      </div>
+      {jobs.map(j => {
+        const dd = j.deliverable_data || {};
+        const ps = j.processing_status;
+        const isActive = ps && ["preflight", "container"].includes(ps.stage);
+        return (
+          <div key={j.id} className="flex items-center justify-between py-1.5 border-b border-weavrn-border/10 last:border-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ${JOB_STATUS_COLORS[j.status] || ""}`}>
+                {JOB_STATUS_LABELS[j.status] || j.status}
+              </span>
+              <span className="text-xs truncate">{j.title}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              {isActive && ps.turn ? (
+                <span className="text-[9px] text-weavrn-muted font-mono">{ps.turn}/{ps.max_turns || 30}</span>
+              ) : null}
+              {dd.pr_url ? (
+                <a href={dd.pr_url as string} target="_blank" rel="noopener noreferrer" className="text-[9px] text-green-400 hover:underline">PR</a>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Component ──
 
 export default function AgentSetup({ walletAddress, signer }: Props) {
@@ -579,6 +654,9 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
 
           {/* Nested listings for this agent */}
           <AgentListings agentWallet={a.wallet_address} ownerWallet={walletAddress} signer={signer} />
+
+          {/* Recent jobs */}
+          <AgentJobs agentWallet={a.wallet_address} />
         </div>
       ))}
 
