@@ -45,7 +45,7 @@ function AgentDetailContent() {
   const [jobPage, setJobPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [listings, setListings] = useState<ServiceListing[]>([]);
-  const [agentInfo, setAgentInfo] = useState<unknown>(null);
+  const [agentInfo, setAgentInfo] = useState<{ name?: string; avg_rating?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedJob, setExpandedJob] = useState<number | null>(null);
   const [chatJob, setChatJob] = useState<number | null>(null);
@@ -72,7 +72,7 @@ function AgentDetailContent() {
       setJobs(jobRes.jobs);
       setJobTotal(jobRes.total);
       setListings(listingRes.listings || []);
-      setAgentInfo(agent);
+      if (agent) setAgentInfo({ name: agent.name, avg_rating: agent.avg_rating });
     } catch { /* ignore */ }
     setLoading(false);
   }, [wallet]);
@@ -93,7 +93,7 @@ function AgentDetailContent() {
     completed: jobs.filter(j => j.status === "completed").length,
     delivered: jobs.filter(j => j.status === "delivered").length,
     inProgress: jobs.filter(j => ["in_progress", "awaiting_input"].includes(j.status)).length,
-    prs: jobs.filter(j => (j.deliverable_data as Record<string, unknown>)?.pr_url).length,
+    prs: jobs.filter(j => (j.deliverable_data as { pr_url?: string } | null)?.pr_url).length,
   };
 
   return (
@@ -106,7 +106,7 @@ function AgentDetailContent() {
         </h1>
         {agentInfo && (
           <p className="text-sm text-weavrn-muted mt-1">
-            {(agentInfo as { name?: string }).name || "Hosted Agent"} · {(agentInfo as { avg_rating?: number }).avg_rating ? `${(agentInfo as { avg_rating: number }).avg_rating}/5` : "No ratings"}
+            {agentInfo.name || "Hosted Agent"} · {agentInfo.avg_rating ? `${agentInfo.avg_rating}/5` : "No ratings"}
           </p>
         )}
       </div>
@@ -164,7 +164,7 @@ function AgentDetailContent() {
         ) : (
           <div className="space-y-2">
             {jobs.map(j => {
-              const dd = (j.deliverable_data as unknown as Record<string, unknown>) || {};
+              const dd = (j.deliverable_data || {}) as { pr_url?: string; has_bundle?: boolean; proof?: { total_files?: number } };
               const ps = j.processing_status;
               const isActive = ps && ["preflight", "container"].includes(ps.stage);
               return (
@@ -200,7 +200,7 @@ function AgentDetailContent() {
                   {/* Action buttons */}
                   <div className="flex gap-2 mt-2">
                     {dd.pr_url && (
-                      <a href={dd.pr_url as string} target="_blank" rel="noopener noreferrer"
+                      <a href={dd.pr_url || "#"} target="_blank" rel="noopener noreferrer"
                         className="text-[10px] px-2 py-1 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20">
                         View PR
                       </a>

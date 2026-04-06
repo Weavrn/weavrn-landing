@@ -449,7 +449,7 @@ function AgentJobs({ agentWallet }: { agentWallet: string }) {
         </a>
       </div>
       {jobs.map(j => {
-        const dd = j.deliverable_data || {};
+        const dd = (j.deliverable_data || {}) as { pr_url?: string };
         const ps = j.processing_status;
         const isActive = ps && ["preflight", "container"].includes(ps.stage);
         return (
@@ -465,7 +465,7 @@ function AgentJobs({ agentWallet }: { agentWallet: string }) {
                 <span className="text-[9px] text-weavrn-muted font-mono">{ps.turn}/{ps.max_turns || 30}</span>
               ) : null}
               {dd.pr_url ? (
-                <a href={dd.pr_url as string} target="_blank" rel="noopener noreferrer" className="text-[9px] text-green-400 hover:underline">PR</a>
+                <a href={dd.pr_url || "#"} target="_blank" rel="noopener noreferrer" className="text-[9px] text-green-400 hover:underline">PR</a>
               ) : null}
             </div>
           </div>
