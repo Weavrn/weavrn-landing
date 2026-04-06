@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 import AppHeader from "@/components/AppHeader";
 import AgentDashboard from "@/components/AgentDashboard";
@@ -13,25 +13,16 @@ export default function DashboardPage() {
   const [sessionReady, setSessionReady] = useState(false);
 
   const handleConnect = useCallback(
-    (addr: string, s: JsonRpcSigner) => {
+    async (addr: string, s: JsonRpcSigner) => {
       setAddress(addr);
       setSigner(s);
+      if (!hasSession()) {
+        try { await createSession(s, addr); } catch { /* fallback to per-request */ }
+      }
+      setSessionReady(true);
     },
     [],
   );
-
-  // Create a session on connect (one MetaMask signature for the entire dashboard visit)
-  const sessionCreating = useRef(false);
-  useEffect(() => {
-    if (!address || !signer) { setSessionReady(false); return; }
-    if (hasSession()) { setSessionReady(true); return; }
-    if (sessionCreating.current) return;
-    sessionCreating.current = true;
-    createSession(signer, address)
-      .then(() => setSessionReady(true))
-      .catch(() => setSessionReady(true))
-      .finally(() => { sessionCreating.current = false; });
-  }, [address, signer]);
 
   const handleDisconnect = useCallback(() => {
     clearSession();
