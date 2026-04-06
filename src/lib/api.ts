@@ -1,19 +1,41 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-// ── Session Auth ──
+// ── Session Auth (shared across tabs via localStorage) ──
 
-let sessionToken: string | null = null;
-let sessionExpiresAt: number | null = null;
+const SESSION_STORAGE_KEY = "weavrn_session";
+
+function loadSession(): { token: string; expiresAt: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const { token, expiresAt } = JSON.parse(raw);
+    if (!token || !expiresAt || Date.now() >= expiresAt) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+    return { token, expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(token: string, expiresAt: number) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
+}
 
 export function hasSession() {
-  return sessionToken !== null && sessionExpiresAt !== null && Date.now() < sessionExpiresAt;
+  return loadSession() !== null;
 }
 
 export function getSessionToken(): string | null {
-  return hasSession() ? sessionToken : null;
+  return loadSession()?.token || null;
 }
 
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
+  // Check localStorage first — another tab may have already created a session
+  if (hasSession()) return;
   const timestamp = Date.now();
   const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
@@ -21,21 +43,20 @@ export async function createSession(signer: import("ethers").JsonRpcSigner, wall
     method: "POST",
     body: JSON.stringify({ wallet_address: walletAddress.toLowerCase(), signature, timestamp }),
   });
-  sessionToken = res.token;
-  sessionExpiresAt = new Date(res.expires_at).getTime();
+  saveSession(res.token, new Date(res.expires_at).getTime());
   return res;
 }
 
 export async function clearSession() {
-  if (sessionToken) {
+  const session = loadSession();
+  if (session) {
     try {
       await apiFetch("/auth/session", { method: "DELETE" });
     } catch {
       // ignore logout errors
     }
   }
-  sessionToken = null;
-  sessionExpiresAt = null;
+  if (typeof window !== "undefined") localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
 export interface Submission {
@@ -205,7 +226,7 @@ async function apiFetch<T>(
     ...(options?.headers as Record<string, string>),
   };
   if (hasSession()) {
-    headers["Authorization"] = `Bearer ${sessionToken}`;
+    headers["Authorization"] = `Bearer ${getSessionToken()}`;
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
@@ -949,7 +970,7 @@ export async function uploadJobFile(
 
   const headers: Record<string, string> = {};
   if (hasSession()) {
-    headers["Authorization"] = `Bearer ${sessionToken}`;
+    headers["Authorization"] = `Bearer ${getSessionToken()}`;
   } else {
     const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file");
     form.append("signature", signature);
