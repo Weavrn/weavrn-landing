@@ -33,23 +33,25 @@ export function getSessionToken(): string | null {
   return loadSession()?.token || null;
 }
 
-let _sessionCreating = false;
+let _sessionPromise: Promise<unknown> | null = null;
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
   if (hasSession()) return;
-  if (_sessionCreating) return;
-  _sessionCreating = true;
+  if (_sessionPromise) return _sessionPromise;
+  _sessionPromise = (async () => {
   const timestamp = Date.now();
   const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
-  try {
     const res = await apiFetch<{ token: string; expires_at: string }>("/auth/session", {
       method: "POST",
       body: JSON.stringify({ wallet_address: walletAddress.toLowerCase(), signature, timestamp }),
     });
     saveSession(res.token, new Date(res.expires_at).getTime());
     return res;
+  })();
+  try {
+    return await _sessionPromise;
   } finally {
-    _sessionCreating = false;
+    _sessionPromise = null;
   }
 }
 
