@@ -9,6 +9,10 @@ export function hasSession() {
   return sessionToken !== null && sessionExpiresAt !== null && Date.now() < sessionExpiresAt;
 }
 
+export function getSessionToken(): string | null {
+  return hasSession() ? sessionToken : null;
+}
+
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
   const timestamp = Date.now();
   const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
@@ -76,10 +80,21 @@ export interface TrackedPost {
   views: number | null;
   raw_score: number | null;
   estimated_wvrn: number;
-  block_history: PostBlockHistory[];
+  block_history: PostBlockHistory[]; // always [] from API — use block_history_total
+  block_history_total: number;
   flagged?: boolean;
   flag_reason?: string | null;
   posted_at?: string | null;
+}
+
+export interface PostBlockHistoryResponse {
+  post_id: number;
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  sort: string;
+  history: PostBlockHistory[];
 }
 
 export interface BlockReward {
@@ -95,6 +110,10 @@ export interface BlockReward {
   claim_tx_hash: string | null;
   block_share_pct: number | null;
   share_bps: number | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
   created_at: string;
 }
 
@@ -247,6 +266,21 @@ export function getRewards(
   const qstr = qs.toString();
   return apiFetch<RewardsResponse>(
     `/rewards/${wallet.toLowerCase()}${qstr ? `?${qstr}` : ""}`,
+  );
+}
+
+export function getPostBlockHistory(
+  wallet: string,
+  postId: number,
+  params?: { page?: number; limit?: number; sort?: "newest" | "oldest" },
+) {
+  const qs = new URLSearchParams();
+  if (params?.page && params.page > 1) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.sort && params.sort !== "newest") qs.set("sort", params.sort);
+  const qstr = qs.toString();
+  return apiFetch<PostBlockHistoryResponse>(
+    `/rewards/${wallet.toLowerCase()}/posts/${postId}/history${qstr ? `?${qstr}` : ""}`,
   );
 }
 
@@ -590,6 +624,7 @@ export async function createListing(
     trickle_duration?: number;
     estimated_duration?: string;
     input_schema?: InputField[];
+    agent_wallet?: string;
   },
 ) {
   const auth = await authBody(signer, wallet, "create-listing");
@@ -633,6 +668,13 @@ export interface Job {
   escrow_id: number | null;
   deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
   deliverable_data: DeliverableData | null;
+  processing_status?: {
+    stage: "preflight" | "container" | "done";
+    turn?: number;
+    max_turns?: number;
+    activity?: string;
+    updated_at?: number;
+  } | null;
   created_at: string;
   updated_at: string;
   queue_position?: number;
@@ -759,18 +801,12 @@ export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet
 }
 
 export async function completeJobWithAuth(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number): Promise<Job | null> {
-  // Sign once, retry the API call without re-signing (avoids multiple MetaMask popups)
   const auth = await authBody(signer, wallet, "complete-job");
-  const body = JSON.stringify(auth);
-  for (let i = 0; i < 8; i++) {
-    try {
-      return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body });
-    } catch {
-      if (i === 7) return null;
-      await new Promise(r => setTimeout(r, 5000));
-    }
+  try {
+    return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body: JSON.stringify(auth) });
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function cancelJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
@@ -968,6 +1004,10 @@ export interface EarningsBlock {
   delta_score: number;
   post_count: number;
   reward_amount: string | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
 }
 
 export function getEarningsHistory(wallet: string, blocks = 20) {

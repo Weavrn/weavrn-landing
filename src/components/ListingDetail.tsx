@@ -190,6 +190,8 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       setRequested(true);
       if (failedFiles.length > 0) {
         setRequestError(`Job created but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}. You can re-upload from the job chat.`);
+      } else {
+        setTimeout(() => { window.location.href = "/dashboard"; }, 2000);
       }
     } catch (err: unknown) {
       setRequestError((err as { message?: string }).message || "Failed to request service");
@@ -202,6 +204,9 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
     setLoading(true);
     try {
       const data = await getListing(id);
+      if (data.input_schema && typeof data.input_schema === "string") {
+        try { data.input_schema = JSON.parse(data.input_schema); } catch { data.input_schema = null; }
+      }
       setListing(data);
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Listing not found");
@@ -272,7 +277,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
         {walletAddress && walletAddress.toLowerCase() !== listing.wallet_address.toLowerCase() && (
           <div className="pt-4 border-t border-weavrn-border/50">
             {requested ? (
-              <p className="text-sm text-weavrn-accent">Service requested — <a href="/dashboard" className="underline hover:text-weavrn-accent-hover">check your dashboard</a> for updates.</p>
+              <p className="text-sm text-weavrn-accent">Service requested — redirecting to <a href="/dashboard" className="underline hover:text-weavrn-accent-hover">your dashboard</a>...</p>
             ) : !showForm ? (
               <button
                 onClick={() => setShowForm(true)}

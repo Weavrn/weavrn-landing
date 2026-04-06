@@ -19,6 +19,7 @@ function truncAddr(addr: string) {
 function ChatMarkdown({ content }: { content: string }) {
   return (
     <ReactMarkdown
+      skipHtml={true}
       allowedElements={["p", "code", "pre", "ul", "ol", "li", "h1", "h2", "h3", "strong", "em", "a", "hr", "blockquote", "table", "thead", "tbody", "tr", "th", "td", "br"]}
       components={{
         code({ className, children, ...props }) {

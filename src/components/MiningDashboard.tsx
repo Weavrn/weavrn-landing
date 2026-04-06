@@ -18,6 +18,7 @@ import MiningRules from "./MiningRules";
 import StatsGrid from "./mining/StatsGrid";
 import PoolCards from "./mining/PoolCards";
 import BlockBanner from "./mining/BlockBanner";
+import LinkedAccounts from "./mining/LinkedAccounts";
 import BlockRewardsSection from "./mining/BlockRewardsSection";
 import TrackedPostsSection from "./mining/TrackedPostsSection";
 
@@ -137,6 +138,18 @@ export default function MiningDashboard({
       setError((err as Error).message);
     }
   }, [signer, walletAddress, setError]);
+
+  const handleUnlinkYT = useCallback(async () => {
+    setError(null);
+    try {
+      if (!signer) { setError("Wallet not connected"); return; }
+      const { unlinkYouTubeHandle } = await import("@/lib/api");
+      await unlinkYouTubeHandle(signer, walletAddress);
+      refreshData();
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    }
+  }, [signer, walletAddress, setError, refreshData]);
 
   const handleCancelVerification = () => {
     setVerificationCode(null);
@@ -279,6 +292,13 @@ export default function MiningDashboard({
         </div>
       )}
 
+      <LinkedAccounts
+        xHandle={xHandle}
+        ytHandle={profile?.yt_handle ?? null}
+        onUnlinkX={handleUnlink}
+        onUnlinkYT={handleUnlinkYT}
+      />
+
       <StatsGrid
         postCount={trackedPosts.length}
         totalEarned={walletSummary?.total_earned || "0"}
@@ -297,9 +317,6 @@ export default function MiningDashboard({
       {currentBlock && (
         <BlockBanner
           currentBlock={currentBlock}
-          xHandle={xHandle}
-          ytHandle={profile?.yt_handle ?? null}
-          onUnlink={handleUnlink}
           onBlockClose={refreshData}
         />
       )}
