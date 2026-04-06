@@ -4,10 +4,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
-import { createEscrowETH, releaseEscrow } from "@/lib/contracts";
+import { createEscrowETH, releaseEscrow, getAgentOnChain, registerAgent } from "@/lib/contracts";
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
+import JobProgress from "./JobProgress";
 
 interface Props {
   walletAddress: string;
@@ -183,6 +184,18 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     setActing(`fund-${job.id}`);
     setError(null);
     try {
+      // Auto-register on-chain if needed (escrow contract requires both parties registered)
+      let agentInfo = await getAgentOnChain(walletAddress);
+      if (!agentInfo?.isRegistered) {
+        await registerAgent(signer, walletAddress.slice(0, 10), "");
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          agentInfo = await getAgentOnChain(walletAddress);
+          if (agentInfo?.isRegistered) break;
+        }
+        if (!agentInfo?.isRegistered) throw new Error("Registration not confirmed. Please try again.");
+      }
+
       const listing = await getListing(job.listing_id);
       const strategy = listing.escrow_strategy || "all_or_nothing";
 
@@ -196,15 +209,14 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         listing.escrow_strategy_address,
       );
 
-      // Retry linking — escrow indexer polls every 30s
-      for (let i = 0; i < 8; i++) {
-        try {
-          await linkJobEscrow(signer, walletAddress, job.id, escrowId);
-          break;
-        } catch {
-          if (i === 7) throw new Error("Escrow created on-chain but indexer hasn't picked it up yet. Try refreshing in 30 seconds.");
-          await new Promise(r => setTimeout(r, 5000));
-        }
+      // Wait for escrow indexer to pick up the on-chain escrow, then link once
+      await new Promise(r => setTimeout(r, 35000));
+      try {
+        await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+      } catch {
+        // One more attempt after waiting
+        await new Promise(r => setTimeout(r, 15000));
+        await linkJobEscrow(signer, walletAddress, job.id, escrowId);
       }
       setFundingJobId(null);
       setFundingDetails(null);
@@ -292,6 +304,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                     <span className="text-yellow-400 ml-2">Unfunded</span>
                   )}
                 </p>
+                <JobProgress job={j} />
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 {/* Fund button for unfunded in_progress jobs */}

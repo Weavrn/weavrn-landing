@@ -3,6 +3,7 @@ const devSources = process.env.NODE_ENV !== 'production'
   ? ' http://localhost:* http://127.0.0.1:*'
   : '';
 
+
 const nextConfig = {
   reactStrictMode: true,
   output: "export",

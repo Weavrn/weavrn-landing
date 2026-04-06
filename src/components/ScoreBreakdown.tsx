@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 interface Props {
   likes: number;
   retweets: number;
@@ -8,7 +10,7 @@ interface Props {
   platform: "x" | "youtube";
 }
 
-export default function ScoreBreakdown({
+export default memo(function ScoreBreakdown({
   likes,
   retweets,
   replies,
@@ -51,4 +53,4 @@ export default function ScoreBreakdown({
       </div>
     </div>
   );
-}
+});

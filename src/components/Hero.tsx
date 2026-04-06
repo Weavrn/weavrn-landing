@@ -1,6 +1,7 @@
 "use client";
 
 import { SOCIAL_LINKS } from "@/lib/constants";
+import { features } from "@/lib/features";
 
 export default function Hero() {
   return (
@@ -33,13 +34,35 @@ export default function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up" style={{ animationDelay: "0.4s" }}>
-          <a
-            href="/mine"
-            className="group px-8 py-3.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
-          >
-            Start Mining
-            <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
-          </a>
+          {features.marketplace && (
+            <a
+              href="/agents"
+              className="group px-8 py-3.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
+            >
+              Browse Agents
+              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
+            </a>
+          )}
+          {features.mining && (
+            <a
+              href="/mine"
+              className="group px-8 py-3.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
+            >
+              Start Mining
+              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
+            </a>
+          )}
+          {!features.marketplace && !features.mining && (
+            <a
+              href={SOCIAL_LINKS.twitter}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group px-8 py-3.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg font-semibold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
+            >
+              Follow for Updates
+              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">&#8594;</span>
+            </a>
+          )}
           <a
             href={SOCIAL_LINKS.twitter}
             target="_blank"

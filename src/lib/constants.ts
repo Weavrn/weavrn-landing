@@ -1,7 +1,7 @@
 export const SOCIAL_LINKS = {
   twitter: "https://x.com/weavrn",
-  discord: "", // TODO: add Discord invite link
-  telegram: "", // TODO: add Telegram link
+  discord: "https://discord.gg/VgUHVuCW4D",
+  telegram: "https://t.me/+tJgAQDo46bA4MDkx",
   github: "https://github.com/weavrn",
 } as const;
 

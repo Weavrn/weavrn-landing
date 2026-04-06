@@ -177,7 +177,9 @@ export default function MarketplacePage() {
         </div>
       </div>
 
-      <Footer />
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </main>
   );
 }

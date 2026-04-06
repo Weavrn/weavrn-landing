@@ -9,6 +9,10 @@ export function hasSession() {
   return sessionToken !== null && sessionExpiresAt !== null && Date.now() < sessionExpiresAt;
 }
 
+export function getSessionToken(): string | null {
+  return hasSession() ? sessionToken : null;
+}
+
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
   const timestamp = Date.now();
   const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
@@ -89,7 +93,34 @@ export interface BlockReward {
   delta_score: number;
   post_count: number;
   submission_id: number | null;
+  reward_amount: string | null;
+  merkle_block: boolean;
+  claimed: boolean;
+  claim_tx_hash: string | null;
+  block_share_pct: number | null;
+  share_bps: number | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
   created_at: string;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface TrackedPostsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  sort: string;
+  status: string;
+  platform: string;
 }
 
 export interface CurrentBlock {
@@ -102,10 +133,14 @@ export interface RewardsResponse {
   wallet: string;
   balance: string;
   total_earned: string;
+  unclaimed_wvrn: number;
+  unclaimed_count: number;
   current_block: CurrentBlock;
   tracked_posts: TrackedPost[];
+  tracked_posts_pagination?: TrackedPostsPagination;
   block_rewards: BlockReward[];
   submissions: Submission[];
+  pagination?: Pagination;
 }
 
 export interface Profile {
@@ -197,8 +232,30 @@ async function authBody(signer: JsonRpcSigner, wallet: string, action: string) {
   return { wallet_address: wallet.toLowerCase(), signature, timestamp };
 }
 
-export function getRewards(wallet: string) {
-  return apiFetch<RewardsResponse>(`/rewards/${wallet.toLowerCase()}`);
+export function getRewards(
+  wallet: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    filter?: "all" | "unclaimed";
+    posts_page?: number;
+    posts_sort?: "newest" | "oldest" | "earned" | "engagement";
+    posts_status?: "active" | "all";
+    posts_platform?: "x" | "youtube";
+  },
+) {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.filter) qs.set("filter", params.filter);
+  if (params?.posts_page && params.posts_page > 1) qs.set("posts_page", String(params.posts_page));
+  if (params?.posts_sort && params.posts_sort !== "newest") qs.set("posts_sort", params.posts_sort);
+  if (params?.posts_status && params.posts_status !== "active") qs.set("posts_status", params.posts_status);
+  if (params?.posts_platform) qs.set("posts_platform", params.posts_platform);
+  const qstr = qs.toString();
+  return apiFetch<RewardsResponse>(
+    `/rewards/${wallet.toLowerCase()}${qstr ? `?${qstr}` : ""}`,
+  );
 }
 
 export function refreshPosts(wallet: string) {
@@ -541,6 +598,7 @@ export async function createListing(
     trickle_duration?: number;
     estimated_duration?: string;
     input_schema?: InputField[];
+    agent_wallet?: string;
   },
 ) {
   const auth = await authBody(signer, wallet, "create-listing");
@@ -584,6 +642,13 @@ export interface Job {
   escrow_id: number | null;
   deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
   deliverable_data: DeliverableData | null;
+  processing_status?: {
+    stage: "preflight" | "container" | "done";
+    turn?: number;
+    max_turns?: number;
+    activity?: string;
+    updated_at?: number;
+  } | null;
   created_at: string;
   updated_at: string;
   queue_position?: number;
@@ -710,18 +775,12 @@ export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet
 }
 
 export async function completeJobWithAuth(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number): Promise<Job | null> {
-  // Sign once, retry the API call without re-signing (avoids multiple MetaMask popups)
   const auth = await authBody(signer, wallet, "complete-job");
-  const body = JSON.stringify(auth);
-  for (let i = 0; i < 8; i++) {
-    try {
-      return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body });
-    } catch {
-      if (i === 7) return null;
-      await new Promise(r => setTimeout(r, 5000));
-    }
+  try {
+    return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body: JSON.stringify(auth) });
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function cancelJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
@@ -919,6 +978,10 @@ export interface EarningsBlock {
   delta_score: number;
   post_count: number;
   reward_amount: string | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
 }
 
 export function getEarningsHistory(wallet: string, blocks = 20) {
@@ -935,6 +998,10 @@ export interface MiningStatsResponse {
   total_miners: number;
   total_blocks_settled: number;
   total_wvrn_distributed: string;
+  pools?: {
+    x: { pct: number; emission: string; miners: number };
+    youtube: { pct: number; emission: string; miners: number };
+  };
   active_miners_this_block: number;
   rules: {
     min_engagement_score: number;
@@ -972,3 +1039,192 @@ export async function unlinkYouTubeHandle(signer: import("ethers").JsonRpcSigner
     body: JSON.stringify(auth),
   });
 }
+
+// Mock provider admin
+
+export interface MockUser {
+  id: string;
+  username: string;
+  bio: string;
+  followersCount: number;
+}
+
+export interface MockTweet {
+  id: string;
+  text: string;
+  authorUsername: string;
+  createdAt: string;
+  likes: number;
+  retweets: number;
+  replies: number;
+  views: number;
+}
+
+export interface MockVideo {
+  id: string;
+  title: string;
+  description: string;
+  channelId: string;
+  channelTitle: string;
+  publishedAt: string;
+  views: number;
+  likes: number;
+  comments: number;
+}
+
+export interface MockChannel {
+  id: string;
+  title: string;
+  handle: string;
+  customUrl: string;
+  description: string;
+  subscriberCount: number;
+}
+
+export function createMockUser(adminKey: string, user: MockUser) {
+  return apiFetch<MockUser>("/admin/mock/users", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(user),
+  });
+}
+
+export function createMockChannel(adminKey: string, channel: MockChannel) {
+  return apiFetch<MockChannel>("/admin/mock/channels", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(channel),
+  });
+}
+
+export function getMockUsers(adminKey: string) {
+  return apiFetch<MockUser[]>("/admin/mock/users", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockUserBio(adminKey: string, username: string, bio: string) {
+  return apiFetch<MockUser>(`/admin/mock/users/${username}/bio`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ bio }),
+  });
+}
+
+export function getMockTweets(adminKey: string) {
+  return apiFetch<MockTweet[]>("/admin/mock/tweets", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockTweetMetrics(adminKey: string, id: string, metrics: Partial<Pick<MockTweet, "likes" | "retweets" | "replies" | "views">>) {
+  return apiFetch<MockTweet>(`/admin/mock/tweets/${id}/metrics`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(metrics),
+  });
+}
+
+export function getMockChannels(adminKey: string) {
+  return apiFetch<MockChannel[]>("/admin/mock/channels", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockChannelDescription(adminKey: string, id: string, description: string) {
+  return apiFetch<MockChannel>(`/admin/mock/channels/${id}/description`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ description }),
+  });
+}
+
+export function getMockVideos(adminKey: string) {
+  return apiFetch<MockVideo[]>("/admin/mock/videos", { headers: adminHeaders(adminKey) });
+}
+
+export function updateMockVideoMetrics(adminKey: string, id: string, metrics: Partial<Pick<MockVideo, "views" | "likes" | "comments">>) {
+  return apiFetch<MockVideo>(`/admin/mock/videos/${id}/metrics`, {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(metrics),
+  });
+}
+
+export function resetMockData(adminKey: string) {
+  return apiFetch<{ ok: boolean }>("/admin/mock/reset", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+  });
+}
+
+export function bulkUpdateMockMetrics(adminKey: string, tweetDelta?: Partial<Pick<MockTweet, "likes" | "retweets" | "replies" | "views">>, videoDelta?: Partial<Pick<MockVideo, "views" | "likes" | "comments">>) {
+  return apiFetch<{ ok: boolean }>("/admin/mock/bulk-update-metrics", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ tweetDelta, videoDelta }),
+  });
+}
+
+export interface LinkedHandle {
+  wallet_address: string;
+  x_handle: string | null;
+  yt_handle: string | null;
+}
+
+export function getLinkedHandles(adminKey: string) {
+  return apiFetch<LinkedHandle[]>("/admin/linked-handles", { headers: adminHeaders(adminKey) });
+}
+
+export function linkHandle(adminKey: string, wallet: string, x_handle: string) {
+  return apiFetch("/admin/link-handle", {
+    method: "PUT",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify({ wallet, x_handle }),
+  });
+}
+
+export function createMockTweet(adminKey: string, tweet: MockTweet) {
+  return apiFetch<MockTweet>("/admin/mock/tweets", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(tweet),
+  });
+}
+
+export function createMockVideo(adminKey: string, video: MockVideo) {
+  return apiFetch<MockVideo>("/admin/mock/videos", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(video),
+  });
+}
+
+export interface MockAutoIncrement {
+  enabled: boolean;
+  tweets: { likes: number; retweets: number; replies: number; views: number };
+  videos: { views: number; likes: number; comments: number };
+}
+
+export function getMockAutoIncrement(adminKey: string) {
+  return apiFetch<MockAutoIncrement>("/admin/mock/auto-increment", { headers: adminHeaders(adminKey) });
+}
+
+export function setMockAutoIncrement(adminKey: string, config: Partial<MockAutoIncrement>) {
+  return apiFetch<MockAutoIncrement>("/admin/mock/auto-increment", {
+    method: "POST",
+    headers: adminHeaders(adminKey),
+    body: JSON.stringify(config),
+  });
+}
+
+// Merkle rewards
+
+export interface MerkleProofResponse {
+  block_number: number;
+  wallet: string;
+  share_bps: number;
+  amount: string;
+  proof: string[];
+  merkle_root: string;
+}
+
+export function getMerkleProof(wallet: string, blockNumber: number) {
+  return apiFetch<MerkleProofResponse>(`/rewards/${wallet.toLowerCase()}/proof/${blockNumber}`);
+}
+
+
