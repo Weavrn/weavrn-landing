@@ -5,7 +5,7 @@ import { JsonRpcSigner } from "ethers";
 import AppHeader from "@/components/AppHeader";
 import AgentDashboard from "@/components/AgentDashboard";
 import Footer from "@/components/Footer";
-import { hasSession, createSession } from "@/lib/api";
+import { hasSession, createSession, clearSession } from "@/lib/api";
 
 export default function DashboardPage() {
   const [address, setAddress] = useState<string | null>(null);
@@ -30,6 +30,8 @@ export default function DashboardPage() {
   }, [address, signer]);
 
   const handleDisconnect = useCallback(() => {
+    clearSession();
+    setSessionReady(false);
     setAddress(null);
     setSigner(null);
   }, []);
