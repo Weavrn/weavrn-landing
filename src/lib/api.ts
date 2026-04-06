@@ -9,6 +9,10 @@ export function hasSession() {
   return sessionToken !== null && sessionExpiresAt !== null && Date.now() < sessionExpiresAt;
 }
 
+export function getSessionToken(): string | null {
+  return hasSession() ? sessionToken : null;
+}
+
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
   const timestamp = Date.now();
   const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
