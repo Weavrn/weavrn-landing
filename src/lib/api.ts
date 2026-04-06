@@ -33,18 +33,24 @@ export function getSessionToken(): string | null {
   return loadSession()?.token || null;
 }
 
+let _sessionCreating = false;
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
-  // Check localStorage first — another tab may have already created a session
   if (hasSession()) return;
+  if (_sessionCreating) return;
+  _sessionCreating = true;
   const timestamp = Date.now();
   const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
-  const res = await apiFetch<{ token: string; expires_at: string }>("/auth/session", {
-    method: "POST",
-    body: JSON.stringify({ wallet_address: walletAddress.toLowerCase(), signature, timestamp }),
-  });
-  saveSession(res.token, new Date(res.expires_at).getTime());
-  return res;
+  try {
+    const res = await apiFetch<{ token: string; expires_at: string }>("/auth/session", {
+      method: "POST",
+      body: JSON.stringify({ wallet_address: walletAddress.toLowerCase(), signature, timestamp }),
+    });
+    saveSession(res.token, new Date(res.expires_at).getTime());
+    return res;
+  } finally {
+    _sessionCreating = false;
+  }
 }
 
 export async function clearSession() {
