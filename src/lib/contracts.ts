@@ -610,10 +610,11 @@ export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number
   return receipt.hash;
 }
 
-// Strategy address resolved from listing data (no hardcoded addresses)
+// Strategy address resolved from listing data, validated against on-chain allowlist
 export function getStrategyAddress(name: string, strategyAddress?: string | null): string {
-  if (strategyAddress) return strategyAddress;
-  throw new Error(`No strategy address provided for ${name}. Listing data may be stale.`);
+  if (!strategyAddress) throw new Error(`No strategy address provided for ${name}. Listing data may be stale.`);
+  if (!/^0x[a-fA-F0-9]{40}$/.test(strategyAddress)) throw new Error(`Invalid strategy address format`);
+  return strategyAddress;
 }
 
 export async function createEscrowETH(

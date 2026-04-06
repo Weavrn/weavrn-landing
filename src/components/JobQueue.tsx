@@ -185,11 +185,15 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     setError(null);
     try {
       // Auto-register on-chain if needed (escrow contract requires both parties registered)
-      const agentInfo = await getAgentOnChain(walletAddress);
+      let agentInfo = await getAgentOnChain(walletAddress);
       if (!agentInfo?.isRegistered) {
         await registerAgent(signer, walletAddress.slice(0, 10), "");
-        // Wait for chain confirmation
-        await new Promise(r => setTimeout(r, 5000));
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          agentInfo = await getAgentOnChain(walletAddress);
+          if (agentInfo?.isRegistered) break;
+        }
+        if (!agentInfo?.isRegistered) throw new Error("Registration not confirmed. Please try again.");
       }
 
       const listing = await getListing(job.listing_id);

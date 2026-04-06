@@ -134,6 +134,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
               {/* For code deliverables, show the report with markdown rendering */}
               <div className="text-xs text-weavrn-muted leading-relaxed max-h-64 overflow-y-auto mb-3 deliverable-markdown">
                 <ReactMarkdown
+                  skipHtml={true}
                   components={{
                     code({ className, children, ...props }) {
                       const isBlock = className?.includes("language-");
@@ -202,6 +203,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
             <>
               <div className="text-xs text-weavrn-muted leading-relaxed max-h-96 overflow-y-auto deliverable-markdown">
                 <ReactMarkdown
+                  skipHtml={true}
                   components={{
                     code({ className, children, ...props }) {
                       const isBlock = className?.includes("language-");
