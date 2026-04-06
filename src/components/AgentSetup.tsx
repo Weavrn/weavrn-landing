@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner, parseEther } from "ethers";
-import { getAgentListings, getAgentJobs, createListing, updateListing, deactivateListing, hasSession, getSessionToken } from "@/lib/api";
+import { getAgentListings, getAgentJobs, createListing, updateListing, deactivateListing, hasSession, getSessionToken, createSession } from "@/lib/api";
 import type { Job } from "@/lib/api";
 import type { ServiceListing, InputField } from "@/lib/api";
 
@@ -502,20 +502,17 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
   const fetchAgents = useCallback(async () => {
     if (!signer) return;
     try {
-      if (hasSession()) {
-        // Use session — no extra signature needed
+      // Create session if we don't have one (one MetaMask signature, reused for all calls)
+      if (!hasSession()) {
+        await createSession(signer, walletAddress);
+      }
+      const token = getSessionToken();
+      if (token) {
         const res = await fetch(`${API_URL}/hosted-agents?wallet_address=${walletAddress.toLowerCase()}`, {
-          headers: { "Authorization": `Bearer ${getSessionToken()}` },
+          headers: { "Authorization": `Bearer ${token}` },
         });
         if (res.ok) { setAgents((await res.json()).agents || []); return; }
       }
-      // Fallback: per-request signature
-      const timestamp = Date.now();
-      const message = `weavrn:list-hosted:${walletAddress.toLowerCase()}:${timestamp}`;
-      const signature = await signer.signMessage(message);
-      const params = new URLSearchParams({ wallet_address: walletAddress.toLowerCase(), signature, timestamp: String(timestamp) });
-      const res = await fetch(`${API_URL}/hosted-agents?${params}`);
-      if (res.ok) setAgents((await res.json()).agents || []);
     } catch { /* ignore */ }
   }, [walletAddress, signer]);
 
