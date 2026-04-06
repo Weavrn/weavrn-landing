@@ -34,6 +34,8 @@ function PostHistoryPanel({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortCol, setSortCol] = useState<keyof PostBlockHistory | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const fetchPage = useCallback(async (p: number) => {
     setIsLoading(true);
@@ -80,18 +82,35 @@ function PostHistoryPanel({
         <table className="w-full text-[11px] font-mono">
           <thead>
             <tr className="text-weavrn-muted border-b border-weavrn-border/20">
-              <th className="text-left py-1.5 pr-3">Block</th>
-              <th className="text-right py-1.5 px-2">Likes</th>
-              {!isYouTube && <th className="text-right py-1.5 px-2">RTs</th>}
-              <th className="text-right py-1.5 px-2">{isYouTube ? "Comments" : "Replies"}</th>
-              <th className="text-right py-1.5 px-2">Views</th>
-              <th className="text-right py-1.5 px-2">Score</th>
-              <th className="text-right py-1.5 px-2">Delta</th>
-              <th className="text-right py-1.5 pl-2">WVRN</th>
+              {([
+                { col: "block_number" as keyof PostBlockHistory, label: "Block", align: "left" },
+                { col: "likes" as keyof PostBlockHistory, label: "Likes" },
+                ...(!isYouTube ? [{ col: "retweets" as keyof PostBlockHistory, label: "RTs" }] : []),
+                { col: "replies" as keyof PostBlockHistory, label: isYouTube ? "Comments" : "Replies" },
+                { col: "views" as keyof PostBlockHistory, label: "Views" },
+                { col: "raw_score" as keyof PostBlockHistory, label: "Score" },
+                { col: "delta" as keyof PostBlockHistory, label: "Delta" },
+                { col: "earned" as keyof PostBlockHistory, label: "WVRN" },
+              ] as { col: keyof PostBlockHistory; label: string; align?: string }[]).map(h => {
+                const active = sortCol === h.col;
+                return (
+                  <th key={h.col} className={`py-1.5 ${h.align === "left" ? "pr-3 text-left" : "px-2 text-right"}`}
+                    aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
+                    <button onClick={() => { if (sortCol === h.col) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(h.col); setSortDir("asc"); } }}
+                      className={`hover:text-white transition-colors ${active ? "text-white" : ""}`}>
+                      {h.label}{active && <span className="ml-0.5">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>}
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {history.map((b) => (
+            {[...history].sort((a, b) => {
+              if (!sortCol) return a.block_number - b.block_number;
+              const av = a[sortCol]; const bv = b[sortCol];
+              return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+            }).map((b) => (
               <tr key={b.block_number} className="text-weavrn-muted/80 border-b border-weavrn-border/10">
                 <td className="py-1.5 pr-3 text-white">{b.block_number}</td>
                 <td className="text-right py-1.5 px-2">{b.likes}</td>
