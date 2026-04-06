@@ -96,6 +96,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [claimingAll, setClaimingAll] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const pageRef = useRef(rewardsPage);
   const filterRef = useRef(rewardFilter);
@@ -108,6 +109,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
   }, [initialBlockRewards]);
 
   const fetchRewards = useCallback(async () => {
+    setIsLoading(true);
     try {
       const rewards = await getRewards(walletAddress, {
         page: pageRef.current,
@@ -123,6 +125,8 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
       }
     } catch (err: unknown) {
       setSectionError((err as Error).message);
+    } finally {
+      setIsLoading(false);
     }
   }, [walletAddress]);
 
@@ -246,7 +250,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
             disabled={claimingAll || claimingId != null}
             className="px-4 py-1.5 bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
           >
-            {claimingAll ? "Claiming..." : `Claim All (${fmtWvrn(totalUnclaimedWvrn)} WVRN)`}
+            {claimingAll ? "Claiming..." : `Claim All (${fmtWvrn(totalUnclaimedWvrn || unclaimedAmount)} WVRN)`}
           </button>
         )}
       </div>
@@ -258,7 +262,19 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
         </div>
       )}
 
-      {showEmpty ? (
+      <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0A0A0F]/60 rounded-xl backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 text-weavrn-muted text-xs font-mono">
+            <svg className="w-4 h-4 animate-spin text-weavrn-accent" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading…
+          </div>
+        </div>
+      )}
+      {showEmpty && !isLoading ? (
         rewardFilter === "unclaimed" ? (
           <div className="text-center py-8 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
             All rewards claimed. Switch to &quot;All&quot; to view history.
@@ -268,6 +284,8 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
             No block rewards yet. Rewards are calculated when each block closes.
           </div>
         )
+      ) : showEmpty && isLoading ? (
+        <div className="py-12" />
       ) : (
         <>
           <div className="space-y-2">
@@ -281,8 +299,11 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
                   <div className="flex items-center gap-4">
                     <span className="text-white font-mono text-xs">Block {br.block_number}</span>
                     <span className="text-weavrn-muted font-mono text-xs">
-                      {br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta {br.delta_score}
-                      {br.block_share_pct != null && <> &mdash; {br.block_share_pct}% of block</>}
+                      {br.x_post_count > 0 && <><span className="text-white/70">X</span> {br.x_post_count}p &Delta;{br.x_delta}</>}
+                      {br.x_post_count > 0 && br.yt_post_count > 0 && <span className="mx-1.5 text-weavrn-border">|</span>}
+                      {br.yt_post_count > 0 && <><span className="text-red-400/70">YT</span> {br.yt_post_count}p &Delta;{br.yt_delta}</>}
+                      {!br.x_post_count && !br.yt_post_count && <>{br.post_count} post{br.post_count !== 1 ? "s" : ""} &mdash; delta {br.delta_score}</>}
+                      {br.block_share_pct != null && <> &mdash; {br.block_share_pct}%</>}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
@@ -356,6 +377,7 @@ const BlockRewardsSection = memo(function BlockRewardsSection({
           )}
         </>
       )}
+      </div>
     </div>
   );
 });

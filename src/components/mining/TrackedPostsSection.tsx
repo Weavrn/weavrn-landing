@@ -1,8 +1,14 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { getRewards, type TrackedPost, type TrackedPostsPagination, type PostBlockHistory } from "@/lib/api";
+import {
+  getRewards,
+  getPostBlockHistory,
+  type TrackedPost,
+  type TrackedPostsPagination,
+  type PostBlockHistory,
+} from "@/lib/api";
 import ScoreBreakdown from "../ScoreBreakdown";
 import PlatformFilter from "../PlatformFilter";
 import RefreshButton from "./RefreshButton";
@@ -12,6 +18,141 @@ const fmtWvrn = (n: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+function PostHistoryPanel({
+  postId,
+  walletAddress,
+  isYouTube,
+  estimatedWvrn,
+}: {
+  postId: number;
+  walletAddress: string;
+  isYouTube: boolean;
+  estimatedWvrn: number;
+}) {
+  const [history, setHistory] = useState<PostBlockHistory[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sortCol, setSortCol] = useState<keyof PostBlockHistory | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const fetchPage = useCallback(async (p: number) => {
+    setIsLoading(true);
+    try {
+      const res = await getPostBlockHistory(walletAddress, postId, { page: p, limit: 10 });
+      setHistory(res.history);
+      setPage(res.page);
+      setTotalPages(res.total_pages);
+    } catch {
+      // treat 404 (post not owned / not found) as empty history
+    } finally {
+      setIsLoading(false);
+    }
+  }, [walletAddress, postId]);
+
+  useEffect(() => { fetchPage(1); }, [fetchPage]);
+
+  if (isLoading && history.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <svg className="w-4 h-4 animate-spin text-weavrn-accent" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (!isLoading && history.length === 0) {
+    return <p className="text-xs text-weavrn-muted text-center py-3">No block history yet</p>;
+  }
+
+  return (
+    <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0A0A0F]/60 rounded backdrop-blur-[1px]">
+          <svg className="w-4 h-4 animate-spin text-weavrn-accent" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] font-mono">
+          <thead>
+            <tr className="text-weavrn-muted border-b border-weavrn-border/20">
+              {([
+                { col: "block_number" as keyof PostBlockHistory, label: "Block", align: "left" },
+                { col: "likes" as keyof PostBlockHistory, label: "Likes" },
+                ...(!isYouTube ? [{ col: "retweets" as keyof PostBlockHistory, label: "RTs" }] : []),
+                { col: "replies" as keyof PostBlockHistory, label: isYouTube ? "Comments" : "Replies" },
+                { col: "views" as keyof PostBlockHistory, label: "Views" },
+                { col: "raw_score" as keyof PostBlockHistory, label: "Score" },
+                { col: "delta" as keyof PostBlockHistory, label: "Delta" },
+                { col: "earned" as keyof PostBlockHistory, label: "WVRN" },
+              ] as { col: keyof PostBlockHistory; label: string; align?: string }[]).map(h => {
+                const active = sortCol === h.col;
+                return (
+                  <th key={h.col} className={`py-1.5 ${h.align === "left" ? "pr-3 text-left" : "px-2 text-right"}`}
+                    aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
+                    <button onClick={() => { if (sortCol === h.col) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(h.col); setSortDir("asc"); } }}
+                      className={`hover:text-white transition-colors ${active ? "text-white" : ""}`}>
+                      {h.label}{active && <span className="ml-0.5">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>}
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {[...history].sort((a, b) => {
+              if (!sortCol) return a.block_number - b.block_number;
+              const av = a[sortCol]; const bv = b[sortCol];
+              return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+            }).map((b) => (
+              <tr key={b.block_number} className="text-weavrn-muted/80 border-b border-weavrn-border/10">
+                <td className="py-1.5 pr-3 text-white">{b.block_number}</td>
+                <td className="text-right py-1.5 px-2">{b.likes}</td>
+                {!isYouTube && <td className="text-right py-1.5 px-2">{b.retweets}</td>}
+                <td className="text-right py-1.5 px-2">{b.replies}</td>
+                <td className="text-right py-1.5 px-2">{b.views.toLocaleString()}</td>
+                <td className="text-right py-1.5 px-2">{b.raw_score}</td>
+                <td className="text-right py-1.5 px-2">{b.delta}</td>
+                <td className="text-right py-1.5 pl-2 text-weavrn-accent">{fmtWvrn(b.earned)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-weavrn-border/30 text-white font-medium">
+              <td className="py-1.5 pr-3" colSpan={isYouTube ? 6 : 7}>Total</td>
+              <td className="text-right py-1.5 pl-2 text-weavrn-accent">{fmtWvrn(estimatedWvrn)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-3">
+          <button
+            onClick={() => fetchPage(page - 1)}
+            disabled={page === 1 || isLoading}
+            className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Prev
+          </button>
+          <span className="text-xs font-mono text-weavrn-muted">{page} / {totalPages}</span>
+          <button
+            onClick={() => fetchPage(page + 1)}
+            disabled={page === totalPages || isLoading}
+            className="px-3 py-1 text-xs font-mono border border-weavrn-border rounded-lg text-weavrn-muted hover:text-white hover:border-weavrn-accent/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type PostFilter = "active" | "all";
 type PostSort = "newest" | "oldest" | "earned" | "engagement";
@@ -76,46 +217,7 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
   const [trackedPosts, setTrackedPosts] = useState<TrackedPost[]>(initialPosts);
   const [postsPagination, setPostsPagination] = useState<TrackedPostsPagination | null>(null);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
-  const [historySortCol, setHistorySortCol] = useState<keyof PostBlockHistory | null>(null);
-  const [historySortDir, setHistorySortDir] = useState<"asc" | "desc">("asc");
-
-  // Reset block history sort when expanded post changes
-  useEffect(() => {
-    setHistorySortCol(null);
-    setHistorySortDir("asc");
-  }, [expandedPostId]);
-
-  const handleHistorySort = (col: keyof PostBlockHistory) => {
-    if (historySortCol === col) {
-      setHistorySortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setHistorySortCol(col);
-      setHistorySortDir("asc");
-    }
-  };
-
-  const SortTh = ({ col, label, align = "right", className = "" }: {
-    col: keyof PostBlockHistory;
-    label: string;
-    align?: "left" | "right";
-    className?: string;
-  }) => {
-    const active = historySortCol === col;
-    return (
-      <th
-        className={`py-1.5 ${align === "left" ? "pr-3 text-left" : "px-2 text-right"} ${className}`}
-        aria-sort={active ? (historySortDir === "asc" ? "ascending" : "descending") : undefined}
-      >
-        <button
-          onClick={() => handleHistorySort(col)}
-          className={`hover:text-white transition-colors ${active ? "text-white" : ""}`}
-        >
-          {label}
-          {active && <span className="ml-0.5">{historySortDir === "asc" ? "\u2191" : "\u2193"}</span>}
-        </button>
-      </th>
-    );
-  };
+  const [isLoading, setIsLoading] = useState(false);
 
   // Refs for stable callbacks
   const pageRef = useRef(postsPage);
@@ -142,6 +244,7 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
   }, [searchParams, router, pathname]);
 
   const fetchPosts = useCallback(async () => {
+    setIsLoading(true);
     try {
       const rewards = await getRewards(walletAddress, {
         posts_page: pageRef.current,
@@ -153,6 +256,8 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
       setPostsPagination(rewards.tracked_posts_pagination ?? null);
     } catch {
       // Silently fail — parent data is still displayed
+    } finally {
+      setIsLoading(false);
     }
   }, [walletAddress]);
 
@@ -212,12 +317,26 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
         </div>
       </div>
 
-      {trackedPosts.length === 0 ? (
+      <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0A0A0F]/60 rounded-xl backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 text-weavrn-muted text-xs font-mono">
+            <svg className="w-4 h-4 animate-spin text-weavrn-accent" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading…
+          </div>
+        </div>
+      )}
+      {trackedPosts.length === 0 && !isLoading ? (
         <div className="text-center py-12 text-weavrn-muted text-sm border border-dashed border-weavrn-border rounded-xl">
           {postFilter === "active" && platformFilter === "all"
             ? "No posts discovered yet. Post about Weavrn on X or YouTube and they'll appear here automatically."
             : "No matching posts. Try changing filters."}
         </div>
+      ) : trackedPosts.length === 0 && isLoading ? (
+        <div className="py-12" />
       ) : (
         <>
         <div className="space-y-3">
@@ -297,8 +416,8 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                                 : "flagged"}
                             </span>
                           )}
-                          {p.block_history.length === 1 &&
-                            p.block_history[0].delta === 0 &&
+                          {p.block_history_total === 1 &&
+                            p.estimated_wvrn === 0 &&
                             !p.deleted_at &&
                             !p.flagged && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -353,83 +472,16 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                         platform={p.platform || "x"}
                       />
                     )}
-                    <div className="border-t border-weavrn-border/30 pt-3">
-                      {p.block_history.length === 0 ? (
-                        <p className="text-xs text-weavrn-muted text-center py-3">
-                          No block history yet
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-[11px] font-mono">
-                            <thead>
-                              <tr className="text-weavrn-muted border-b border-weavrn-border/20">
-                                <SortTh col="block_number" label="Block" align="left" />
-                                <SortTh col="likes" label="Likes" />
-                                {!isYouTube && <SortTh col="retweets" label="RTs" />}
-                                <SortTh col="replies" label={isYouTube ? "Comments" : "Replies"} />
-                                <SortTh col="views" label="Views" />
-                                <SortTh col="raw_score" label="Score" />
-                                <SortTh col="delta" label="Delta" />
-                                <SortTh col="earned" label="WVRN" className="pl-2" />
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[...p.block_history].sort((a, b) => {
-                                if (historySortCol == null) return a.block_number - b.block_number;
-                                const av = a[historySortCol];
-                                const bv = b[historySortCol];
-                                return historySortDir === "asc" ? av - bv : bv - av;
-                              }).map((b) => (
-                                <tr
-                                  key={b.block_number}
-                                  className="text-weavrn-muted/80 border-b border-weavrn-border/10"
-                                >
-                                  <td className="py-1.5 pr-3 text-white">
-                                    {b.block_number}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.likes}
-                                  </td>
-                                  {!isYouTube && (
-                                    <td className="text-right py-1.5 px-2">
-                                      {b.retweets}
-                                    </td>
-                                  )}
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.replies}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.views.toLocaleString()}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.raw_score}
-                                  </td>
-                                  <td className="text-right py-1.5 px-2">
-                                    {b.delta}
-                                  </td>
-                                  <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                    {fmtWvrn(b.earned)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t border-weavrn-border/30 text-white font-medium">
-                                <td
-                                  className="py-1.5 pr-3"
-                                  colSpan={isYouTube ? 6 : 7}
-                                >
-                                  Total
-                                </td>
-                                <td className="text-right py-1.5 pl-2 text-weavrn-accent">
-                                  {fmtWvrn(p.estimated_wvrn)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-                    </div>
+                    {p.block_history_total > 0 && (
+                      <div className="border-t border-weavrn-border/30 pt-3">
+                        <PostHistoryPanel
+                          postId={p.id}
+                          walletAddress={walletAddress}
+                          isYouTube={isYouTube}
+                          estimatedWvrn={p.estimated_wvrn}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -459,6 +511,7 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
         )}
         </>
       )}
+      </div>
     </div>
   );
 });
