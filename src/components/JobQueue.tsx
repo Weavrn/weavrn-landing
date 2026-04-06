@@ -111,13 +111,21 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       else if (action === "complete") {
         const job = jobs.find(j => j.id === jobId);
         if (job?.escrow_id) {
-          try { await releaseEscrow(signer, job.escrow_id); } catch { /* already released */ }
+          try {
+            await releaseEscrow(signer, job.escrow_id);
+          } catch (err: unknown) {
+            const msg = (err as { code?: number; message?: string }).message || "";
+            if ((err as { code?: number }).code === 4001 || msg.includes("user rejected") || msg.includes("denied")) {
+              setActing(null);
+              return; // User cancelled — don't complete
+            }
+            // Other errors (already released) — continue
+          }
         }
-        // Sign once, then retry with the same auth — avoids multiple MetaMask popups
         const { completeJobWithAuth } = await import("@/lib/api");
         const auth = await completeJobWithAuth(signer, walletAddress, jobId);
         if (!auth) {
-          setError("Escrow released but could not complete job. Try again in 30s.");
+          setError("Could not complete job. Try again.");
           fetchJobs(page);
           return;
         }
