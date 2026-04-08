@@ -97,7 +97,7 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
       const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`);
       if (!res.ok) return;
       const data = await res.json();

@@ -111,7 +111,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
       </div>
 
       {/* Git push result */}
-      {(data as DeliverableData & { pr_url?: string }).pr_url && (
+      {(data as DeliverableData & { pr_url?: string }).pr_url && /^https?:\/\//.test((data as DeliverableData & { pr_url?: string }).pr_url!) && (
         <a
           href={(data as DeliverableData & { pr_url?: string }).pr_url!}
           target="_blank"
@@ -135,6 +135,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
               <div className="text-xs text-weavrn-muted leading-relaxed max-h-64 overflow-y-auto mb-3 deliverable-markdown">
                 <ReactMarkdown
                   skipHtml={true}
+                  allowedElements={["p", "code", "pre", "ul", "ol", "li", "h1", "h2", "h3", "strong", "em", "a", "hr", "blockquote", "table", "thead", "tbody", "tr", "th", "td", "br"]}
                   components={{
                     code({ className, children, ...props }) {
                       const isBlock = className?.includes("language-");
@@ -168,7 +169,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
                       const timestamp = Date.now();
                       const message = `weavrn:download-job:${walletAddress.toLowerCase()}:${jobId}:${timestamp}`;
                       const signature = await signer.signMessage(message);
-                      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+                      const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
                       const res = await fetch(`${API_URL}/jobs/${jobId}/download`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -216,6 +217,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
               <div className="text-xs text-weavrn-muted leading-relaxed max-h-96 overflow-y-auto deliverable-markdown">
                 <ReactMarkdown
                   skipHtml={true}
+                  allowedElements={["p", "code", "pre", "ul", "ol", "li", "h1", "h2", "h3", "strong", "em", "a", "hr", "blockquote", "table", "thead", "tbody", "tr", "th", "td", "br"]}
                   components={{
                     code({ className, children, ...props }) {
                       const isBlock = className?.includes("language-");

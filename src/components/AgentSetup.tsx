@@ -30,7 +30,7 @@ interface Pricing {
   managed: { price_eth: string; description: string };
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
 
 const TEMPLATES: Record<string, { name: string; prompt: string; model: string; temp: number }> = {
   code_review: {
