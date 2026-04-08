@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
@@ -72,6 +72,9 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [chatJobId, setChatJobId] = useState<number | null>(null);
   const [fundingJobId, setFundingJobId] = useState<number | null>(null);
   const [fundingDetails, setFundingDetails] = useState<{ price: string; fee: string; total: string; feeModel: string; providerFee: string } | null>(null);
+  const fundingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const fetchJobs = useCallback(async (p: number, silent = false) => {
     if (!silent) setLoading(true);
@@ -116,16 +119,17 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
           } catch (err: unknown) {
             const msg = (err as { code?: number; message?: string }).message || "";
             if ((err as { code?: number }).code === 4001 || msg.includes("user rejected") || msg.includes("denied")) {
-              setActing(null);
-              return; // User cancelled — don't complete
+              if (mountedRef.current) setActing(null);
+              return;
             }
-            // Other errors (already released) — continue
           }
         }
         const { completeJobWithAuth } = await import("@/lib/api");
         const auth = await completeJobWithAuth(signer, walletAddress, jobId);
         if (!auth) {
-          setError("Could not complete job. Try again.");
+          if (mountedRef.current) {
+            setError("Could not complete job. Try again.");
+          }
           fetchJobs(page);
           return;
         }
@@ -134,9 +138,9 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      setError((err as { message?: string }).message || "Action failed");
+      if (mountedRef.current) setError((err as { message?: string }).message || "Action failed");
     } finally {
-      setActing(null);
+      if (mountedRef.current) setActing(null);
     }
   };
 
@@ -185,14 +189,14 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   };
 
   const confirmFund = async () => {
+    if (fundingRef.current) return;
+    fundingRef.current = true;
     const job = jobs.find(j => j.id === fundingJobId);
-    if (!signer || !job?.listing_id || !fundingDetails) return;
-    // Prevent double-funding: re-check escrow_id before creating
-    if (job.escrow_id) { setError("Job already funded"); setFundingJobId(null); return; }
+    if (!signer || !job?.listing_id || !fundingDetails) { fundingRef.current = false; return; }
+    if (job.escrow_id) { setError("Job already funded"); setFundingJobId(null); fundingRef.current = false; return; }
     setActing(`fund-${job.id}`);
     setError(null);
     try {
-      // Auto-register on-chain if needed (escrow contract requires both parties registered)
       let agentInfo = await getAgentOnChain(walletAddress);
       if (!agentInfo?.isRegistered) {
         await registerAgent(signer, walletAddress.slice(0, 10), "");
@@ -217,23 +221,32 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         listing.escrow_strategy_address,
       );
 
-      // Wait for escrow indexer to pick up the on-chain escrow, then link once
-      await new Promise(r => setTimeout(r, 35000));
-      try {
-        await linkJobEscrow(signer, walletAddress, job.id, escrowId);
-      } catch {
-        // One more attempt after waiting
-        await new Promise(r => setTimeout(r, 15000));
-        await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+      // Poll for escrow indexer to pick up, then link
+      let linked = false;
+      for (let i = 0; i < 12; i++) {
+        const delay = 3000 + i * 2000;
+        await new Promise(r => setTimeout(r, delay));
+        try {
+          await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+          linked = true;
+          break;
+        } catch {
+          // retry
+        }
       }
-      setFundingJobId(null);
-      setFundingDetails(null);
+      if (!linked) throw new Error("Escrow created on-chain but linking timed out. Contact support with escrow ID " + escrowId);
+
+      if (mountedRef.current) {
+        setFundingJobId(null);
+        setFundingDetails(null);
+      }
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      setError((err as { message?: string }).message || "Funding failed");
+      if (mountedRef.current) setError((err as { message?: string }).message || "Funding failed");
     } finally {
-      setActing(null);
+      if (mountedRef.current) setActing(null);
+      fundingRef.current = false;
     }
   };
 

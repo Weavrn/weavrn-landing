@@ -8,6 +8,8 @@ import type { ServiceListing, InputField } from "@/lib/api";
 interface Props {
   walletAddress: string;
   signer: JsonRpcSigner | null;
+  agentWallet?: string;
+  compact?: boolean;
 }
 
 const CATEGORIES = ["data", "code", "research", "automation", "creative", "trading", "other"];

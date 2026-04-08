@@ -54,7 +54,9 @@ function MarketplaceContent({ walletAddress, signer }: { walletAddress: string |
   const totalPages = Math.ceil(total / 24);
 
   if (listingId) {
-    return <ListingDetail id={parseInt(listingId)} walletAddress={walletAddress} signer={signer} />;
+    const id = parseInt(listingId);
+    if (isNaN(id) || id < 1) return <p className="text-sm text-red-400 text-center py-8">Invalid listing ID</p>;
+    return <ListingDetail id={id} walletAddress={walletAddress} signer={signer} />;
   }
 
   return (

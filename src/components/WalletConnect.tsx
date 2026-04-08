@@ -38,19 +38,32 @@ export default function WalletConnect({
       } catch {
         // silent fail on auto-connect
       }
-    }).catch(() => {});
+    }).catch((err: { code?: number }) => { if (err?.code !== 4001) console.warn("Auto-connect failed:", err); });
   }, [address, onConnect]);
 
   // Listen for chain/account changes
   useEffect(() => {
     if (!window.ethereum) return;
-    const handleChainChanged = () => { window.location.reload(); };
-    const handleAccountsChanged = (accounts: string[]) => {
+    const handleChainChanged = async () => {
+      try {
+        const switched = await checkAndSwitchChain();
+        if (!switched) onDisconnect();
+      } catch {
+        onDisconnect();
+      }
+    };
+    const handleAccountsChanged = async (accounts: string[]) => {
       if (accounts.length === 0) {
         clearSession();
         onDisconnect();
       } else {
-        window.location.reload();
+        clearSession();
+        try {
+          const { signer: newSigner, address: newAddr } = await getProviderAndSigner();
+          onConnect(newAddr, newSigner);
+        } catch {
+          onDisconnect();
+        }
       }
     };
     window.ethereum.on("chainChanged", handleChainChanged);

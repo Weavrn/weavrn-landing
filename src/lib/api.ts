@@ -1,28 +1,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-// ── Session Auth (shared across tabs via localStorage) ──
+// ── Session Auth (memory-only, re-auth via wallet on refresh) ──
 
-const SESSION_STORAGE_KEY = "weavrn_session";
+let _session: { token: string; expiresAt: number } | null = null;
 
 function loadSession(): { token: string; expiresAt: number } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const { token, expiresAt } = JSON.parse(raw);
-    if (!token || !expiresAt || Date.now() >= expiresAt) {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      return null;
-    }
-    return { token, expiresAt };
-  } catch {
+  if (!_session) return null;
+  if (Date.now() >= _session.expiresAt - 60_000) {
+    _session = null;
     return null;
   }
+  return _session;
 }
 
 function saveSession(token: string, expiresAt: number) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
+  _session = { token, expiresAt };
 }
 
 export function hasSession() {
@@ -55,6 +47,15 @@ export async function createSession(signer: import("ethers").JsonRpcSigner, wall
   }
 }
 
+export async function refreshSessionIfNeeded(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
+  const session = _session;
+  if (!session) return;
+  if (session.expiresAt - Date.now() < 5 * 60 * 1000) {
+    _session = null;
+    await createSession(signer, walletAddress);
+  }
+}
+
 export async function clearSession() {
   const session = loadSession();
   if (session) {
@@ -64,7 +65,7 @@ export async function clearSession() {
       // ignore logout errors
     }
   }
-  if (typeof window !== "undefined") localStorage.removeItem(SESSION_STORAGE_KEY);
+  _session = null;
 }
 
 export interface Submission {

@@ -150,6 +150,11 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
                     h2({ children }) { return <p className="font-bold text-white mb-1">{children}</p>; },
                     h3({ children }) { return <p className="font-semibold text-white mb-1">{children}</p>; },
                     strong({ children }) { return <strong className="text-white font-semibold">{children}</strong>; },
+                    a({ href, children }) {
+                      const safe = href && /^https?:\/\//.test(href) ? href : undefined;
+                      if (!safe) return <span>{children}</span>;
+                      return <a href={safe} target="_blank" rel="noopener noreferrer" className="text-weavrn-accent hover:underline">{children}<span className="text-[9px] opacity-60 ml-0.5">↗</span></a>;
+                    },
                     hr() { return <hr className="border-weavrn-border/30 my-2" />; },
                   }}
                 >
@@ -161,7 +166,7 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
                   onClick={async () => {
                     try {
                       const timestamp = Date.now();
-                      const message = `weavrn:download-job:${walletAddress.toLowerCase()}:${timestamp}`;
+                      const message = `weavrn:download-job:${jobId}:${walletAddress.toLowerCase()}:${timestamp}`;
                       const signature = await signer.signMessage(message);
                       const params = new URLSearchParams({ wallet_address: walletAddress.toLowerCase(), signature, timestamp: String(timestamp) });
                       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -219,6 +224,11 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
                     h2({ children }) { return <p className="font-bold text-white mb-1">{children}</p>; },
                     h3({ children }) { return <p className="font-semibold text-white mb-1">{children}</p>; },
                     strong({ children }) { return <strong className="text-white font-semibold">{children}</strong>; },
+                    a({ href, children }) {
+                      const safe = href && /^https?:\/\//.test(href) ? href : undefined;
+                      if (!safe) return <span>{children}</span>;
+                      return <a href={safe} target="_blank" rel="noopener noreferrer" className="text-weavrn-accent hover:underline">{children}<span className="text-[9px] opacity-60 ml-0.5">↗</span></a>;
+                    },
                     hr() { return <hr className="border-weavrn-border/30 my-2" />; },
                   }}
                 >

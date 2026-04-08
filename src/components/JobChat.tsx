@@ -41,7 +41,11 @@ function ChatMarkdown({ content }: { content: string }) {
         h2({ children }) { return <p className="font-bold text-white mb-1">{children}</p>; },
         h3({ children }) { return <p className="font-semibold text-white mb-1">{children}</p>; },
         strong({ children }) { return <strong className="text-white font-semibold">{children}</strong>; },
-        a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="text-weavrn-accent hover:underline">{children}</a>; },
+        a({ href, children }) {
+          const safe = href && /^https?:\/\//.test(href) ? href : undefined;
+          if (!safe) return <span className="text-weavrn-muted">{children}</span>;
+          return <a href={safe} target="_blank" rel="noopener noreferrer" className="text-weavrn-accent hover:underline">{children}</a>;
+        },
         hr() { return <hr className="border-weavrn-border/30 my-2" />; },
         blockquote({ children }) { return <blockquote className="border-l-2 border-weavrn-accent/30 pl-2 italic opacity-80">{children}</blockquote>; },
         table({ children }) { return <table className="text-[10px] w-full my-1">{children}</table>; },

@@ -143,10 +143,22 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       // Validate required fields
       if (hasSchema) {
         for (const field of listing.input_schema!) {
+          const val = formValues[field.name];
           if (field.required && field.type !== "file") {
-            const val = formValues[field.name];
             if (!val || (typeof val === "string" && !val.trim())) {
               setRequestError(`${field.label} is required`);
+              setRequesting(false);
+              return;
+            }
+          }
+          if (typeof val === "string" && val.length > 10000) {
+            setRequestError(`${field.label} exceeds maximum length (10000 chars)`);
+            setRequesting(false);
+            return;
+          }
+          if ((field.type === "url" || field.type === "git_url") && typeof val === "string" && val.trim()) {
+            try { new URL(val); } catch {
+              setRequestError(`${field.label} must be a valid URL`);
               setRequesting(false);
               return;
             }

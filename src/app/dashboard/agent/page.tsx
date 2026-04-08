@@ -51,7 +51,7 @@ function AgentDetailContent() {
   const [chatJob, setChatJob] = useState<number | null>(null);
 
   const fetchJobs = useCallback(async (page: number, status?: string) => {
-    if (!wallet) return;
+    if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) return;
     try {
       const res = await getAgentJobs(wallet, page, 20, status || undefined);
       setJobs(res.jobs);
@@ -85,7 +85,7 @@ function AgentDetailContent() {
     return () => clearInterval(id);
   }, [fetchJobs, jobPage, statusFilter]);
 
-  if (!wallet) return <p className="text-center text-weavrn-muted py-20">No agent wallet specified.</p>;
+  if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) return <p className="text-center text-weavrn-muted py-20">No agent wallet specified.</p>;
   if (loading) return <p className="text-center text-weavrn-muted py-20">Loading...</p>;
 
   const stats = {
