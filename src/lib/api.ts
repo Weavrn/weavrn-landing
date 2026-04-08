@@ -255,21 +255,23 @@ async function apiFetch<T>(
 
 import type { JsonRpcSigner } from "ethers";
 
-async function signForWallet(signer: JsonRpcSigner, wallet: string, action: string) {
+async function signForWallet(signer: JsonRpcSigner, wallet: string, action: string, resourceId?: string | number) {
   const timestamp = Date.now();
-  const message = `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
-  const signature = await signer.signMessage(message);
+  const parts = resourceId != null
+    ? `weavrn:${action}:${wallet.toLowerCase()}:${resourceId}:${timestamp}`
+    : `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
+  const signature = await signer.signMessage(parts);
   return { signature, timestamp };
 }
 
 // Returns auth fields for the request body. With a session token the bearer
 // header handles auth so we only need wallet_address. Falls back to per-request
 // signature when no session exists.
-async function authBody(signer: JsonRpcSigner, wallet: string, action: string) {
+async function authBody(signer: JsonRpcSigner, wallet: string, action: string, resourceId?: string | number) {
   if (hasSession()) {
     return { wallet_address: wallet.toLowerCase() };
   }
-  const { signature, timestamp } = await signForWallet(signer, wallet, action);
+  const { signature, timestamp } = await signForWallet(signer, wallet, action, resourceId);
   return { wallet_address: wallet.toLowerCase(), signature, timestamp };
 }
 
@@ -785,7 +787,7 @@ export async function createJob(
 }
 
 export async function acceptJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
-  const auth = await authBody(signer, wallet, "accept-job");
+  const auth = await authBody(signer, wallet, "accept-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/accept`, {
     method: "PUT",
     body: JSON.stringify(auth),
@@ -798,7 +800,7 @@ export async function linkJobEscrow(
   jobId: number,
   escrowId: number,
 ) {
-  const auth = await authBody(signer, wallet, "link-escrow");
+  const auth = await authBody(signer, wallet, "link-escrow", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/escrow`, {
     method: "PUT",
     body: JSON.stringify({ ...auth, escrow_id: escrowId }),
@@ -812,7 +814,7 @@ export async function deliverJob(
   deliverableType: string,
   deliverableData: unknown,
 ) {
-  const auth = await authBody(signer, wallet, "deliver-job");
+  const auth = await authBody(signer, wallet, "deliver-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/deliver`, {
     method: "PUT",
     body: JSON.stringify({
@@ -823,7 +825,7 @@ export async function deliverJob(
 }
 
 export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
-  const auth = await authBody(signer, wallet, "complete-job");
+  const auth = await authBody(signer, wallet, "complete-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/complete`, {
     method: "PUT",
     body: JSON.stringify(auth),
@@ -831,7 +833,7 @@ export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet
 }
 
 export async function completeJobWithAuth(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number): Promise<Job | null> {
-  const auth = await authBody(signer, wallet, "complete-job");
+  const auth = await authBody(signer, wallet, "complete-job", jobId);
   try {
     return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body: JSON.stringify(auth) });
   } catch {
@@ -840,7 +842,7 @@ export async function completeJobWithAuth(signer: import("ethers").JsonRpcSigner
 }
 
 export async function cancelJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
-  const auth = await authBody(signer, wallet, "cancel-job");
+  const auth = await authBody(signer, wallet, "cancel-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/cancel`, {
     method: "PUT",
     body: JSON.stringify(auth),
@@ -873,7 +875,7 @@ export async function disputeJob(
   jobId: number,
   reason: string,
 ) {
-  const auth = await authBody(signer, wallet, "dispute-job");
+  const auth = await authBody(signer, wallet, "dispute-job", jobId);
   return apiFetch(`/jobs/${jobId}/dispute`, {
     method: "PUT",
     body: JSON.stringify({ ...auth, reason }),
@@ -917,7 +919,7 @@ export async function submitReview(
   rating: number,
   comment?: string,
 ) {
-  const auth = await authBody(signer, wallet, "submit-review");
+  const auth = await authBody(signer, wallet, "submit-review", jobId);
   return apiFetch<Review>(`/jobs/${jobId}/review`, {
     method: "POST",
     body: JSON.stringify({ ...auth, rating, comment }),
@@ -933,7 +935,7 @@ export async function sendJobMessage(
   content: string,
   contentType = "text",
 ) {
-  const auth = await authBody(signer, wallet, "send-message");
+  const auth = await authBody(signer, wallet, "send-message", jobId);
   return apiFetch<JobMessage>(`/jobs/${jobId}/message`, {
     method: "POST",
     body: JSON.stringify({ ...auth, content, content_type: contentType }),
@@ -981,7 +983,7 @@ export async function uploadJobFile(
   if (hasSession()) {
     headers["Authorization"] = `Bearer ${getSessionToken()}`;
   } else {
-    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file");
+    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file", jobId);
     form.append("signature", signature);
     form.append("timestamp", String(timestamp));
   }

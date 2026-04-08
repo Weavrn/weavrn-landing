@@ -166,11 +166,18 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
                   onClick={async () => {
                     try {
                       const timestamp = Date.now();
-                      const message = `weavrn:download-job:${jobId}:${walletAddress.toLowerCase()}:${timestamp}`;
+                      const message = `weavrn:download-job:${walletAddress.toLowerCase()}:${jobId}:${timestamp}`;
                       const signature = await signer.signMessage(message);
-                      const params = new URLSearchParams({ wallet_address: walletAddress.toLowerCase(), signature, timestamp: String(timestamp) });
                       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-                      const res = await fetch(`${API_URL}/jobs/${jobId}/download?${params}`);
+                      const res = await fetch(`${API_URL}/jobs/${jobId}/download`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          wallet_address: walletAddress.toLowerCase(),
+                          signature,
+                          timestamp,
+                        }),
+                      });
                       if (!res.ok) throw new Error("Download failed");
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
