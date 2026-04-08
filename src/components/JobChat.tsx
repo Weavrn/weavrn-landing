@@ -102,6 +102,7 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
       if (!res.ok) return;
       const data = await res.json();
       setMessages((prev) => {
+        if (!Array.isArray(data.messages)) return prev;
         if (data.messages.length !== prev.length) {
           if (data.messages.length > prev.length && waiting) {
             const lastMsg = data.messages[data.messages.length - 1];

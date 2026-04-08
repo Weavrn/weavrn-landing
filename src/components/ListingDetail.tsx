@@ -129,7 +129,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
     return fileInputRefs.current[name];
   };
 
-  const hasSchema = listing?.input_schema && listing.input_schema.length > 0;
+  const hasSchema = listing?.input_schema && Array.isArray(listing.input_schema) && listing.input_schema.length > 0;
 
   const setFieldValue = (name: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
