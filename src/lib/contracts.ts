@@ -418,7 +418,7 @@ const ESCROW_ROUTER_GETESCROW_ABI = [
 
 // Known strategy addresses (Base Sepolia)
 const STRATEGY_ADDRESSES: Record<string, string> = {
-  "0xcf8591a0ef17a04ce39203244f2955131e74fccd": "all_or_nothing",
+  "0xc2f875efdde23366758e1e344449853027ed8a62": "all_or_nothing",
   "0x37ceb82437fc4de5b0186d498944e066a36472ab": "milestone",
   "0x34473daf2f1675e38ed397dab66ae1843d219708": "trickle",
 };
