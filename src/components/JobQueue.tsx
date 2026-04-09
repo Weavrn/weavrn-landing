@@ -5,6 +5,21 @@ import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
 import { createEscrowETH, releaseEscrow, getAgentOnChain, registerAgent } from "@/lib/contracts";
+function friendlyError(err: unknown): string {
+  const msg = (err as { message?: string; reason?: string; code?: string }).message || "";
+  const reason = (err as { reason?: string }).reason || "";
+  const code = (err as { code?: string }).code || "";
+  if (msg.includes("insufficient funds") || msg.includes("INSUFFICIENT_FUNDS")) return "Insufficient ETH balance to fund this escrow. Please add funds to your wallet.";
+  if (msg.includes("user rejected") || code === "ACTION_REJECTED") return "Transaction was rejected in your wallet.";
+  if (reason.includes("Sender not active")) return "Your wallet is not registered as an active agent. Register first.";
+  if (reason.includes("Recipient not active")) return "The provider is not registered as an active agent.";
+  if (reason.includes("Strategy not allowed")) return "Escrow strategy is not configured. Contact support.";
+  if (reason.includes("Below minimum")) return "Amount is below the minimum escrow amount.";
+  if (reason.includes("Deadline too soon")) return "Escrow deadline is too short.";
+  if (msg.includes("missing revert data")) return "Transaction failed — likely insufficient ETH balance for this escrow amount.";
+  return reason || msg.slice(0, 200) || "Transaction failed";
+}
+
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
@@ -138,7 +153,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      if (mountedRef.current) setError((err as { message?: string }).message || "Action failed");
+      if (mountedRef.current) setError(friendlyError(err));
     } finally {
       if (mountedRef.current) setActing(null);
     }
@@ -243,7 +258,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      if (mountedRef.current) setError((err as { message?: string }).message || "Funding failed");
+      if (mountedRef.current) setError(friendlyError(err));
     } finally {
       if (mountedRef.current) setActing(null);
       fundingRef.current = false;
