@@ -193,7 +193,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     fundingRef.current = true;
     const job = jobs.find(j => j.id === fundingJobId);
     if (!signer || !job?.listing_id || !fundingDetails) { fundingRef.current = false; return; }
-    if (job.escrow_id) { setError("Job already funded"); setFundingJobId(null); fundingRef.current = false; return; }
+    if (job.escrow_id != null) { setError("Job already funded"); setFundingJobId(null); fundingRef.current = false; return; }
     setActing(`fund-${job.id}`);
     setError(null);
     try {
@@ -321,7 +321,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 </p>
                 <p className="text-xs text-weavrn-muted">
                   {tab === "provider" ? `From ${truncAddr(j.requester_wallet)}` : `To ${truncAddr(j.provider_wallet)}`}
-                  {!j.escrow_id && j.status === "in_progress" && tab === "requester" && (
+                  {j.escrow_id == null && j.status === "in_progress" && tab === "requester" && (
                     <span className="text-yellow-400 ml-2">Unfunded</span>
                   )}
                 </p>
@@ -329,7 +329,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 {/* Fund button for unfunded in_progress jobs */}
-                {tab === "requester" && j.status === "in_progress" && !j.escrow_id && j.listing_id && (
+                {tab === "requester" && j.status === "in_progress" && j.escrow_id == null && j.listing_id && (
                   <button
                     onClick={() => handleFundJob(j)}
                     disabled={acting === `fund-${j.id}`}
