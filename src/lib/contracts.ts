@@ -418,13 +418,9 @@ const ESCROW_ROUTER_GETESCROW_ABI = [
 
 // Known strategy addresses (Base Sepolia)
 const STRATEGY_ADDRESSES: Record<string, string> = {
-  "0xa59aa27822e53ecffbf5658c2d08945a30c54614": "all_or_nothing",
-  "0x72837361e7c0d3e27094eded0776f20cb5ddbd93": "milestone",
-  "0x50f77522077da24eea2d3ca2c87cbfd0dc83b0f9": "trickle",
-  // Legacy (pre-audit)
-  "0xbadf7908c00fcca8cc136ae4d7669eb72abf4829": "all_or_nothing",
-  "0x08dd54c7d9f1300dc2c3df823ddabfa1a0aaf8aa": "milestone",
-  "0x4b5f4aa57e352902845d5e65b665b0109b04bfd3": "trickle",
+  "0xcf8591a0ef17a04ce39203244f2955131e74fccd": "all_or_nothing",
+  "0x37ceb82437fc4de5b0186d498944e066a36472ab": "milestone",
+  "0x34473daf2f1675e38ed397dab66ae1843d219708": "trickle",
 };
 
 export function getStrategyType(strategyAddress: string | null): "all_or_nothing" | "milestone" | "trickle" | "unknown" {
