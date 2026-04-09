@@ -128,7 +128,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       if (action === "accept") await acceptJob(signer, walletAddress, jobId);
       else if (action === "complete") {
         const job = jobs.find(j => j.id === jobId);
-        if (job?.escrow_id) {
+        if (job?.escrow_id != null) {
           try {
             await releaseEscrow(signer, job.escrow_id);
           } catch (err: unknown) {
