@@ -340,7 +340,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   </button>
                 )}
                 {/* Funded indicator */}
-                {j.escrow_id && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
+                {j.escrow_id != null && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <span className="px-2 py-1.5 rounded-lg text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">
                     Escrow #{j.escrow_id}
                   </span>

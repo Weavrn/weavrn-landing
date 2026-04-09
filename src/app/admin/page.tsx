@@ -542,7 +542,7 @@ export default function AdminPage() {
                               {disputeJobDetail.description && (
                                 <p className="text-xs text-weavrn-muted">{disputeJobDetail.description}</p>
                               )}
-                              {disputeJobDetail.escrow_id && (
+                              {disputeJobDetail.escrow_id != null && (
                                 <p className="text-xs text-weavrn-muted font-mono">Escrow #{disputeJobDetail.escrow_id}</p>
                               )}
                               {disputeJobDetail.deliverable_type && (() => {
