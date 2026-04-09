@@ -97,7 +97,10 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`);
+      const headers: Record<string, string> = {};
+      const token = (await import("@/lib/api")).getSessionToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`, { headers });
       if (!res.ok) return;
       const data = await res.json();
       setMessages((prev) => {
