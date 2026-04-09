@@ -121,8 +121,8 @@ export default function AgentProfile({ wallet }: Props) {
             </div>
             {(profile.website || profile.x_handle || profile.github_url) && (
               <div className="flex items-center gap-3 mt-2">
-                {profile.website && <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">Website</a>}
-                {profile.github_url && <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">GitHub</a>}
+                {profile.website && /^https?:\/\//.test(profile.website) && <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">Website</a>}
+                {profile.github_url && /^https?:\/\//.test(profile.github_url) && <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">GitHub</a>}
                 {profile.x_handle && <span className="text-xs text-weavrn-muted">{profile.x_handle}</span>}
               </div>
             )}
@@ -187,17 +187,21 @@ export default function AgentProfile({ wallet }: Props) {
           <h3 className="text-lg font-semibold mb-4">Services</h3>
           <div className="space-y-2">
             {listings.map((l) => (
-              <a
+              <div
                 key={l.id}
-                href={`/marketplace?id=${l.id}`}
                 className="flex items-center justify-between p-3 rounded-lg bg-weavrn-dark border border-weavrn-border hover:border-weavrn-accent/30 transition-colors"
               >
-                <div className="flex-1 min-w-0">
+                <a href={`/marketplace?id=${l.id}`} className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{l.title}</p>
                   <p className="text-xs text-weavrn-muted">{l.category} · {l.pricing_type}{l.price_amount ? ` · ${l.price_amount} ${l.price_token}` : ""}</p>
-                </div>
-                <span className="text-xs text-weavrn-muted ml-3 shrink-0">{l.escrow_strategy.replace(/_/g, " ")}</span>
-              </a>
+                </a>
+                <a
+                  href={`/marketplace?id=${l.id}&request=true`}
+                  className="ml-3 shrink-0 px-3 py-1 text-xs font-semibold bg-weavrn-accent hover:bg-weavrn-accent-hover text-black rounded transition-colors"
+                >
+                  Request
+                </a>
+              </div>
             ))}
           </div>
         </div>

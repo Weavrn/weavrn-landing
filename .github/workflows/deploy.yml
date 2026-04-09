@@ -41,6 +41,10 @@ jobs:
         with:
           name: build-output
           path: out/
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy
+          path: repo
       - name: Deploy to droplet
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -52,6 +56,8 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           rsync -rlgoDzvc --delete -e "ssh -i ~/.ssh/deploy_key" out/ "root@${HOST}:${TARGET}"
+          scp -i ~/.ssh/deploy_key repo/deploy/nginx-security-headers.conf "root@${HOST}:/etc/nginx/snippets/security-headers.conf"
+          ssh -i ~/.ssh/deploy_key "root@${HOST}" "nginx -t && systemctl reload nginx"
   notify:
     needs: [deploy]
     if: always()

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { memo, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getEarningsHistory } from "@/lib/api";
 import type { EarningsBlock } from "@/lib/api";
 
 interface Props {
   walletAddress: string;
-  refreshKey?: number;
+  historyRefreshKey?: number;
 }
 
 const CHART_HEIGHT = 140;
@@ -18,18 +18,25 @@ const fmtWvrn = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-export default function EarningsChart({ walletAddress, refreshKey }: Props) {
+export default memo(function EarningsChart({ walletAddress, historyRefreshKey }: Props) {
   const [blocks, setBlocks] = useState<EarningsBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const hasLoadedOnce = useRef(false);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // After initial load, skip showing the loading placeholder (stale-while-revalidate)
+    if (!hasLoadedOnce.current) {
+      setLoading(true);
+    }
     try {
       const res = await getEarningsHistory(walletAddress);
       setBlocks(res.blocks.slice(-30).reverse());
+      hasLoadedOnce.current = true;
     } catch {
-      setBlocks([]);
+      if (!hasLoadedOnce.current) {
+        setBlocks([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -37,7 +44,7 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, refreshKey]);
+  }, [fetchData, historyRefreshKey]);
 
   const earnings = useMemo(
     () => blocks.map((b) => parseFloat(b.reward_amount ?? "0")),
@@ -54,7 +61,7 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
 
   const totalEarned = cumulative.length > 0 ? cumulative[cumulative.length - 1] : 0;
 
-  if (loading) {
+  if (loading && !hasLoadedOnce.current) {
     return (
       <div className="glow-card rounded-2xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Earnings</h3>
@@ -93,14 +100,20 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
 
       {/* Hovered block detail */}
       <div className="h-5 mb-2">
-        {hoveredIdx !== null && blocks[hoveredIdx] && (
-          <div className="flex items-center gap-3 text-[10px] font-mono text-weavrn-muted">
-            <span className="text-white">Block {blocks[hoveredIdx].block_number}</span>
-            <span>delta {blocks[hoveredIdx].delta_score}</span>
-            <span className="text-weavrn-accent">+{fmtWvrn(earnings[hoveredIdx])} WVRN</span>
-            <span>cumulative {fmtWvrn(cumulative[hoveredIdx])}</span>
-          </div>
-        )}
+        {hoveredIdx !== null && blocks[hoveredIdx] && (() => {
+          const b = blocks[hoveredIdx];
+          const hasX = b.x_post_count > 0;
+          const hasYT = b.yt_post_count > 0;
+          return (
+            <div className="flex items-center gap-3 text-[10px] font-mono text-weavrn-muted">
+              <span className="text-white">Block {b.block_number}</span>
+              {hasX && <span><span className="text-white/70">X</span> {b.x_post_count}p &Delta;{b.x_delta}</span>}
+              {hasYT && <span><span className="text-red-400/70">YT</span> {b.yt_post_count}p &Delta;{b.yt_delta}</span>}
+              {!hasX && !hasYT && <span>delta {b.delta_score}</span>}
+              <span className="text-weavrn-accent">+{fmtWvrn(earnings[hoveredIdx])} WVRN</span>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="overflow-x-auto">
@@ -112,9 +125,15 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
           {blocks.map((b, i) => {
             const earned = earnings[i];
             const h = maxEarned > 0 ? (earned / maxEarned) * (CHART_HEIGHT - 16) : 0;
-            const x = i * (barWidth + BAR_GAP);
+            const bx = i * (barWidth + BAR_GAP);
             const y = CHART_HEIGHT - h;
             const isHovered = hoveredIdx === i;
+
+            // Platform split for stacked bar
+            const totalDelta = (b.x_delta || 0) + (b.yt_delta || 0);
+            const xRatio = totalDelta > 0 ? (b.x_delta || 0) / totalDelta : 1;
+            const xH = Math.max(h * xRatio, 0);
+            const ytH = h - xH;
 
             return (
               <g
@@ -123,20 +142,19 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
                 onMouseLeave={() => setHoveredIdx(null)}
                 className="cursor-pointer"
               >
-                {/* Hover target (full height) */}
+                <rect x={bx} y={0} width={barWidth} height={CHART_HEIGHT} fill="transparent" />
+                {/* YouTube portion (bottom) */}
+                {ytH > 0 && (
+                  <rect
+                    x={bx} y={CHART_HEIGHT - ytH} width={barWidth} height={ytH}
+                    rx={barWidth > 6 ? 2 : 1}
+                    fill={isHovered ? "#FF6B6B" : "#EF4444"}
+                    opacity={isHovered ? 0.9 : 0.6}
+                  />
+                )}
+                {/* X portion (top, stacked above YouTube) */}
                 <rect
-                  x={x}
-                  y={0}
-                  width={barWidth}
-                  height={CHART_HEIGHT}
-                  fill="transparent"
-                />
-                {/* Bar */}
-                <rect
-                  x={x}
-                  y={y}
-                  width={barWidth}
-                  height={Math.max(h, 2)}
+                  x={bx} y={y} width={barWidth} height={Math.max(xH, earned > 0 ? 2 : 0)}
                   rx={barWidth > 6 ? 2 : 1}
                   fill={isHovered ? "#00F0C0" : "#00D4AA"}
                   opacity={isHovered ? 1 : earned > 0 ? 0.7 : 0.2}
@@ -148,4 +166,4 @@ export default function EarningsChart({ walletAddress, refreshKey }: Props) {
       </div>
     </div>
   );
-}
+});

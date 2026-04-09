@@ -1,13 +1,29 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
-import { createEscrowETH, releaseEscrow } from "@/lib/contracts";
+import { createEscrowETH, releaseEscrow, getAgentOnChain, registerAgent } from "@/lib/contracts";
+function friendlyError(err: unknown): string {
+  const msg = (err as { message?: string; reason?: string; code?: string }).message || "";
+  const reason = (err as { reason?: string }).reason || "";
+  const code = (err as { code?: string }).code || "";
+  if (msg.includes("insufficient funds") || msg.includes("INSUFFICIENT_FUNDS")) return "Insufficient ETH balance to fund this escrow. Please add funds to your wallet.";
+  if (msg.includes("user rejected") || code === "ACTION_REJECTED") return "Transaction was rejected in your wallet.";
+  if (reason.includes("Sender not active")) return "Your wallet is not registered as an active agent. Register first.";
+  if (reason.includes("Recipient not active")) return "The provider is not registered as an active agent.";
+  if (reason.includes("Strategy not allowed")) return "Escrow strategy is not configured. Contact support.";
+  if (reason.includes("Below minimum")) return "Amount is below the minimum escrow amount.";
+  if (reason.includes("Deadline too soon")) return "Escrow deadline is too short.";
+  if (msg.includes("missing revert data")) return "Transaction failed — likely insufficient ETH balance for this escrow amount.";
+  return reason || msg.slice(0, 200) || "Transaction failed";
+}
+
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
+import JobProgress from "./JobProgress";
 
 interface Props {
   walletAddress: string;
@@ -71,6 +87,9 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [chatJobId, setChatJobId] = useState<number | null>(null);
   const [fundingJobId, setFundingJobId] = useState<number | null>(null);
   const [fundingDetails, setFundingDetails] = useState<{ price: string; fee: string; total: string; feeModel: string; providerFee: string } | null>(null);
+  const fundingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const fetchJobs = useCallback(async (p: number, silent = false) => {
     if (!silent) setLoading(true);
@@ -110,13 +129,22 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       else if (action === "complete") {
         const job = jobs.find(j => j.id === jobId);
         if (job?.escrow_id) {
-          try { await releaseEscrow(signer, job.escrow_id); } catch { /* already released */ }
+          try {
+            await releaseEscrow(signer, job.escrow_id);
+          } catch (err: unknown) {
+            const msg = (err as { code?: number; message?: string }).message || "";
+            if ((err as { code?: number }).code === 4001 || msg.includes("user rejected") || msg.includes("denied")) {
+              if (mountedRef.current) setActing(null);
+              return;
+            }
+          }
         }
-        // Sign once, then retry with the same auth — avoids multiple MetaMask popups
         const { completeJobWithAuth } = await import("@/lib/api");
         const auth = await completeJobWithAuth(signer, walletAddress, jobId);
         if (!auth) {
-          setError("Escrow released but could not complete job. Try again in 30s.");
+          if (mountedRef.current) {
+            setError("Could not complete job. Try again.");
+          }
           fetchJobs(page);
           return;
         }
@@ -125,9 +153,9 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      setError((err as { message?: string }).message || "Action failed");
+      if (mountedRef.current) setError(friendlyError(err));
     } finally {
-      setActing(null);
+      if (mountedRef.current) setActing(null);
     }
   };
 
@@ -138,7 +166,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     setError(null);
     try {
       const listing = await getListing(job.listing_id);
-      const price = listing.price_amount || "0.001";
+      const price = listing.price_amount || "0.0005";
       const priceNum = parseFloat(price);
       const feeModel = listing.fee_model || "payer";
 
@@ -176,13 +204,25 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   };
 
   const confirmFund = async () => {
+    if (fundingRef.current) return;
+    fundingRef.current = true;
     const job = jobs.find(j => j.id === fundingJobId);
-    if (!signer || !job?.listing_id || !fundingDetails) return;
-    // Prevent double-funding: re-check escrow_id before creating
-    if (job.escrow_id) { setError("Job already funded"); setFundingJobId(null); return; }
+    if (!signer || !job?.listing_id || !fundingDetails) { fundingRef.current = false; return; }
+    if (job.escrow_id != null) { setError("Job already funded"); setFundingJobId(null); fundingRef.current = false; return; }
     setActing(`fund-${job.id}`);
     setError(null);
     try {
+      let agentInfo = await getAgentOnChain(walletAddress);
+      if (!agentInfo?.isRegistered) {
+        await registerAgent(signer, walletAddress.slice(0, 10), "");
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          agentInfo = await getAgentOnChain(walletAddress);
+          if (agentInfo?.isRegistered) break;
+        }
+        if (!agentInfo?.isRegistered) throw new Error("Registration not confirmed. Please try again.");
+      }
+
       const listing = await getListing(job.listing_id);
       const strategy = listing.escrow_strategy || "all_or_nothing";
 
@@ -196,24 +236,32 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
         listing.escrow_strategy_address,
       );
 
-      // Retry linking — escrow indexer polls every 30s
-      for (let i = 0; i < 8; i++) {
+      // Poll for escrow indexer to pick up, then link
+      let linked = false;
+      for (let i = 0; i < 12; i++) {
+        const delay = 3000 + i * 2000;
+        await new Promise(r => setTimeout(r, delay));
         try {
           await linkJobEscrow(signer, walletAddress, job.id, escrowId);
+          linked = true;
           break;
         } catch {
-          if (i === 7) throw new Error("Escrow created on-chain but indexer hasn't picked it up yet. Try refreshing in 30 seconds.");
-          await new Promise(r => setTimeout(r, 5000));
+          // retry
         }
       }
-      setFundingJobId(null);
-      setFundingDetails(null);
+      if (!linked) throw new Error("Escrow created on-chain but linking timed out. Contact support with escrow ID " + escrowId);
+
+      if (mountedRef.current) {
+        setFundingJobId(null);
+        setFundingDetails(null);
+      }
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      setError((err as { message?: string }).message || "Funding failed");
+      if (mountedRef.current) setError(friendlyError(err));
     } finally {
-      setActing(null);
+      if (mountedRef.current) setActing(null);
+      fundingRef.current = false;
     }
   };
 
@@ -288,14 +336,15 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 </p>
                 <p className="text-xs text-weavrn-muted">
                   {tab === "provider" ? `From ${truncAddr(j.requester_wallet)}` : `To ${truncAddr(j.provider_wallet)}`}
-                  {!j.escrow_id && j.status === "in_progress" && tab === "requester" && (
+                  {j.escrow_id == null && j.status === "in_progress" && tab === "requester" && (
                     <span className="text-yellow-400 ml-2">Unfunded</span>
                   )}
                 </p>
+                <JobProgress job={j} />
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 {/* Fund button for unfunded in_progress jobs */}
-                {tab === "requester" && j.status === "in_progress" && !j.escrow_id && j.listing_id && (
+                {tab === "requester" && j.status === "in_progress" && j.escrow_id == null && j.listing_id && (
                   <button
                     onClick={() => handleFundJob(j)}
                     disabled={acting === `fund-${j.id}`}
@@ -306,7 +355,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   </button>
                 )}
                 {/* Funded indicator */}
-                {j.escrow_id && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
+                {j.escrow_id != null && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <span className="px-2 py-1.5 rounded-lg text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">
                     Escrow #{j.escrow_id}
                   </span>

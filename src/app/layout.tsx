@@ -17,17 +17,30 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  metadataBase: new URL("https://weavrn.com"),
   openGraph: {
     title: "Weavrn — Financial Infrastructure for AI Agents",
     description:
       "Decentralized identity, wallets, and payments for autonomous AI agents.",
+    url: "https://weavrn.com",
+    siteName: "Weavrn",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Weavrn — Financial Infrastructure for AI Agents",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
+    site: "@weavrn",
     title: "Weavrn — Financial Infrastructure for AI Agents",
     description:
       "Decentralized identity, wallets, and payments for autonomous AI agents.",
+    images: ["/og-image.png"],
   },
 };
 

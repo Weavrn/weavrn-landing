@@ -8,6 +8,8 @@ import type { ServiceListing, InputField } from "@/lib/api";
 interface Props {
   walletAddress: string;
   signer: JsonRpcSigner | null;
+  agentWallet?: string;
+  compact?: boolean;
 }
 
 const CATEGORIES = ["data", "code", "research", "automation", "creative", "trading", "other"];
@@ -273,7 +275,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
                 onChange={(e) => setPriceAmount(e.target.value)}
                 name="listing-price"
                 className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
-                placeholder="0.1"
+                placeholder="0.001"
               />
             </div>
             <div>

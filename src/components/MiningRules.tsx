@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { getMiningStats } from "@/lib/api";
+import { memo, useState } from "react";
 import type { MiningStatsResponse } from "@/lib/api";
 
 interface Props {
   followerCount?: number | null;
   subscriberCount?: number | null;
+  rules?: MiningStatsResponse["rules"] | null;
 }
 
 function RuleRow({
@@ -36,7 +36,7 @@ function RuleRow({
                   : "text-red-400"
             }`}
           >
-            {unknown ? "-" : met ? "✓" : "✗"}
+            {unknown ? "-" : met ? "\u2713" : "\u2717"}
           </span>
           <span className="text-sm text-weavrn-muted">{label}</span>
         </div>
@@ -53,30 +53,12 @@ function RuleRow({
   );
 }
 
-export default function MiningRules({
+export default memo(function MiningRules({
   followerCount,
   subscriberCount,
+  rules,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [stats, setStats] = useState<MiningStatsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchStats = useCallback(async () => {
-    if (stats) return;
-    setLoading(true);
-    try {
-      const res = await getMiningStats();
-      setStats(res);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [stats]);
-
-  useEffect(() => {
-    if (open) fetchStats();
-  }, [open, fetchStats]);
 
   return (
     <div className="glow-card rounded-xl">
@@ -104,40 +86,56 @@ export default function MiningRules({
 
       {open && (
         <div className="px-4 pb-4 border-t border-weavrn-border/30 pt-3">
-          {loading ? (
-            <div className="text-center py-4 text-weavrn-muted text-xs">
-              Loading...
-            </div>
-          ) : stats ? (
-            <div className="space-y-0.5">
-              <RuleRow
-                label="Min engagement score"
-                threshold={stats.rules.min_engagement_score}
-                userValue={null}
-              />
-              <RuleRow
-                label="Min X followers"
-                threshold={stats.rules.min_x_followers}
-                userValue={followerCount}
-                currentLabel={
-                  followerCount != null
-                    ? `Current followers: ${followerCount.toLocaleString()}`
-                    : undefined
-                }
-              />
-              <RuleRow
-                label="Min YouTube subscribers"
-                threshold={stats.rules.min_yt_subscribers}
-                userValue={subscriberCount}
-              />
+          {rules ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-weavrn-accent mb-1">General</p>
+                <RuleRow
+                  label="Min engagement score per post"
+                  threshold={rules.min_engagement_score}
+                  userValue={null}
+                />
+                <p className="text-xs text-weavrn-muted/50 ml-4 mt-0.5">Posts below this threshold are excluded from rewards</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-weavrn-accent mb-1">X (Twitter)</p>
+                <RuleRow
+                  label="Min followers"
+                  threshold={rules.min_x_followers}
+                  userValue={followerCount}
+                  currentLabel={
+                    followerCount != null
+                      ? `Your followers: ${followerCount.toLocaleString()}`
+                      : undefined
+                  }
+                />
+                <p className="text-xs text-weavrn-muted/50 ml-4 mt-0.5">Score: likes + retweets x3 + replies x2 + views x0.01</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-weavrn-accent mb-1">YouTube</p>
+                <RuleRow
+                  label="Min subscribers"
+                  threshold={rules.min_yt_subscribers}
+                  userValue={subscriberCount}
+                  currentLabel={
+                    subscriberCount != null
+                      ? `Your subscribers: ${subscriberCount.toLocaleString()}`
+                      : undefined
+                  }
+                />
+                <p className="text-xs text-weavrn-muted/50 ml-4 mt-0.5">Score: likes + comments x2 + views x0.01. Video must mention weavrn/$WVRN in title or description.</p>
+              </div>
+              <div className="pt-1 border-t border-weavrn-border/20">
+                <p className="text-xs text-weavrn-muted/50">Rewards are split between X (70%) and YouTube (30%) pools each block. Only engagement gained during the block counts (delta scoring).</p>
+              </div>
             </div>
           ) : (
             <div className="text-center py-4 text-weavrn-muted text-xs">
-              Failed to load rules.
+              Rules not available.
             </div>
           )}
         </div>
       )}
     </div>
   );
-}
+});

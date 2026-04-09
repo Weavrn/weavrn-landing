@@ -423,7 +423,7 @@ export default function AdminPage() {
                   >
                     <div className="flex-1 truncate mr-4">
                       <a
-                        href={p.post_url}
+                        href={/^https?:\/\//.test(p.post_url) ? p.post_url : '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-weavrn-accent hover:text-weavrn-accent-hover font-mono text-xs"
@@ -542,7 +542,7 @@ export default function AdminPage() {
                               {disputeJobDetail.description && (
                                 <p className="text-xs text-weavrn-muted">{disputeJobDetail.description}</p>
                               )}
-                              {disputeJobDetail.escrow_id && (
+                              {disputeJobDetail.escrow_id != null && (
                                 <p className="text-xs text-weavrn-muted font-mono">Escrow #{disputeJobDetail.escrow_id}</p>
                               )}
                               {disputeJobDetail.deliverable_type && (() => {

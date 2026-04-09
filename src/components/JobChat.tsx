@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
-import { sendJobMessage, uploadJobFile, getJobFileUrl } from "@/lib/api";
+import { API_URL, sendJobMessage, uploadJobFile, getJobFileUrl } from "@/lib/api";
 import type { JobMessage } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 
@@ -19,6 +19,7 @@ function truncAddr(addr: string) {
 function ChatMarkdown({ content }: { content: string }) {
   return (
     <ReactMarkdown
+      skipHtml={true}
       allowedElements={["p", "code", "pre", "ul", "ol", "li", "h1", "h2", "h3", "strong", "em", "a", "hr", "blockquote", "table", "thead", "tbody", "tr", "th", "td", "br"]}
       components={{
         code({ className, children, ...props }) {
@@ -40,7 +41,11 @@ function ChatMarkdown({ content }: { content: string }) {
         h2({ children }) { return <p className="font-bold text-white mb-1">{children}</p>; },
         h3({ children }) { return <p className="font-semibold text-white mb-1">{children}</p>; },
         strong({ children }) { return <strong className="text-white font-semibold">{children}</strong>; },
-        a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="text-weavrn-accent hover:underline">{children}</a>; },
+        a({ href, children }) {
+          const safe = href && /^https?:\/\//.test(href) ? href : undefined;
+          if (!safe) return <span className="text-weavrn-muted">{children}</span>;
+          return <a href={safe} target="_blank" rel="noopener noreferrer" className="text-weavrn-accent hover:underline">{children}</a>;
+        },
         hr() { return <hr className="border-weavrn-border/30 my-2" />; },
         blockquote({ children }) { return <blockquote className="border-l-2 border-weavrn-accent/30 pl-2 italic opacity-80">{children}</blockquote>; },
         table({ children }) { return <table className="text-[10px] w-full my-1">{children}</table>; },
@@ -92,11 +97,14 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`);
+      const headers: Record<string, string> = {};
+      const token = (await import("@/lib/api")).getSessionToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`, { headers });
       if (!res.ok) return;
       const data = await res.json();
       setMessages((prev) => {
+        if (!Array.isArray(data.messages)) return prev;
         if (data.messages.length !== prev.length) {
           if (data.messages.length > prev.length && waiting) {
             const lastMsg = data.messages[data.messages.length - 1];

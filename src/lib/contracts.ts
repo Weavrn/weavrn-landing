@@ -2,8 +2,7 @@ import { BrowserProvider, Contract, JsonRpcSigner, JsonRpcProvider } from "ether
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ethereum?: any;
+    ethereum?: any; // eslint-disable-line
   }
 }
 
@@ -94,7 +93,9 @@ const SOCIAL_MINING_ABI = [
 ];
 
 export function getChainConfig() {
-  return CHAIN_CONFIGS[CHAIN_ID] || CHAIN_CONFIGS["84532"];
+  const config = CHAIN_CONFIGS[CHAIN_ID];
+  if (!config) throw new Error(`Invalid NEXT_PUBLIC_CHAIN_ID: "${CHAIN_ID}". Supported: ${Object.keys(CHAIN_CONFIGS).join(", ")}`);
+  return config;
 }
 
 export function getExplorerTxUrl(txHash: string) {
@@ -158,7 +159,8 @@ export async function claimReward(
 ): Promise<string> {
   const contract = new Contract(SOCIAL_MINING_ADDRESS, SOCIAL_MINING_ABI, signer);
   const tx = await contract.claimReward(onChainId);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
@@ -168,7 +170,8 @@ export async function batchClaimRewards(
 ): Promise<string> {
   const contract = new Contract(SOCIAL_MINING_ADDRESS, SOCIAL_MINING_ABI, signer);
   const tx = await contract.batchClaimRewards(onChainIds);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
@@ -415,9 +418,9 @@ const ESCROW_ROUTER_GETESCROW_ABI = [
 
 // Known strategy addresses (Base Sepolia)
 const STRATEGY_ADDRESSES: Record<string, string> = {
-  "0xbadf7908c00fcca8cc136ae4d7669eb72abf4829": "all_or_nothing",
-  "0x08dd54c7d9f1300dc2c3df823ddabfa1a0aaf8aa": "milestone",
-  "0x4b5f4aa57e352902845d5e65b665b0109b04bfd3": "trickle",
+  "0xc2f875efdde23366758e1e344449853027ed8a62": "all_or_nothing",
+  "0x37ceb82437fc4de5b0186d498944e066a36472ab": "milestone",
+  "0x34473daf2f1675e38ed397dab66ae1843d219708": "trickle",
 };
 
 export function getStrategyType(strategyAddress: string | null): "all_or_nothing" | "milestone" | "trickle" | "unknown" {
@@ -573,9 +576,11 @@ export async function registerAgent(
   name: string,
   metadataURI: string,
 ): Promise<string> {
+  if (!AGENT_REGISTRY_ADDRESS) throw new Error("Agent Registry contract address not configured");
   const contract = new Contract(AGENT_REGISTRY_ADDRESS, AGENT_REGISTRY_ABI, signer);
   const tx = await contract.registerAgent(name, metadataURI);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
@@ -586,28 +591,34 @@ export async function updateAgentOnChain(
 ): Promise<string> {
   const contract = new Contract(AGENT_REGISTRY_ADDRESS, AGENT_REGISTRY_ABI, signer);
   const tx = await contract.updateAgent(name, metadataURI);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
 export async function claimFirstUseBonus(signer: JsonRpcSigner): Promise<string> {
   const contract = new Contract(USAGE_INCENTIVES_ADDRESS, USAGE_INCENTIVES_ABI, signer);
   const tx = await contract.claimFirstUseBonus();
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
 export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number): Promise<string> {
   const contract = new Contract(USAGE_INCENTIVES_ADDRESS, USAGE_INCENTIVES_ABI, signer);
   const tx = await contract.claimRebate(rebateId);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
-// Strategy address resolved from listing data (no hardcoded addresses)
+// Strategy address resolved from listing data, validated against on-chain allowlist
 export function getStrategyAddress(name: string, strategyAddress?: string | null): string {
-  if (strategyAddress) return strategyAddress;
-  throw new Error(`No strategy address provided for ${name}. Listing data may be stale.`);
+  if (!strategyAddress) throw new Error(`No strategy address provided for ${name}. Listing data may be stale.`);
+  if (!/^0x[a-fA-F0-9]{40}$/.test(strategyAddress)) throw new Error(`Invalid strategy address format`);
+  const known = STRATEGY_ADDRESSES[strategyAddress.toLowerCase()];
+  if (!known) throw new Error("Strategy address not in platform allowlist");
+  return strategyAddress;
 }
 
 export async function createEscrowETH(
@@ -619,6 +630,9 @@ export async function createEscrowETH(
   memo: string,
   strategyAddress?: string | null,
 ): Promise<{ escrowId: number; txHash: string }> {
+  if (!amountEth || !/^\d+(\.\d+)?$/.test(amountEth)) throw new Error("Invalid amount format");
+  if (!recipient || !/^0x[a-fA-F0-9]{40}$/.test(recipient)) throw new Error("Invalid recipient address");
+  if (!ESCROW_ROUTER_ADDRESS) throw new Error("Escrow Router contract address not configured");
   const { parseEther, AbiCoder } = await import("ethers");
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
   const strategyAddr = getStrategyAddress(strategyName, strategyAddress);
@@ -633,7 +647,8 @@ export async function createEscrowETH(
     memo,
     { value: parseEther(amountEth) },
   );
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
 
   // Parse EscrowCreated event to get escrowId
   const iface = contract.interface;
@@ -645,27 +660,30 @@ export async function createEscrowETH(
       }
     } catch { /* skip */ }
   }
-  return { escrowId: 0, txHash: receipt.hash };
+  throw new Error("Escrow created but could not parse escrow ID from logs");
 }
 
 export async function releaseEscrow(signer: JsonRpcSigner, escrowId: number): Promise<string> {
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
   const tx = await contract.release(escrowId);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
 export async function claimStream(signer: JsonRpcSigner, escrowId: number): Promise<string> {
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
   const tx = await contract.claimStream(escrowId);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
 export async function refundEscrow(signer: JsonRpcSigner, escrowId: number): Promise<string> {
   const contract = new Contract(ESCROW_ROUTER_ADDRESS, ESCROW_ROUTER_ABI, signer);
   const tx = await contract.refund(escrowId);
-  const receipt = await tx.wait();
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
@@ -675,7 +693,7 @@ const MERKLE_REWARDS_ABI = [
   {
     inputs: [
       { name: "blockNumber", type: "uint256" },
-      { name: "amount", type: "uint256" },
+      { name: "shareBps", type: "uint256" },
       { name: "proof", type: "bytes32[]" },
     ],
     name: "claim",
@@ -686,7 +704,7 @@ const MERKLE_REWARDS_ABI = [
   {
     inputs: [
       { name: "blockNumbers", type: "uint256[]" },
-      { name: "amounts", type: "uint256[]" },
+      { name: "shareBpsArr", type: "uint256[]" },
       { name: "proofs", type: "bytes32[][]" },
     ],
     name: "batchClaim",
@@ -699,23 +717,25 @@ const MERKLE_REWARDS_ABI = [
 export async function claimMerkleReward(
   signer: JsonRpcSigner,
   blockNumber: number,
-  amount: string,
+  shareBps: number,
   proof: string[],
 ): Promise<string> {
   const contract = new Contract(MERKLE_REWARDS_ADDRESS, MERKLE_REWARDS_ABI, signer);
-  const tx = await contract.claim(blockNumber, amount, proof);
-  const receipt = await tx.wait();
+  const tx = await contract.claim(blockNumber, shareBps, proof);
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }
 
 export async function batchClaimMerkleRewards(
   signer: JsonRpcSigner,
   blockNumbers: number[],
-  amounts: string[],
+  shareBpsArr: number[],
   proofs: string[][],
 ): Promise<string> {
   const contract = new Contract(MERKLE_REWARDS_ADDRESS, MERKLE_REWARDS_ABI, signer);
-  const tx = await contract.batchClaim(blockNumbers, amounts, proofs);
-  const receipt = await tx.wait();
+  const tx = await contract.batchClaim(blockNumbers, shareBpsArr, proofs);
+  const receipt = await tx.wait(2);
+  if (!receipt) throw new Error("Transaction was dropped or replaced");
   return receipt.hash;
 }

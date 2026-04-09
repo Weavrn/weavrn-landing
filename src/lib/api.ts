@@ -1,37 +1,72 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
 
-// ── Session Auth ──
+// ── Session Auth (memory-only, re-auth via wallet on refresh) ──
 
-let sessionToken: string | null = null;
-let sessionExpiresAt: number | null = null;
+let _session: { token: string; expiresAt: number } | null = null;
 
-export function hasSession() {
-  return sessionToken !== null && sessionExpiresAt !== null && Date.now() < sessionExpiresAt;
+function loadSession(): { token: string; expiresAt: number } | null {
+  if (!_session) return null;
+  if (Date.now() >= _session.expiresAt - 60_000) {
+    _session = null;
+    return null;
+  }
+  return _session;
 }
 
+function saveSession(token: string, expiresAt: number) {
+  _session = { token, expiresAt };
+}
+
+export function hasSession() {
+  return loadSession() !== null;
+}
+
+export function getSessionToken(): string | null {
+  return loadSession()?.token || null;
+}
+
+let _sessionPromise: Promise<unknown> | null = null;
 export async function createSession(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
+  if (hasSession()) return;
+  if (_sessionPromise) return _sessionPromise;
+  _sessionPromise = (async () => {
   const timestamp = Date.now();
-  const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
+  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
+  const message = `weavrn:${chainId}:session:${walletAddress.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
-  const res = await apiFetch<{ token: string; expires_at: string }>("/auth/session", {
-    method: "POST",
-    body: JSON.stringify({ wallet_address: walletAddress.toLowerCase(), signature, timestamp }),
-  });
-  sessionToken = res.token;
-  sessionExpiresAt = new Date(res.expires_at).getTime();
-  return res;
+    const res = await apiFetch<{ token: string; expires_at: string }>("/auth/session", {
+      method: "POST",
+      body: JSON.stringify({ wallet_address: walletAddress.toLowerCase(), signature, timestamp }),
+    });
+    saveSession(res.token, new Date(res.expires_at).getTime());
+    return res;
+  })();
+  try {
+    return await _sessionPromise;
+  } finally {
+    _sessionPromise = null;
+  }
+}
+
+export async function refreshSessionIfNeeded(signer: import("ethers").JsonRpcSigner, walletAddress: string) {
+  const session = _session;
+  if (!session) return;
+  if (session.expiresAt - Date.now() < 5 * 60 * 1000) {
+    _session = null;
+    await createSession(signer, walletAddress);
+  }
 }
 
 export async function clearSession() {
-  if (sessionToken) {
+  const session = loadSession();
+  if (session) {
     try {
       await apiFetch("/auth/session", { method: "DELETE" });
     } catch {
       // ignore logout errors
     }
   }
-  sessionToken = null;
-  sessionExpiresAt = null;
+  _session = null;
 }
 
 export interface Submission {
@@ -76,10 +111,21 @@ export interface TrackedPost {
   views: number | null;
   raw_score: number | null;
   estimated_wvrn: number;
-  block_history: PostBlockHistory[];
+  block_history: PostBlockHistory[]; // always [] from API — use block_history_total
+  block_history_total: number;
   flagged?: boolean;
   flag_reason?: string | null;
   posted_at?: string | null;
+}
+
+export interface PostBlockHistoryResponse {
+  post_id: number;
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  sort: string;
+  history: PostBlockHistory[];
 }
 
 export interface BlockReward {
@@ -94,7 +140,29 @@ export interface BlockReward {
   claimed: boolean;
   claim_tx_hash: string | null;
   block_share_pct: number | null;
+  share_bps: number | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
   created_at: string;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface TrackedPostsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  sort: string;
+  status: string;
+  platform: string;
 }
 
 export interface CurrentBlock {
@@ -107,10 +175,14 @@ export interface RewardsResponse {
   wallet: string;
   balance: string;
   total_earned: string;
+  unclaimed_wvrn: number;
+  unclaimed_count: number;
   current_block: CurrentBlock;
   tracked_posts: TrackedPost[];
+  tracked_posts_pagination?: TrackedPostsPagination;
   block_rewards: BlockReward[];
   submissions: Submission[];
+  pagination?: Pagination;
 }
 
 export interface Profile {
@@ -164,7 +236,7 @@ async function apiFetch<T>(
     ...(options?.headers as Record<string, string>),
   };
   if (hasSession()) {
-    headers["Authorization"] = `Bearer ${sessionToken}`;
+    headers["Authorization"] = `Bearer ${getSessionToken()}`;
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
@@ -184,26 +256,66 @@ async function apiFetch<T>(
 
 import type { JsonRpcSigner } from "ethers";
 
-async function signForWallet(signer: JsonRpcSigner, wallet: string, action: string) {
+async function signForWallet(signer: JsonRpcSigner, wallet: string, action: string, resourceId?: string | number) {
   const timestamp = Date.now();
-  const message = `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
-  const signature = await signer.signMessage(message);
+  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
+  const parts = resourceId != null
+    ? `weavrn:${chainId}:${action}:${wallet.toLowerCase()}:${resourceId}:${timestamp}`
+    : `weavrn:${chainId}:${action}:${wallet.toLowerCase()}:${timestamp}`;
+  const signature = await signer.signMessage(parts);
   return { signature, timestamp };
 }
 
 // Returns auth fields for the request body. With a session token the bearer
 // header handles auth so we only need wallet_address. Falls back to per-request
 // signature when no session exists.
-async function authBody(signer: JsonRpcSigner, wallet: string, action: string) {
+async function authBody(signer: JsonRpcSigner, wallet: string, action: string, resourceId?: string | number) {
   if (hasSession()) {
     return { wallet_address: wallet.toLowerCase() };
   }
-  const { signature, timestamp } = await signForWallet(signer, wallet, action);
+  const { signature, timestamp } = await signForWallet(signer, wallet, action, resourceId);
   return { wallet_address: wallet.toLowerCase(), signature, timestamp };
 }
 
-export function getRewards(wallet: string) {
-  return apiFetch<RewardsResponse>(`/rewards/${wallet.toLowerCase()}`);
+export function getRewards(
+  wallet: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    filter?: "all" | "unclaimed";
+    posts_page?: number;
+    posts_sort?: "newest" | "oldest" | "earned" | "engagement";
+    posts_status?: "active" | "all";
+    posts_platform?: "x" | "youtube";
+  },
+) {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.filter) qs.set("filter", params.filter);
+  if (params?.posts_page && params.posts_page > 1) qs.set("posts_page", String(params.posts_page));
+  if (params?.posts_sort && params.posts_sort !== "newest") qs.set("posts_sort", params.posts_sort);
+  if (params?.posts_status && params.posts_status !== "active") qs.set("posts_status", params.posts_status);
+  if (params?.posts_platform) qs.set("posts_platform", params.posts_platform);
+  const qstr = qs.toString();
+  return apiFetch<RewardsResponse>(
+    `/rewards/${wallet.toLowerCase()}${qstr ? `?${qstr}` : ""}`,
+  );
+}
+
+export function getPostBlockHistory(
+  wallet: string,
+  postId: number,
+  params?: { page?: number; limit?: number; sort?: "newest" | "oldest" },
+) {
+  const qs = new URLSearchParams();
+  if (params?.page && params.page > 1) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.sort && params.sort !== "newest") qs.set("sort", params.sort);
+  const qstr = qs.toString();
+  return apiFetch<PostBlockHistoryResponse>(
+    `/rewards/${wallet.toLowerCase()}/posts/${postId}/history${qstr ? `?${qstr}` : ""}`,
+  );
 }
 
 export function refreshPosts(wallet: string) {
@@ -546,6 +658,7 @@ export async function createListing(
     trickle_duration?: number;
     estimated_duration?: string;
     input_schema?: InputField[];
+    agent_wallet?: string;
   },
 ) {
   const auth = await authBody(signer, wallet, "create-listing");
@@ -589,6 +702,13 @@ export interface Job {
   escrow_id: number | null;
   deliverable_type: "text" | "code" | "url" | "file" | "report" | "multi" | "ipfs" | null;
   deliverable_data: DeliverableData | null;
+  processing_status?: {
+    stage: "preflight" | "container" | "done";
+    turn?: number;
+    max_turns?: number;
+    activity?: string;
+    updated_at?: number;
+  } | null;
   created_at: string;
   updated_at: string;
   queue_position?: number;
@@ -669,7 +789,7 @@ export async function createJob(
 }
 
 export async function acceptJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
-  const auth = await authBody(signer, wallet, "accept-job");
+  const auth = await authBody(signer, wallet, "accept-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/accept`, {
     method: "PUT",
     body: JSON.stringify(auth),
@@ -682,7 +802,7 @@ export async function linkJobEscrow(
   jobId: number,
   escrowId: number,
 ) {
-  const auth = await authBody(signer, wallet, "link-escrow");
+  const auth = await authBody(signer, wallet, "link-escrow", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/escrow`, {
     method: "PUT",
     body: JSON.stringify({ ...auth, escrow_id: escrowId }),
@@ -696,7 +816,7 @@ export async function deliverJob(
   deliverableType: string,
   deliverableData: unknown,
 ) {
-  const auth = await authBody(signer, wallet, "deliver-job");
+  const auth = await authBody(signer, wallet, "deliver-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/deliver`, {
     method: "PUT",
     body: JSON.stringify({
@@ -707,7 +827,7 @@ export async function deliverJob(
 }
 
 export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
-  const auth = await authBody(signer, wallet, "complete-job");
+  const auth = await authBody(signer, wallet, "complete-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/complete`, {
     method: "PUT",
     body: JSON.stringify(auth),
@@ -715,22 +835,16 @@ export async function completeJob(signer: import("ethers").JsonRpcSigner, wallet
 }
 
 export async function completeJobWithAuth(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number): Promise<Job | null> {
-  // Sign once, retry the API call without re-signing (avoids multiple MetaMask popups)
-  const auth = await authBody(signer, wallet, "complete-job");
-  const body = JSON.stringify(auth);
-  for (let i = 0; i < 8; i++) {
-    try {
-      return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body });
-    } catch {
-      if (i === 7) return null;
-      await new Promise(r => setTimeout(r, 5000));
-    }
+  const auth = await authBody(signer, wallet, "complete-job", jobId);
+  try {
+    return await apiFetch<Job>(`/jobs/${jobId}/complete`, { method: "PUT", body: JSON.stringify(auth) });
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function cancelJob(signer: import("ethers").JsonRpcSigner, wallet: string, jobId: number) {
-  const auth = await authBody(signer, wallet, "cancel-job");
+  const auth = await authBody(signer, wallet, "cancel-job", jobId);
   return apiFetch<Job>(`/jobs/${jobId}/cancel`, {
     method: "PUT",
     body: JSON.stringify(auth),
@@ -763,7 +877,7 @@ export async function disputeJob(
   jobId: number,
   reason: string,
 ) {
-  const auth = await authBody(signer, wallet, "dispute-job");
+  const auth = await authBody(signer, wallet, "dispute-job", jobId);
   return apiFetch(`/jobs/${jobId}/dispute`, {
     method: "PUT",
     body: JSON.stringify({ ...auth, reason }),
@@ -807,7 +921,7 @@ export async function submitReview(
   rating: number,
   comment?: string,
 ) {
-  const auth = await authBody(signer, wallet, "submit-review");
+  const auth = await authBody(signer, wallet, "submit-review", jobId);
   return apiFetch<Review>(`/jobs/${jobId}/review`, {
     method: "POST",
     body: JSON.stringify({ ...auth, rating, comment }),
@@ -823,7 +937,7 @@ export async function sendJobMessage(
   content: string,
   contentType = "text",
 ) {
-  const auth = await authBody(signer, wallet, "send-message");
+  const auth = await authBody(signer, wallet, "send-message", jobId);
   return apiFetch<JobMessage>(`/jobs/${jobId}/message`, {
     method: "POST",
     body: JSON.stringify({ ...auth, content, content_type: contentType }),
@@ -869,9 +983,9 @@ export async function uploadJobFile(
 
   const headers: Record<string, string> = {};
   if (hasSession()) {
-    headers["Authorization"] = `Bearer ${sessionToken}`;
+    headers["Authorization"] = `Bearer ${getSessionToken()}`;
   } else {
-    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file");
+    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file", jobId);
     form.append("signature", signature);
     form.append("timestamp", String(timestamp));
   }
@@ -924,6 +1038,10 @@ export interface EarningsBlock {
   delta_score: number;
   post_count: number;
   reward_amount: string | null;
+  x_delta: number;
+  x_post_count: number;
+  yt_delta: number;
+  yt_post_count: number;
 }
 
 export function getEarningsHistory(wallet: string, blocks = 20) {
@@ -1159,6 +1277,7 @@ export function setMockAutoIncrement(adminKey: string, config: Partial<MockAutoI
 export interface MerkleProofResponse {
   block_number: number;
   wallet: string;
+  share_bps: number;
   amount: string;
   proof: string[];
   merkle_root: string;
@@ -1168,10 +1287,4 @@ export function getMerkleProof(wallet: string, blockNumber: number) {
   return apiFetch<MerkleProofResponse>(`/rewards/${wallet.toLowerCase()}/proof/${blockNumber}`);
 }
 
-export async function markMerkleClaimed(signer: import("ethers").JsonRpcSigner, wallet: string, blockNumber: number, txHash: string) {
-  // Session token in header handles auth — no extra signature needed
-  return apiFetch(`/claim/merkle`, {
-    method: "POST",
-    body: JSON.stringify({ block_number: blockNumber, tx_hash: txHash, wallet_address: wallet.toLowerCase() }),
-  });
-}
+

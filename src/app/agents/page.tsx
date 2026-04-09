@@ -51,6 +51,7 @@ function AgentsContent() {
   const totalPages = Math.ceil(total / 24);
 
   if (walletParam) {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletParam)) return <p className="text-sm text-red-400 text-center py-8">Invalid wallet address</p>;
     return <AgentProfile wallet={walletParam} />;
   }
 
@@ -141,7 +142,9 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      <Footer />
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </main>
   );
 }

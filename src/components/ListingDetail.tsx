@@ -129,7 +129,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
     return fileInputRefs.current[name];
   };
 
-  const hasSchema = listing?.input_schema && listing.input_schema.length > 0;
+  const hasSchema = listing?.input_schema && Array.isArray(listing.input_schema) && listing.input_schema.length > 0;
 
   const setFieldValue = (name: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
@@ -143,10 +143,22 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       // Validate required fields
       if (hasSchema) {
         for (const field of listing.input_schema!) {
+          const val = formValues[field.name];
           if (field.required && field.type !== "file") {
-            const val = formValues[field.name];
             if (!val || (typeof val === "string" && !val.trim())) {
               setRequestError(`${field.label} is required`);
+              setRequesting(false);
+              return;
+            }
+          }
+          if (typeof val === "string" && val.length > 10000) {
+            setRequestError(`${field.label} exceeds maximum length (10000 chars)`);
+            setRequesting(false);
+            return;
+          }
+          if ((field.type === "url" || field.type === "git_url") && typeof val === "string" && val.trim()) {
+            try { new URL(val); } catch {
+              setRequestError(`${field.label} must be a valid URL`);
               setRequesting(false);
               return;
             }
@@ -190,6 +202,8 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       setRequested(true);
       if (failedFiles.length > 0) {
         setRequestError(`Job created but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}. You can re-upload from the job chat.`);
+      } else {
+        setTimeout(() => { window.location.href = "/dashboard"; }, 2000);
       }
     } catch (err: unknown) {
       setRequestError((err as { message?: string }).message || "Failed to request service");
@@ -202,6 +216,9 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
     setLoading(true);
     try {
       const data = await getListing(id);
+      if (data.input_schema && typeof data.input_schema === "string") {
+        try { data.input_schema = JSON.parse(data.input_schema); } catch { data.input_schema = null; }
+      }
       setListing(data);
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Listing not found");
@@ -272,7 +289,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
         {walletAddress && walletAddress.toLowerCase() !== listing.wallet_address.toLowerCase() && (
           <div className="pt-4 border-t border-weavrn-border/50">
             {requested ? (
-              <p className="text-sm text-weavrn-accent">Service requested — <a href="/dashboard" className="underline hover:text-weavrn-accent-hover">check your dashboard</a> for updates.</p>
+              <p className="text-sm text-weavrn-accent">Service requested — redirecting to <a href="/dashboard" className="underline hover:text-weavrn-accent-hover">your dashboard</a>...</p>
             ) : !showForm ? (
               <button
                 onClick={() => setShowForm(true)}
