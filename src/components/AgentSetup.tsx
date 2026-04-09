@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner, parseEther } from "ethers";
-import { getAgentListings, getAgentJobs, createListing, updateListing, deactivateListing, hasSession, getSessionToken, createSession } from "@/lib/api";
+import { API_URL, getAgentListings, getAgentJobs, createListing, updateListing, deactivateListing, hasSession, getSessionToken, createSession } from "@/lib/api";
 import type { Job } from "@/lib/api";
 import type { ServiceListing, InputField } from "@/lib/api";
 
@@ -29,8 +29,6 @@ interface Pricing {
   byok: { price_eth: string; description: string };
   managed: { price_eth: string; description: string };
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
 
 const TEMPLATES: Record<string, { name: string; prompt: string; model: string; temp: number }> = {
   code_review: {
@@ -65,7 +63,8 @@ const CATEGORIES = ["data", "code", "research", "automation", "creative", "tradi
 
 async function signedFetch(signer: JsonRpcSigner, wallet: string, action: string, path: string, method: string, extra?: Record<string, unknown>) {
   const timestamp = Date.now();
-  const message = `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
+  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
+  const message = `weavrn:${chainId}:${action}:${wallet.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
   const body: Record<string, unknown> = { wallet_address: wallet.toLowerCase(), signature, timestamp, ...extra };
   const res = await fetch(`${API_URL}${path}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -149,7 +148,7 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("code");
   const [pricingType, setPricingType] = useState("fixed");
-  const [priceAmount, setPriceAmount] = useState("0.00001");
+  const [priceAmount, setPriceAmount] = useState("0.0005");
   const [escrowStrategy, setEscrowStrategy] = useState("all_or_nothing");
   const [tags, setTags] = useState("");
   const [estimatedDuration, setEstimatedDuration] = useState("");
@@ -194,7 +193,7 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
         agent_wallet: agentWallet,
       });
       setShowCreate(false);
-      setTitle(""); setDescription(""); setTags(""); setPriceAmount("0.00001"); setEstimatedDuration(""); setInputFields([]);
+      setTitle(""); setDescription(""); setTags(""); setPriceAmount("0.0005"); setEstimatedDuration(""); setInputFields([]);
       fetchListings();
     } catch (err: unknown) {
       setError((err as { message?: string }).message || "Failed to create listing");
@@ -346,7 +345,7 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
             </div>
             <div>
               <label className="text-xs text-weavrn-muted block mb-1">Price (ETH)</label>
-              <input value={priceAmount} onChange={e => setPriceAmount(e.target.value)} placeholder="0.001" className={inputCls} />
+              <input value={priceAmount} onChange={e => setPriceAmount(e.target.value)} placeholder="0.0005" className={inputCls} />
             </div>
             <div>
               <label className="text-xs text-weavrn-muted block mb-1">Escrow</label>
@@ -465,7 +464,7 @@ function AgentJobs({ agentWallet }: { agentWallet: string }) {
                 <span className="text-[9px] text-weavrn-muted font-mono">{ps.turn}/{ps.max_turns || 30}</span>
               ) : null}
               {dd.pr_url ? (
-                <a href={dd.pr_url || "#"} target="_blank" rel="noopener noreferrer" className="text-[9px] text-green-400 hover:underline">PR</a>
+                <a href={dd.pr_url && /^https?:\/\//.test(dd.pr_url) ? dd.pr_url : '#'} target="_blank" rel="noopener noreferrer" className="text-[9px] text-green-400 hover:underline">PR</a>
               ) : null}
             </div>
           </div>

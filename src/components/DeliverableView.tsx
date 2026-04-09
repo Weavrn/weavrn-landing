@@ -167,7 +167,8 @@ export default function DeliverableView({ type, data: rawData, status, jobId, wa
                   onClick={async () => {
                     try {
                       const timestamp = Date.now();
-                      const message = `weavrn:download-job:${walletAddress.toLowerCase()}:${jobId}:${timestamp}`;
+                      const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
+                      const message = `weavrn:${chainId}:download-job:${walletAddress.toLowerCase()}:${jobId}:${timestamp}`;
                       const signature = await signer.signMessage(message);
                       const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
                       const res = await fetch(`${API_URL}/jobs/${jobId}/download`, {

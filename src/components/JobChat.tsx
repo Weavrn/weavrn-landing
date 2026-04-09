@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { JsonRpcSigner } from "ethers";
-import { sendJobMessage, uploadJobFile, getJobFileUrl } from "@/lib/api";
+import { API_URL, sendJobMessage, uploadJobFile, getJobFileUrl } from "@/lib/api";
 import type { JobMessage } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 
@@ -97,7 +97,6 @@ export default function JobChat({ jobId, walletAddress, signer }: Props) {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
       const res = await fetch(`${API_URL}/jobs/${jobId}/messages?wallet_address=${walletAddress.toLowerCase()}`);
       if (!res.ok) return;
       const data = await res.json();

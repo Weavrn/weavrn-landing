@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV !== "production" ? "http://localhost:3001" : "");
 
 // ── Session Auth (memory-only, re-auth via wallet on refresh) ──
 
@@ -31,7 +31,8 @@ export async function createSession(signer: import("ethers").JsonRpcSigner, wall
   if (_sessionPromise) return _sessionPromise;
   _sessionPromise = (async () => {
   const timestamp = Date.now();
-  const message = `weavrn:session:${walletAddress.toLowerCase()}:${timestamp}`;
+  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
+  const message = `weavrn:${chainId}:session:${walletAddress.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(message);
     const res = await apiFetch<{ token: string; expires_at: string }>("/auth/session", {
       method: "POST",
@@ -257,9 +258,10 @@ import type { JsonRpcSigner } from "ethers";
 
 async function signForWallet(signer: JsonRpcSigner, wallet: string, action: string, resourceId?: string | number) {
   const timestamp = Date.now();
+  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
   const parts = resourceId != null
-    ? `weavrn:${action}:${wallet.toLowerCase()}:${resourceId}:${timestamp}`
-    : `weavrn:${action}:${wallet.toLowerCase()}:${timestamp}`;
+    ? `weavrn:${chainId}:${action}:${wallet.toLowerCase()}:${resourceId}:${timestamp}`
+    : `weavrn:${chainId}:${action}:${wallet.toLowerCase()}:${timestamp}`;
   const signature = await signer.signMessage(parts);
   return { signature, timestamp };
 }

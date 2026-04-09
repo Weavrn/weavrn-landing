@@ -151,7 +151,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     setError(null);
     try {
       const listing = await getListing(job.listing_id);
-      const price = listing.price_amount || "0.001";
+      const price = listing.price_amount || "0.0005";
       const priceNum = parseFloat(price);
       const feeModel = listing.fee_model || "payer";
 

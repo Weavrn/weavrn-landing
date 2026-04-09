@@ -428,7 +428,7 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                           </p>
                         ) : (
                           <a
-                            href={p.post_url}
+                            href={/^https?:\/\//.test(p.post_url) ? p.post_url : '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-weavrn-accent hover:text-weavrn-accent-hover transition-colors font-mono text-xs"
@@ -449,7 +449,7 @@ const TrackedPostsSection = memo(function TrackedPostsSection({
                           </span>
                           {p.text && (
                             <a
-                              href={p.post_url}
+                              href={/^https?:\/\//.test(p.post_url) ? p.post_url : '#'}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-weavrn-accent/60 hover:text-weavrn-accent transition-colors font-mono text-[10px]"

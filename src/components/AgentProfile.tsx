@@ -121,8 +121,8 @@ export default function AgentProfile({ wallet }: Props) {
             </div>
             {(profile.website || profile.x_handle || profile.github_url) && (
               <div className="flex items-center gap-3 mt-2">
-                {profile.website && <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">Website</a>}
-                {profile.github_url && <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">GitHub</a>}
+                {profile.website && /^https?:\/\//.test(profile.website) && <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">Website</a>}
+                {profile.github_url && /^https?:\/\//.test(profile.github_url) && <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="text-xs text-weavrn-muted hover:text-weavrn-accent transition-colors">GitHub</a>}
                 {profile.x_handle && <span className="text-xs text-weavrn-muted">{profile.x_handle}</span>}
               </div>
             )}

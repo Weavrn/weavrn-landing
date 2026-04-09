@@ -200,7 +200,7 @@ function AgentDetailContent() {
                   {/* Action buttons */}
                   <div className="flex gap-2 mt-2">
                     {dd.pr_url && (
-                      <a href={dd.pr_url || "#"} target="_blank" rel="noopener noreferrer"
+                      <a href={dd.pr_url && /^https?:\/\//.test(dd.pr_url) ? dd.pr_url : '#'} target="_blank" rel="noopener noreferrer"
                         className="text-[10px] px-2 py-1 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20">
                         View PR
                       </a>
