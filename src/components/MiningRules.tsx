@@ -126,7 +126,7 @@ export default memo(function MiningRules({
                 <p className="text-xs text-weavrn-muted/50 ml-4 mt-0.5">Score: likes + comments x2 + views x0.01. Video must mention weavrn/$WVRN in title or description.</p>
               </div>
               <div className="pt-1 border-t border-weavrn-border/20">
-                <p className="text-xs text-weavrn-muted/50">Rewards are split between X ({rules.x_pool_pct ?? 70}%) and YouTube ({rules.yt_pool_pct ?? 30}%) pools each block. Only engagement gained during the block counts (delta scoring).</p>
+                <p className="text-xs text-weavrn-muted/50">Rewards are split between X (70%) and YouTube (30%) pools each block. Only engagement gained during the block counts (delta scoring).</p>
               </div>
             </div>
           ) : (
