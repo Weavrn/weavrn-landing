@@ -23,6 +23,7 @@ interface HostedAgent {
   active: boolean;
   created_at: string;
   job_count?: number;
+  agent_name?: string;
 }
 
 interface Pricing {
@@ -34,29 +35,27 @@ const TEMPLATES: Record<string, { name: string; prompt: string; model: string; t
   code_review: {
     name: "Code Review Agent",
     prompt: `You are a code review agent. When given a task:\n- Clone the repo if access is provided\n- Review for correctness, security, and maintainability\n- Flag OWASP top 10 vulnerabilities\n- Suggest concrete fixes with code examples\n- Commit changes to the weavrn/job-{id} branch if applicable\n- Structure output as: summary, findings per file, suggested changes`,
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-haiku-4-5-20251001",
     temp: 0.3,
   },
   research: {
     name: "Research Agent",
     prompt: `You are a research analyst. When given a task:\n- Break the problem into sub-questions\n- Analyze from multiple angles with evidence\n- Structure output as: executive summary, methodology, findings, recommendations`,
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-haiku-4-5-20251001",
     temp: 0.5,
   },
   solidity_audit: {
     name: "Solidity Audit Agent",
     prompt: `You are a smart contract auditor. When given a task:\n- Review all .sol files for reentrancy, overflow, access control, and front-running\n- Verify OpenZeppelin usage patterns\n- Run forge build and forge test if available\n- Structure output as severity-classified findings with recommended fixes`,
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-haiku-4-5-20251001",
     temp: 0.2,
   },
   custom: { name: "", prompt: "", model: "claude-haiku-4-5-20251001", temp: 0.5 },
 };
 
 const MODELS = [
-  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
   { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
-  { value: "gpt-4o", label: "GPT-4o" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+  { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" },
 ];
 
 const CATEGORIES = ["data", "code", "research", "automation", "creative", "trading", "other"];
@@ -622,7 +621,7 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
         <div key={a.id} className="glow-card rounded-xl p-6">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">{a.system_prompt.split("\n")[0].slice(0, 50) || a.wallet_address.slice(0, 12) + "..."}</span>
+              <span className="font-semibold">{a.agent_name || a.wallet_address.slice(0, 12) + "..."}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.tier === "managed" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"}`}>
                 {a.tier === "managed" ? "Managed" : "BYOK"}
               </span>

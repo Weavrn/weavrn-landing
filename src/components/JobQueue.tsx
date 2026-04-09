@@ -5,6 +5,21 @@ import { JsonRpcSigner } from "ethers";
 import { getAgentJobs, getAgentRequests, acceptJob, completeJob, cancelJob, disputeJob, linkJobEscrow, getListing } from "@/lib/api";
 import type { Job } from "@/lib/api";
 import { createEscrowETH, releaseEscrow, getAgentOnChain, registerAgent } from "@/lib/contracts";
+function friendlyError(err: unknown): string {
+  const msg = (err as { message?: string; reason?: string; code?: string }).message || "";
+  const reason = (err as { reason?: string }).reason || "";
+  const code = (err as { code?: string }).code || "";
+  if (msg.includes("insufficient funds") || msg.includes("INSUFFICIENT_FUNDS")) return "Insufficient ETH balance to fund this escrow. Please add funds to your wallet.";
+  if (msg.includes("user rejected") || code === "ACTION_REJECTED") return "Transaction was rejected in your wallet.";
+  if (reason.includes("Sender not active")) return "Your wallet is not registered as an active agent. Register first.";
+  if (reason.includes("Recipient not active")) return "The provider is not registered as an active agent.";
+  if (reason.includes("Strategy not allowed")) return "Escrow strategy is not configured. Contact support.";
+  if (reason.includes("Below minimum")) return "Amount is below the minimum escrow amount.";
+  if (reason.includes("Deadline too soon")) return "Escrow deadline is too short.";
+  if (msg.includes("missing revert data")) return "Transaction failed — likely insufficient ETH balance for this escrow amount.";
+  return reason || msg.slice(0, 200) || "Transaction failed";
+}
+
 import ReviewForm from "./ReviewForm";
 import DeliverableView from "./DeliverableView";
 import JobChat from "./JobChat";
@@ -138,7 +153,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      if (mountedRef.current) setError((err as { message?: string }).message || "Action failed");
+      if (mountedRef.current) setError(friendlyError(err));
     } finally {
       if (mountedRef.current) setActing(null);
     }
@@ -193,7 +208,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
     fundingRef.current = true;
     const job = jobs.find(j => j.id === fundingJobId);
     if (!signer || !job?.listing_id || !fundingDetails) { fundingRef.current = false; return; }
-    if (job.escrow_id) { setError("Job already funded"); setFundingJobId(null); fundingRef.current = false; return; }
+    if (job.escrow_id != null) { setError("Job already funded"); setFundingJobId(null); fundingRef.current = false; return; }
     setActing(`fund-${job.id}`);
     setError(null);
     try {
@@ -243,7 +258,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       fetchJobs(page);
       onAction?.();
     } catch (err: unknown) {
-      if (mountedRef.current) setError((err as { message?: string }).message || "Funding failed");
+      if (mountedRef.current) setError(friendlyError(err));
     } finally {
       if (mountedRef.current) setActing(null);
       fundingRef.current = false;
@@ -321,7 +336,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                 </p>
                 <p className="text-xs text-weavrn-muted">
                   {tab === "provider" ? `From ${truncAddr(j.requester_wallet)}` : `To ${truncAddr(j.provider_wallet)}`}
-                  {!j.escrow_id && j.status === "in_progress" && tab === "requester" && (
+                  {j.escrow_id == null && j.status === "in_progress" && tab === "requester" && (
                     <span className="text-yellow-400 ml-2">Unfunded</span>
                   )}
                 </p>
@@ -329,7 +344,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
                 {/* Fund button for unfunded in_progress jobs */}
-                {tab === "requester" && j.status === "in_progress" && !j.escrow_id && j.listing_id && (
+                {tab === "requester" && j.status === "in_progress" && j.escrow_id == null && j.listing_id && (
                   <button
                     onClick={() => handleFundJob(j)}
                     disabled={acting === `fund-${j.id}`}
@@ -340,7 +355,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
                   </button>
                 )}
                 {/* Funded indicator */}
-                {j.escrow_id && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
+                {j.escrow_id != null && ["in_progress", "awaiting_input", "delivered"].includes(j.status) && (
                   <span className="px-2 py-1.5 rounded-lg text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">
                     Escrow #{j.escrow_id}
                   </span>

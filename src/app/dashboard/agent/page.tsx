@@ -184,7 +184,7 @@ function AgentDetailContent() {
 
                   <div className="flex items-center gap-3 mt-2 text-xs text-weavrn-muted">
                     <span>From {truncAddr(j.requester_wallet)}</span>
-                    {j.escrow_id && <span className="text-[10px]">Escrow #{j.escrow_id}</span>}
+                    {j.escrow_id != null && <span className="text-[10px]">Escrow #{j.escrow_id}</span>}
                     {isActive && ps.turn ? <span className="font-mono text-weavrn-accent">{ps.turn}/{ps.max_turns || 30}</span> : null}
                     {isActive && ps.activity ? <span className="truncate max-w-[200px] text-[10px]">{ps.activity}</span> : null}
                   </div>
