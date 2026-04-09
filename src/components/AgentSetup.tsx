@@ -23,6 +23,7 @@ interface HostedAgent {
   active: boolean;
   created_at: string;
   job_count?: number;
+  agent_name?: string;
 }
 
 interface Pricing {
@@ -620,7 +621,7 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
         <div key={a.id} className="glow-card rounded-xl p-6">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">{a.system_prompt.split("\n")[0].slice(0, 50) || a.wallet_address.slice(0, 12) + "..."}</span>
+              <span className="font-semibold">{a.agent_name || a.wallet_address.slice(0, 12) + "..."}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.tier === "managed" ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"}`}>
                 {a.tier === "managed" ? "Managed" : "BYOK"}
               </span>
