@@ -353,7 +353,8 @@ export default function MyListings({ walletAddress, signer }: Props) {
       ) : (
         <div className="space-y-2">
           {listings.map((l) => (
-            <div key={l.id} className="flex items-center justify-between p-3 rounded-lg bg-weavrn-dark border border-weavrn-border">
+            <div key={l.id} className="p-3 rounded-lg bg-weavrn-dark border border-weavrn-border">
+            <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-weavrn-surface border border-weavrn-border text-weavrn-muted">
@@ -425,6 +426,7 @@ export default function MyListings({ walletAddress, signer }: Props) {
                 </button>
               </div>
             )}
+            </div>
           ))}
         </div>
       )}
