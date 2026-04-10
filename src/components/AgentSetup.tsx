@@ -265,13 +265,14 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
             setError(null);
             try {
               const validFields = editInputFields.filter(f => f.name && f.label);
-              await updateListing(signer, ownerWallet, l.id, {
+              const updateData: Record<string, unknown> = {
                 title: editTitle || undefined,
                 description: editDescription || undefined,
                 price_amount: editPrice || undefined,
                 estimated_duration: editDuration || undefined,
                 input_schema: validFields,
-              } as Partial<ServiceListing>);
+              };
+              await updateListing(signer, ownerWallet, l.id, updateData as Partial<ServiceListing>);
               setEditingId(null);
               fetchListings();
             } catch (err: unknown) {
@@ -289,7 +290,7 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
             <p className="text-sm truncate">{l.title}</p>
             <p className="text-[10px] text-weavrn-muted">
               {l.category} · {l.price_amount} {l.price_token} · {l.escrow_strategy.replace(/_/g, " ")}
-              {l.input_schema && Array.isArray(l.input_schema) && l.input_schema.length > 0 && ` · ${l.input_schema.length} fields`}
+              {(() => { const s = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema; return Array.isArray(s) && s.length > 0 ? ` · ${s.length} fields` : ""; })()}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -301,7 +302,8 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
                 setEditDescription(l.description || "");
                 setEditPrice(l.price_amount || "");
                 setEditDuration(l.estimated_duration || "");
-                setEditInputFields(l.input_schema && Array.isArray(l.input_schema) ? l.input_schema as InputField[] : []);
+                const schema = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema;
+                setEditInputFields(Array.isArray(schema) ? schema : []);
               }} className="text-[10px] text-weavrn-muted hover:text-white">Edit</button>
             )}
             {l.active && signer && (
