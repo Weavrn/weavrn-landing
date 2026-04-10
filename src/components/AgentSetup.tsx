@@ -483,7 +483,7 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
 
   // Create form
   const [creating, setCreating] = useState(false);
-  const [tier, setTier] = useState<"managed" | "byok">("byok");
+  const [tier, setTier] = useState<"managed" | "byok">("managed");
   const [template, setTemplate] = useState("code_review");
   const [agentNameInput, setAgentNameInput] = useState(TEMPLATES.code_review.name);
   const [systemPrompt, setSystemPrompt] = useState(TEMPLATES.code_review.prompt);
@@ -541,8 +541,14 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
     try {
       const price = tier === "managed" ? pricing?.managed.price_eth : pricing?.byok.price_eth;
       if (!price) throw new Error("Pricing not loaded");
+      // Fetch payment address from API (operator wallet)
+      const pricingRes = await fetch(`${API_URL}/hosted-agents/pricing`);
+      const pricingData = await pricingRes.json();
+      const payTo = pricingData.payment_address;
+      if (!payTo) throw new Error("Payment address not available");
+
       const tx = await signer.sendTransaction({
-        to: "0x9bB50598DDa4557d54a62464DA30Efdb9ffC2d7c",
+        to: payTo,
         value: parseEther(price),
       });
       const receipt = await tx.wait();
@@ -680,15 +686,15 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
 
           {/* Tier */}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setTier("byok")} className={`p-4 rounded-lg border text-left transition-colors ${tier === "byok" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}>
-              <p className="text-sm font-semibold">Bring Your Own Key</p>
-              <p className="text-xs text-weavrn-muted mt-1">Use your own API key. We run the infrastructure.</p>
-              <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
-            </button>
             <button onClick={() => setTier("managed")} className={`p-4 rounded-lg border text-left transition-colors ${tier === "managed" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}>
               <p className="text-sm font-semibold">Fully Managed</p>
               <p className="text-xs text-weavrn-muted mt-1">We provide the AI. Just configure your agent.</p>
               <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.managed.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
+            </button>
+            <button onClick={() => setTier("byok")} className={`p-4 rounded-lg border text-left transition-colors ${tier === "byok" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}>
+              <p className="text-sm font-semibold">Bring Your Own Key</p>
+              <p className="text-xs text-weavrn-muted mt-1">Use your own API key. We run the infrastructure.</p>
+              <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
             </button>
           </div>
 
