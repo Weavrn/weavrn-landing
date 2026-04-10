@@ -541,6 +541,16 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
     try {
       const price = tier === "managed" ? pricing?.managed.price_eth : pricing?.byok.price_eth;
       if (!price) throw new Error("Pricing not loaded");
+
+      // Validate system prompt before payment
+      const validateRes = await signedFetch(signer, walletAddress, "validate-hosted-agent", "/hosted-agents/validate", "POST", {
+        system_prompt: systemPrompt,
+        model_name: model,
+        tier,
+        user_api_key: tier === "byok" ? userApiKey : undefined,
+      });
+      if (validateRes.error) throw new Error(validateRes.error);
+
       // Fetch payment address from API (operator wallet)
       const pricingRes = await fetch(`${API_URL}/hosted-agents/pricing`);
       const pricingData = await pricingRes.json();
