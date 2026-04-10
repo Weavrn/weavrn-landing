@@ -411,11 +411,12 @@ export default function MyListings({ walletAddress, signer }: Props) {
                 <button
                   onClick={async () => {
                     try {
-                      await updateListing(signer, walletAddress, l.id, { tags: editTagsValue.split(",").map(t => t.trim()).filter(Boolean) } as Partial<ServiceListing>);
+                      const newTags = editTagsValue.split(",").map(t => t.trim()).filter(Boolean);
+                      await updateListing(signer, walletAddress, l.id, { tags: newTags });
                       setEditingTags(null);
                       fetchListings(page);
                     } catch (err) {
-                      setError((err as { message?: string }).message || "Failed to update tags");
+                      setError((err as Error).message || "Failed to update tags");
                     }
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover"
