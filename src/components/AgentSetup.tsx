@@ -89,6 +89,7 @@ function emptyField(): InputField {
 
 function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; onChange: (f: InputField) => void; onRemove: () => void }) {
   const cls = "w-full px-2 py-1.5 bg-weavrn-surface border border-weavrn-border rounded text-xs focus:outline-none focus:border-weavrn-accent/50";
+  const [rawOptions, setRawOptions] = useState(field.options?.join(", ") || "");
   return (
     <div className="p-3 rounded-lg bg-weavrn-surface border border-weavrn-border/50 space-y-2">
       <div className="flex items-center justify-between">
@@ -125,7 +126,7 @@ function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; on
       {field.type === "select" && (
         <div>
           <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (comma-separated)</label>
-          <input value={field.options?.join(", ") || ""} onChange={(e) => onChange({ ...field, options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} placeholder="Option A, Option B" className={cls} />
+          <input value={rawOptions} onChange={(e) => { setRawOptions(e.target.value); onChange({ ...field, options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }} placeholder="Option A, Option B" className={cls} />
         </div>
       )}
       {field.type === "file" && (
