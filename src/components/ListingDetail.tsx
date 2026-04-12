@@ -115,6 +115,7 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [createdJobId, setCreatedJobId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   // Generic fallback fields
   const [description, setDescription] = useState("");
@@ -144,8 +145,14 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       if (hasSchema) {
         for (const field of listing.input_schema!) {
           const val = formValues[field.name];
-          if (field.required && field.type !== "file") {
-            if (!val || (typeof val === "string" && !val.trim())) {
+          if (field.required) {
+            if (field.type === "file") {
+              if (!(val instanceof File)) {
+                setRequestError(`${field.label} is required`);
+                setRequesting(false);
+                return;
+              }
+            } else if (!val || (typeof val === "string" && !val.trim())) {
               setRequestError(`${field.label} is required`);
               setRequesting(false);
               return;
@@ -199,10 +206,11 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
         }
       }
 
-      setRequested(true);
       if (failedFiles.length > 0) {
-        setRequestError(`Job created but ${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}. You can re-upload from the job chat.`);
+        setCreatedJobId(job.id);
+        setRequestError(`${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}. The job was created — go to your dashboard to retry.`);
       } else {
+        setRequested(true);
         setTimeout(() => { window.location.href = "/dashboard"; }, 2000);
       }
     } catch (err: unknown) {
@@ -290,6 +298,16 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
           <div className="pt-4 border-t border-weavrn-border/50">
             {requested ? (
               <p className="text-sm text-weavrn-accent">Service requested — redirecting to <a href="/dashboard" className="underline hover:text-weavrn-accent-hover">your dashboard</a>...</p>
+            ) : createdJobId ? (
+              <div className="space-y-2">
+                <p className="text-xs text-red-400">{requestError}</p>
+                <a
+                  href="/dashboard"
+                  className="inline-block px-4 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm text-weavrn-accent hover:bg-weavrn-accent/10 transition-colors"
+                >
+                  View job on dashboard
+                </a>
+              </div>
             ) : !showForm ? (
               <button
                 onClick={() => setShowForm(true)}
