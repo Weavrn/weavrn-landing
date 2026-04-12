@@ -985,7 +985,12 @@ export async function uploadJobFile(
   if (hasSession()) {
     headers["Authorization"] = `Bearer ${getSessionToken()}`;
   } else {
-    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file", jobId);
+    // Timestamp generated immediately before signing so it doesn't expire
+    // Message format: weavrn:<chainId>:upload-file:<wallet>:<timestamp>
+    const timestamp = Date.now();
+    const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || "84532";
+    const message = `weavrn:${chainId}:upload-file:${wallet.toLowerCase()}:${timestamp}`;
+    const signature = await signer.signMessage(message);
     form.append("signature", signature);
     form.append("timestamp", String(timestamp));
   }
