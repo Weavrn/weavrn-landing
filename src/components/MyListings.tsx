@@ -84,8 +84,8 @@ function InputFieldEditor({ field, onChange, onRemove }: {
         <div>
           <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (one per line or comma-separated)</label>
           <textarea
-            value={field.options?.join("\n") || ""}
-            onChange={(e) => onChange({ ...field, options: e.target.value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean) })}
+            defaultValue={field.options?.join("\n") || ""}
+            onBlur={(e) => onChange({ ...field, options: e.target.value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean) })}
             placeholder={"Option A\nOption B\nOption C"}
             rows={3}
             className={inputCls}
