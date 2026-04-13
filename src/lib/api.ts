@@ -985,7 +985,7 @@ export async function uploadJobFile(
   if (hasSession()) {
     headers["Authorization"] = `Bearer ${getSessionToken()}`;
   } else {
-    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file", jobId);
+    const { signature, timestamp } = await signForWallet(signer, wallet, "upload-file");
     form.append("signature", signature);
     form.append("timestamp", String(timestamp));
   }

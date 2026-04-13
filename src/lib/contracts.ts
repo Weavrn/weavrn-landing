@@ -416,11 +416,11 @@ const ESCROW_ROUTER_GETESCROW_ABI = [
   },
 ];
 
-// Known strategy addresses (Base Sepolia)
+// Known strategy addresses (Base mainnet)
 const STRATEGY_ADDRESSES: Record<string, string> = {
-  "0xc2f875efdde23366758e1e344449853027ed8a62": "all_or_nothing",
-  "0x37ceb82437fc4de5b0186d498944e066a36472ab": "milestone",
-  "0x34473daf2f1675e38ed397dab66ae1843d219708": "trickle",
+  "0xf369e771135a694d60816d989cb9bb95549fb2de": "all_or_nothing",
+  "0x3e06daf736905848befd8cea982b08118b0efe87": "milestone",
+  "0x3a6c6712e7c01399808a2e56e39f3c8973b48f37": "trickle",
 };
 
 export function getStrategyType(strategyAddress: string | null): "all_or_nothing" | "milestone" | "trickle" | "unknown" {

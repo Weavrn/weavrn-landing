@@ -89,6 +89,7 @@ function emptyField(): InputField {
 
 function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; onChange: (f: InputField) => void; onRemove: () => void }) {
   const cls = "w-full px-2 py-1.5 bg-weavrn-surface border border-weavrn-border rounded text-xs focus:outline-none focus:border-weavrn-accent/50";
+  const [rawOptions, setRawOptions] = useState(field.options?.join(", ") || "");
   return (
     <div className="p-3 rounded-lg bg-weavrn-surface border border-weavrn-border/50 space-y-2">
       <div className="flex items-center justify-between">
@@ -125,7 +126,7 @@ function InputFieldEditor({ field, onChange, onRemove }: { field: InputField; on
       {field.type === "select" && (
         <div>
           <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (comma-separated)</label>
-          <input value={field.options?.join(", ") || ""} onChange={(e) => onChange({ ...field, options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} placeholder="Option A, Option B" className={cls} />
+          <input value={rawOptions} onChange={(e) => { setRawOptions(e.target.value); onChange({ ...field, options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }); }} placeholder="Option A, Option B" className={cls} />
         </div>
       )}
       {field.type === "file" && (
@@ -265,13 +266,14 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
             setError(null);
             try {
               const validFields = editInputFields.filter(f => f.name && f.label);
-              await updateListing(signer, ownerWallet, l.id, {
+              const updateData: Record<string, unknown> = {
                 title: editTitle || undefined,
                 description: editDescription || undefined,
                 price_amount: editPrice || undefined,
                 estimated_duration: editDuration || undefined,
                 input_schema: validFields,
-              } as Partial<ServiceListing>);
+              };
+              await updateListing(signer, ownerWallet, l.id, updateData as Partial<ServiceListing>);
               setEditingId(null);
               fetchListings();
             } catch (err: unknown) {
@@ -289,7 +291,7 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
             <p className="text-sm truncate">{l.title}</p>
             <p className="text-[10px] text-weavrn-muted">
               {l.category} · {l.price_amount} {l.price_token} · {l.escrow_strategy.replace(/_/g, " ")}
-              {l.input_schema && Array.isArray(l.input_schema) && l.input_schema.length > 0 && ` · ${l.input_schema.length} fields`}
+              {(() => { const s = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema; return Array.isArray(s) && s.length > 0 ? ` · ${s.length} fields` : ""; })()}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -301,7 +303,8 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
                 setEditDescription(l.description || "");
                 setEditPrice(l.price_amount || "");
                 setEditDuration(l.estimated_duration || "");
-                setEditInputFields(l.input_schema && Array.isArray(l.input_schema) ? l.input_schema as InputField[] : []);
+                const schema = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema;
+                setEditInputFields(Array.isArray(schema) ? schema : []);
               }} className="text-[10px] text-weavrn-muted hover:text-white">Edit</button>
             )}
             {l.active && signer && (
@@ -483,7 +486,7 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
 
   // Create form
   const [creating, setCreating] = useState(false);
-  const [tier, setTier] = useState<"managed" | "byok">("byok");
+  const [tier, setTier] = useState<"managed" | "byok">("managed");
   const [template, setTemplate] = useState("code_review");
   const [agentNameInput, setAgentNameInput] = useState(TEMPLATES.code_review.name);
   const [systemPrompt, setSystemPrompt] = useState(TEMPLATES.code_review.prompt);
@@ -541,8 +544,24 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
     try {
       const price = tier === "managed" ? pricing?.managed.price_eth : pricing?.byok.price_eth;
       if (!price) throw new Error("Pricing not loaded");
+
+      // Validate system prompt before payment
+      const validateRes = await signedFetch(signer, walletAddress, "validate-hosted-agent", "/hosted-agents/validate", "POST", {
+        system_prompt: systemPrompt,
+        model_name: model,
+        tier,
+        user_api_key: tier === "byok" ? userApiKey : undefined,
+      });
+      if (validateRes.error) throw new Error(validateRes.error);
+
+      // Fetch payment address from API (operator wallet)
+      const pricingRes = await fetch(`${API_URL}/hosted-agents/pricing`);
+      const pricingData = await pricingRes.json();
+      const payTo = pricingData.payment_address;
+      if (!payTo) throw new Error("Payment address not available");
+
       const tx = await signer.sendTransaction({
-        to: "0x9bB50598DDa4557d54a62464DA30Efdb9ffC2d7c",
+        to: payTo,
         value: parseEther(price),
       });
       const receipt = await tx.wait();
@@ -680,15 +699,15 @@ export default function AgentSetup({ walletAddress, signer }: Props) {
 
           {/* Tier */}
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setTier("byok")} className={`p-4 rounded-lg border text-left transition-colors ${tier === "byok" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}>
-              <p className="text-sm font-semibold">Bring Your Own Key</p>
-              <p className="text-xs text-weavrn-muted mt-1">Use your own API key. We run the infrastructure.</p>
-              <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
-            </button>
             <button onClick={() => setTier("managed")} className={`p-4 rounded-lg border text-left transition-colors ${tier === "managed" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}>
               <p className="text-sm font-semibold">Fully Managed</p>
               <p className="text-xs text-weavrn-muted mt-1">We provide the AI. Just configure your agent.</p>
               <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.managed.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
+            </button>
+            <button onClick={() => setTier("byok")} className={`p-4 rounded-lg border text-left transition-colors ${tier === "byok" ? "border-weavrn-accent bg-weavrn-accent/5" : "border-weavrn-border hover:border-weavrn-accent/30"}`}>
+              <p className="text-sm font-semibold">Bring Your Own Key</p>
+              <p className="text-xs text-weavrn-muted mt-1">Use your own API key. We run the infrastructure.</p>
+              <p className="text-lg font-bold text-weavrn-accent mt-2">{pricing?.byok.price_eth || "..."} ETH<span className="text-xs text-weavrn-muted font-normal"> one-time</span></p>
             </button>
           </div>
 

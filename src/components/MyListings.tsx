@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcSigner } from "ethers";
-import { getAgentListings, createListing, deactivateListing } from "@/lib/api";
+import { getAgentListings, createListing, deactivateListing, updateListing } from "@/lib/api";
 import type { ServiceListing, InputField } from "@/lib/api";
 
 interface Props {
@@ -82,11 +82,12 @@ function InputFieldEditor({ field, onChange, onRemove }: {
       </div>
       {field.type === "select" && (
         <div>
-          <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (comma-separated)</label>
-          <input
-            value={field.options?.join(", ") || ""}
-            onChange={(e) => onChange({ ...field, options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-            placeholder="Option A, Option B, Option C"
+          <label className="text-[10px] text-weavrn-muted block mb-0.5">Options (one per line or comma-separated)</label>
+          <textarea
+            defaultValue={field.options?.join("\n") || ""}
+            onBlur={(e) => onChange({ ...field, options: e.target.value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean) })}
+            placeholder={"Option A\nOption B\nOption C"}
+            rows={3}
             className={inputCls}
           />
         </div>
@@ -125,6 +126,8 @@ export default function MyListings({ walletAddress, signer }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [acting, setActing] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingTags, setEditingTags] = useState<number | null>(null);
+  const [editTagsValue, setEditTagsValue] = useState("");
 
   // Form state
   const [title, setTitle] = useState("");
@@ -256,19 +259,6 @@ export default function MyListings({ walletAddress, signer }: Props) {
               </select>
             </div>
             <div>
-              <label className="text-xs text-weavrn-muted block mb-1">Pricing</label>
-              <select
-                value={pricingType}
-                onChange={(e) => setPricingType(e.target.value)}
-                name="listing-pricing"
-                className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
-              >
-                <option value="fixed">Fixed</option>
-                <option value="hourly">Hourly</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <div>
               <label className="text-xs text-weavrn-muted block mb-1">Price (ETH)</label>
               <input
                 value={priceAmount}
@@ -280,16 +270,9 @@ export default function MyListings({ walletAddress, signer }: Props) {
             </div>
             <div>
               <label className="text-xs text-weavrn-muted block mb-1">Escrow</label>
-              <select
-                value={escrowStrategy}
-                onChange={(e) => setEscrowStrategy(e.target.value)}
-                name="listing-escrow"
-                className="w-full px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm focus:outline-none focus:border-weavrn-accent/50"
-              >
-                <option value="all_or_nothing">All or Nothing</option>
-                <option value="milestone">Milestone</option>
-                <option value="trickle">Trickle</option>
-              </select>
+              <div className="px-3 py-2 bg-weavrn-surface border border-weavrn-border rounded-lg text-sm text-weavrn-muted">
+                All or Nothing
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -317,20 +300,9 @@ export default function MyListings({ walletAddress, signer }: Props) {
 
           {/* Input Fields Builder */}
           <div className="border-t border-weavrn-border/50 pt-3">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-weavrn-muted">Input Fields (optional)</label>
-              <button
-                onClick={() => {
-                  if (inputFields.length < 10) setInputFields([...inputFields, emptyField()]);
-                }}
-                disabled={inputFields.length >= 10}
-                className="text-[10px] px-2 py-1 rounded bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 disabled:opacity-30 transition-colors"
-              >
-                + Add Field
-              </button>
-            </div>
+            <label className="text-xs text-weavrn-muted mb-2 block">Input Fields (optional)</label>
             {inputFields.length === 0 && (
-              <p className="text-[10px] text-weavrn-muted/50">No custom fields. Requesters will see generic text inputs.</p>
+              <p className="text-[10px] text-weavrn-muted/50 mb-2">No custom fields. Requesters will see generic text inputs.</p>
             )}
             <div className="space-y-2">
               {inputFields.map((field, i) => (
@@ -346,6 +318,15 @@ export default function MyListings({ walletAddress, signer }: Props) {
                 />
               ))}
             </div>
+            <button
+              onClick={() => {
+                if (inputFields.length < 10) setInputFields([...inputFields, emptyField()]);
+              }}
+              disabled={inputFields.length >= 10}
+              className="mt-2 text-[10px] px-2 py-1 rounded bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 disabled:opacity-30 transition-colors"
+            >
+              + Add Field
+            </button>
           </div>
 
           {error && <p className="text-xs text-red-400">{error}</p>}
@@ -372,7 +353,8 @@ export default function MyListings({ walletAddress, signer }: Props) {
       ) : (
         <div className="space-y-2">
           {listings.map((l) => (
-            <div key={l.id} className="flex items-center justify-between p-3 rounded-lg bg-weavrn-dark border border-weavrn-border">
+            <div key={l.id} className="p-3 rounded-lg bg-weavrn-dark border border-weavrn-border">
+            <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-weavrn-surface border border-weavrn-border text-weavrn-muted">
@@ -393,6 +375,15 @@ export default function MyListings({ walletAddress, signer }: Props) {
                 </p>
               </div>
               <div className="flex gap-2 ml-3 shrink-0">
+                <button
+                  onClick={() => {
+                    if (editingTags === l.id) { setEditingTags(null); }
+                    else { setEditingTags(l.id); setEditTagsValue((l.tags || []).join(", ")); }
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white transition-colors"
+                >
+                  {editingTags === l.id ? "Cancel" : "Edit Tags"}
+                </button>
                 <a
                   href={`/marketplace?id=${l.id}`}
                   className="px-3 py-1.5 rounded-lg text-xs border border-weavrn-border text-weavrn-muted hover:text-white transition-colors"
@@ -409,6 +400,32 @@ export default function MyListings({ walletAddress, signer }: Props) {
                   </button>
                 )}
               </div>
+            </div>
+            {editingTags === l.id && signer && (
+              <div className="mt-2 flex gap-2 items-center">
+                <input
+                  value={editTagsValue}
+                  onChange={(e) => setEditTagsValue(e.target.value)}
+                  className="flex-1 px-3 py-1.5 bg-weavrn-surface border border-weavrn-border rounded-lg text-xs focus:outline-none focus:border-weavrn-accent/50"
+                  placeholder="tag1, tag2, tag3"
+                />
+                <button
+                  onClick={async () => {
+                    try {
+                      const newTags = editTagsValue.split(",").map(t => t.trim()).filter(Boolean);
+                      await updateListing(signer, walletAddress, l.id, { tags: newTags });
+                      setEditingTags(null);
+                      fetchListings(page);
+                    } catch (err) {
+                      setError((err as Error).message || "Failed to update tags");
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-weavrn-accent text-black font-semibold hover:bg-weavrn-accent-hover"
+                >
+                  Save
+                </button>
+              </div>
+            )}
             </div>
           ))}
         </div>
