@@ -144,8 +144,14 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
       if (hasSchema) {
         for (const field of listing.input_schema!) {
           const val = formValues[field.name];
-          if (field.required && field.type !== "file") {
-            if (!val || (typeof val === "string" && !val.trim())) {
+          if (field.required) {
+            if (field.type === "file") {
+              if (!(val instanceof File)) {
+                setRequestError(`${field.label} is required`);
+                setRequesting(false);
+                return;
+              }
+            } else if (!val || (typeof val === "string" && !val.trim())) {
               setRequestError(`${field.label} is required`);
               setRequesting(false);
               return;
