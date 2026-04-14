@@ -14,7 +14,7 @@ jobs:
           ref: ${{ github.ref_name }}
           path: weavrn-sdk
           token: ${{ secrets.SDK_TOKEN }}
-      - run: ln -s $GITHUB_WORKSPACE/weavrn-sdk ../weavrn-sdk
+      - run: mv weavrn-sdk ../weavrn-sdk && cd ../weavrn-sdk && npm install --ignore-scripts
       - uses: actions/setup-node@v4
         with:
           node-version: 20
