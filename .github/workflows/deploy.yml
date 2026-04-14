@@ -13,6 +13,7 @@ jobs:
           repository: Weavrn/weavrn-sdk
           ref: ${{ github.ref_name }}
           path: weavrn-sdk
+          token: ${{ secrets.SDK_TOKEN }}
       - run: ln -s $GITHUB_WORKSPACE/weavrn-sdk ../weavrn-sdk
       - uses: actions/setup-node@v4
         with:
