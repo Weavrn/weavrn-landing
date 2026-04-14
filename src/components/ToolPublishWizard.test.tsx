@@ -249,6 +249,61 @@ describe("ToolPublishWizard - step 5 tab gating", () => {
     expect(hostedTab.disabled).toBe(true);
     expect(byoTab.disabled).toBe(true);
   });
+
+  it("enables BYO tab (not Hosted) when TOOLS_BYO_ENABLED is on and reveals BYO sub-form on activation", async () => {
+    getToolConfigMock.mockResolvedValue({ byoEnabled: true, hostedEnabled: false });
+    await act(async () => {
+      mountWizard();
+    });
+
+    // Fill step 1.
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/^Title$/i), {
+        target: { value: "BYO Tool" },
+      });
+      fireEvent.change(screen.getByLabelText(/MCP tool slug/i), {
+        target: { value: "byo-tool" },
+      });
+      fireEvent.change(screen.getByLabelText(/^Description$/i), {
+        target: { value: "hi" },
+      });
+      fireEvent.change(screen.getByLabelText(/Description for model/i), {
+        target: { value: "model desc" },
+      });
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 600));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("slug-status").textContent).toMatch(/available/i);
+    });
+
+    // Step through to step 5 (Execution).
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+
+    const hostedTab = screen.getByTestId("hosted-tab") as HTMLButtonElement;
+    const byoTab = screen.getByTestId("byo-tab") as HTMLButtonElement;
+    expect(hostedTab.disabled).toBe(true);
+    expect(byoTab.disabled).toBe(false);
+
+    // Activate BYO tab and confirm sub-form surfaces (endpoint_url input +
+    // Generate HMAC secret button).
+    await act(async () => {
+      fireEvent.click(byoTab);
+    });
+    expect(screen.getByText(/Generate HMAC secret/i)).toBeTruthy();
+  });
 });
 
 describe("ToolPublishWizard - autosave", () => {
