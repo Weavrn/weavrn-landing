@@ -145,6 +145,65 @@ describe("ListingDetail — schema branching", () => {
     expect(screen.queryByLabelText(/Prompt/)).toBeNull();
   });
 
+  it("uploads file fields via uploadToolInput and puts the URL into input_data on createJob (Task 19 scenario 5)", async () => {
+    const uploadedUrl = "/tool-inputs/files/0xuser/abcd-diagram.png";
+    hoisted.uploadToolInput.mockResolvedValue({
+      file_url: uploadedUrl,
+      mime_type: "image/png",
+      bytes: 42,
+    });
+    hoisted.createJob.mockResolvedValue({ id: 9001 });
+
+    await renderWithListing(
+      makeListing({
+        input_schema: {
+          type: "object",
+          properties: {
+            screenshot: {
+              type: "string",
+              title: "Screenshot",
+              contentEncoding: "base64",
+              contentMediaType: "image/*",
+            },
+          },
+          required: ["screenshot"],
+        } as unknown as ServiceListing["input_schema"],
+      }),
+    );
+    await clickRequestAndOpenForm();
+
+    const fileInput = screen.getByLabelText(/Screenshot/) as HTMLInputElement;
+    expect(fileInput.type).toBe("file");
+
+    const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const file = new File([pngBytes], "diagram.png", { type: "image/png" });
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    // Wait for the async upload to settle — SchemaForm's file control awaits
+    // the onFileUpload promise before writing into form state.
+    await waitFor(() => {
+      expect(hoisted.uploadToolInput).toHaveBeenCalledTimes(1);
+    });
+    const uploadArgs = hoisted.uploadToolInput.mock.calls[0];
+    expect(uploadArgs[0]).toBe(fakeSigner);
+    expect(uploadArgs[1]).toBe(fakeWallet);
+    expect(uploadArgs[2]).toBe(42); // listing_id
+    expect((uploadArgs[3] as File).name).toBe("diagram.png");
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Submit Request"));
+    });
+    await waitFor(() => {
+      expect(hoisted.createJob).toHaveBeenCalledTimes(1);
+    });
+    const createJobBody = hoisted.createJob.mock.calls[0][2];
+    expect(createJobBody.input_data).toEqual({ screenshot: uploadedUrl });
+    expect(createJobBody.listing_id).toBe(42);
+  });
+
   it("surfaces a field error and does NOT call createJob when a required field is missing", async () => {
     await renderWithListing(
       makeListing({
