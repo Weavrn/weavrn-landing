@@ -8,6 +8,11 @@ jobs:
     environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'qa' && 'qa' || 'development' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Weavrn/weavrn-sdk
+          ref: ${{ github.ref_name }}
+          path: ../weavrn-sdk
       - uses: actions/setup-node@v4
         with:
           node-version: 20
