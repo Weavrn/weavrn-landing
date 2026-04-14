@@ -250,6 +250,64 @@ describe("ToolPublishWizard - step 5 tab gating", () => {
     expect(byoTab.disabled).toBe(true);
   });
 
+  it("enables Hosted tab (not BYO) when TOOLS_HOSTED_ENABLED is on and reveals LLM/Script/Container sub-tabs", async () => {
+    getToolConfigMock.mockResolvedValue({ byoEnabled: false, hostedEnabled: true });
+    await act(async () => {
+      mountWizard();
+    });
+
+    // Fill step 1.
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/^Title$/i), {
+        target: { value: "Hosted Tool" },
+      });
+      fireEvent.change(screen.getByLabelText(/MCP tool slug/i), {
+        target: { value: "hosted-tool" },
+      });
+      fireEvent.change(screen.getByLabelText(/^Description$/i), {
+        target: { value: "hi" },
+      });
+      fireEvent.change(screen.getByLabelText(/Description for model/i), {
+        target: { value: "model desc" },
+      });
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 600));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("slug-status").textContent).toMatch(/available/i);
+    });
+
+    // Step through to step 5 (Execution).
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("next-button"));
+    });
+
+    const hostedTab = screen.getByTestId("hosted-tab") as HTMLButtonElement;
+    const byoTab = screen.getByTestId("byo-tab") as HTMLButtonElement;
+    expect(hostedTab.disabled).toBe(false);
+    expect(byoTab.disabled).toBe(true);
+
+    // Activate Hosted tab; LLM-backed should be the default sub-mode and show
+    // the LLM config (System prompt field).
+    await act(async () => {
+      fireEvent.click(hostedTab);
+    });
+    expect(screen.getByText(/LLM-backed/i)).toBeTruthy();
+    expect(screen.getByText(/Script/i)).toBeTruthy();
+    expect(screen.getByText(/Container/i)).toBeTruthy();
+    expect(screen.getByLabelText(/System prompt/i)).toBeTruthy();
+  });
+
   it("enables BYO tab (not Hosted) when TOOLS_BYO_ENABLED is on and reveals BYO sub-form on activation", async () => {
     getToolConfigMock.mockResolvedValue({ byoEnabled: true, hostedEnabled: false });
     await act(async () => {
