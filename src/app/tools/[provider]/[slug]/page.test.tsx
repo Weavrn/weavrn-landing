@@ -271,6 +271,34 @@ describe("ToolDetailView", () => {
     expect(screen.getByText(/No reviews yet/)).toBeTruthy();
   });
 
+  it("surfaces success rate and p50/p95 latency from the stats aggregate (Task 32)", () => {
+    render(<ToolDetailView tool={baseTool()} />);
+
+    // Labels
+    expect(screen.getByText(/Success rate/i)).toBeTruthy();
+    expect(screen.getByText(/p50 latency/i)).toBeTruthy();
+    expect(screen.getByText(/p95 latency/i)).toBeTruthy();
+
+    // Values — baseTool sets success_rate=0.95, p50=1200ms, p95=4800ms.
+    // The page renders rates as "95%" and latencies via a humanizer
+    // ("1.2s" / "4.8s" or the ms forms). Match loosely so small formatter
+    // tweaks don't break this test.
+    expect(screen.getByText(/95%/)).toBeTruthy();
+    expect(screen.getByText(/1\.?2\s*s|1200\s*ms/i)).toBeTruthy();
+    expect(screen.getByText(/4\.?8\s*s|4800\s*ms/i)).toBeTruthy();
+  });
+
+  it("renders '—' for latency fields when stats aggregate is missing (Task 32)", () => {
+    const tool = baseTool({ stats: undefined as unknown as typeof baseTool extends () => infer T ? T extends { stats: infer S } ? S : never : never });
+    render(<ToolDetailView tool={tool} />);
+    // Both p50 and p95 labels render with an em dash fallback.
+    expect(screen.getByText(/p50 latency/i)).toBeTruthy();
+    expect(screen.getByText(/p95 latency/i)).toBeTruthy();
+    // At least two em dashes present for the two latency cards.
+    const dashes = screen.getAllByText("—");
+    expect(dashes.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("renders up to 5 reviews with stars and truncated wallet", () => {
     const reviews = Array.from({ length: 7 }, (_, i) => ({
       rating: 5,
