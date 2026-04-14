@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@weavrn/sdk": "file:../weavrn-sdk",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "ethers": "^6.13.0",

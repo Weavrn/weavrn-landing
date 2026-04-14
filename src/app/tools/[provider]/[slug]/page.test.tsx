@@ -54,11 +54,12 @@ vi.mock("@/lib/contracts", () => ({
   releaseEscrow: vi.fn(),
 }));
 
-import ToolDetailPage, {
+import ToolDetailPage from "./page";
+import {
   ToolDetailView,
   type ToolDetailClient,
   type ToolEvent,
-} from "./page";
+} from "./tool-detail";
 
 function baseTool(overrides: Partial<ToolDetail> = {}): ToolDetail {
   const tool: ToolDetail = {
