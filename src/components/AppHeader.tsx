@@ -16,6 +16,7 @@ interface Props {
 const NAV_LINKS = [
   ...(features.agents ? [{ label: "Agents", href: "/agents" }] : []),
   ...(features.marketplace ? [{ label: "Marketplace", href: "/marketplace" }] : []),
+  { label: "Tools", href: "/tools" },
   ...(features.dashboard ? [{ label: "Dashboard", href: "/dashboard" }] : []),
   ...(features.mining ? [{ label: "Mining", href: "/mine" }] : []),
 ];

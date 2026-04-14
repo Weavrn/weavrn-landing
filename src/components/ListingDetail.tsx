@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { getListing, createJob, uploadJobFile } from "@/lib/api";
-import type { ServiceListing, InputField } from "@/lib/api";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { getListing, createJob, uploadToolInput } from "@/lib/api";
+import type { ServiceListing } from "@/lib/api";
+import {
+  isLegacySchema,
+  legacyToJsonSchema,
+  schemaToFormFields,
+  validateAgainstSchema,
+  type FormField,
+  type JSONSchema,
+  type LegacyInputField,
+} from "@/lib/schema-form";
+import SchemaForm from "./SchemaForm";
 
 interface Props {
   id: number;
@@ -12,100 +22,6 @@ interface Props {
 
 function truncAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
-function DynamicField({ field, value, onChange, fileRef }: {
-  field: InputField;
-  value: unknown;
-  onChange: (val: unknown) => void;
-  fileRef?: React.MutableRefObject<HTMLInputElement | null>;
-}) {
-  const base = "w-full bg-weavrn-dark border border-weavrn-border rounded-lg p-3 text-sm text-white placeholder:text-weavrn-muted focus:border-weavrn-accent/50 focus:outline-none";
-
-  switch (field.type) {
-    case "textarea":
-      return (
-        <textarea
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder}
-          rows={4}
-          maxLength={field.max_length}
-          className={`${base} resize-none`}
-        />
-      );
-    case "code":
-      return (
-        <textarea
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder || "Paste code here..."}
-          rows={6}
-          maxLength={field.max_length}
-          className={`${base} resize-none font-mono text-xs`}
-        />
-      );
-    case "select":
-      return (
-        <select
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          className={base}
-        >
-          <option value="">Select...</option>
-          {field.options?.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      );
-    case "number":
-      return (
-        <input
-          type="number"
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder}
-          className={base}
-        />
-      );
-    case "file":
-      return (
-        <div>
-          <input
-            ref={(el) => { if (fileRef) fileRef.current = el; }}
-            type="file"
-            accept={field.accept?.join(",") || undefined}
-            onChange={(e) => onChange(e.target.files?.[0] || null)}
-            className="block w-full text-sm text-weavrn-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border file:border-weavrn-border file:bg-weavrn-surface file:text-sm file:text-weavrn-accent hover:file:bg-weavrn-accent/10 file:cursor-pointer"
-          />
-          {value instanceof File && (
-            <p className="text-[10px] text-weavrn-muted mt-1">{(value as File).name} ({Math.round((value as File).size / 1024)}KB)</p>
-          )}
-        </div>
-      );
-    case "url":
-    case "git_url":
-      return (
-        <input
-          type="url"
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder || (field.type === "git_url" ? "https://github.com/owner/repo" : "https://")}
-          className={base}
-        />
-      );
-    default:
-      return (
-        <input
-          type="text"
-          value={(value as string) || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder}
-          maxLength={field.max_length}
-          className={base}
-        />
-      );
-  }
 }
 
 export default function ListingDetail({ id, walletAddress, signer }: Props) {
@@ -120,99 +36,97 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
   // Generic fallback fields
   const [description, setDescription] = useState("");
   const [initialMessage, setInitialMessage] = useState("");
-  // Dynamic form state
-  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
-  const fileInputRefs = useRef<Record<string, React.MutableRefObject<HTMLInputElement | null>>>({});
-  const getFileRef = (name: string) => {
-    if (!fileInputRefs.current[name]) {
-      fileInputRefs.current[name] = { current: null };
+  // Schema-driven form state (flat dot-path keys — see schemaToFormFields)
+  const [formState, setFormState] = useState<Record<string, unknown>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Coerce legacy → JSON Schema when needed; memoize both the schema and the
+  // derived flat field list so SchemaForm sees a stable prop reference.
+  const inputSchema = useMemo<JSONSchema | null>(() => {
+    const raw = listing?.input_schema;
+    if (!raw) return null;
+    if (Array.isArray(raw) && isLegacySchema(raw)) {
+      return legacyToJsonSchema(raw as unknown as LegacyInputField[]);
     }
-    return fileInputRefs.current[name];
-  };
+    if (typeof raw === "object") {
+      return raw as unknown as JSONSchema;
+    }
+    return null;
+  }, [listing?.input_schema]);
 
-  const hasSchema = listing?.input_schema && Array.isArray(listing.input_schema) && listing.input_schema.length > 0;
+  const formFields = useMemo<FormField[] | null>(
+    () => (inputSchema ? schemaToFormFields(inputSchema) : null),
+    [inputSchema],
+  );
 
-  const setFieldValue = (name: string, value: unknown) => {
-    setFormValues((prev) => ({ ...prev, [name]: value }));
-  };
+  const handleToolInputUpload = useCallback(
+    async (_field: FormField, file: File): Promise<string> => {
+      if (!signer || !walletAddress) {
+        throw new Error("Connect your wallet to upload files");
+      }
+      const res = await uploadToolInput(signer, walletAddress, listing?.id ?? null, file);
+      return res.file_url;
+    },
+    [signer, walletAddress, listing?.id],
+  );
 
   const handleRequestService = async () => {
     if (!signer || !walletAddress || !listing) return;
     setRequesting(true);
     setRequestError(null);
+    setFieldErrors({});
     try {
-      // Validate required fields
-      if (hasSchema) {
-        for (const field of listing.input_schema!) {
-          const val = formValues[field.name];
-          if (field.required) {
-            if (field.type === "file") {
-              if (!(val instanceof File)) {
-                setRequestError(`${field.label} is required`);
-                setRequesting(false);
-                return;
-              }
-            } else if (!val || (typeof val === "string" && !val.trim())) {
-              setRequestError(`${field.label} is required`);
-              setRequesting(false);
-              return;
+      // Schema-driven path: validate via ajv. Legacy listings reach here via
+      // isLegacySchema + legacyToJsonSchema coercion above.
+      if (formFields && inputSchema) {
+        const result = validateAgainstSchema(inputSchema, formState);
+        if (!result.ok) {
+          const nextErrors: Record<string, string> = {};
+          for (const e of result.errors) {
+            // ajv instancePath is leading-slash, e.g. "/prompt" or
+            // "/options/seed". SchemaForm indexes errors by dot-path
+            // ("prompt", "options.seed"). Convert.
+            const basePath = e.path.startsWith("/")
+              ? e.path.slice(1).replace(/\//g, ".")
+              : e.path;
+            // Required-property errors surface with an empty instancePath
+            // and a message of "must have required property '<name>'".
+            // Map them onto the missing property so SchemaForm can render
+            // the error inline with the field.
+            let path = basePath;
+            const requiredMatch = /must have required property '([^']+)'/.exec(e.message);
+            if (requiredMatch) {
+              const name = requiredMatch[1];
+              path = basePath ? `${basePath}.${name}` : name;
             }
+            if (!nextErrors[path]) nextErrors[path] = e.message || "Invalid value";
           }
-          if (typeof val === "string" && val.length > 10000) {
-            setRequestError(`${field.label} exceeds maximum length (10000 chars)`);
-            setRequesting(false);
-            return;
-          }
-          if ((field.type === "url" || field.type === "git_url") && typeof val === "string" && val.trim()) {
-            try { new URL(val); } catch {
-              setRequestError(`${field.label} must be a valid URL`);
-              setRequesting(false);
-              return;
-            }
-          }
+          setFieldErrors(nextErrors);
+          setRequesting(false);
+          return;
         }
       }
 
-      // Build input_data (exclude file fields — those get uploaded after job creation)
-      const inputData: Record<string, unknown> = {};
-      const fileFields: { field: InputField; file: File }[] = [];
-      if (hasSchema) {
-        for (const field of listing.input_schema!) {
-          const val = formValues[field.name];
-          if (field.type === "file" && val instanceof File) {
-            fileFields.push({ field, file: val });
-          } else if (val !== undefined && val !== null && val !== "") {
-            inputData[field.name] = val;
-          }
-        }
-      }
+      const inputData: Record<string, unknown> | undefined =
+        formFields && Object.keys(formState).length > 0 ? { ...formState } : undefined;
 
-      const job = await createJob(signer, walletAddress, {
+      await createJob(signer, walletAddress, {
         listing_id: listing.id,
         provider_wallet: listing.wallet_address,
         title: listing.title,
-        description: hasSchema ? `Service request for: ${listing.title}` : (description.trim() || `Service request for: ${listing.title}`),
-        initial_message: hasSchema ? undefined : (initialMessage.trim() || undefined),
-        input_data: hasSchema && Object.keys(inputData).length > 0 ? inputData : undefined,
+        description: formFields
+          ? `Service request for: ${listing.title}`
+          : description.trim() || `Service request for: ${listing.title}`,
+        initial_message: formFields ? undefined : initialMessage.trim() || undefined,
+        input_data: inputData,
       });
 
-      // Upload file fields after job creation
-      const failedFiles: string[] = [];
-      for (const { file } of fileFields) {
-        try {
-          await uploadJobFile(signer, walletAddress, job.id, file);
-        } catch {
-          failedFiles.push(file.name);
-        }
-      }
+      // Schema-driven listings upload pre-job via uploadToolInput (URLs are
+      // already in formState). The non-schema fallback submits with no
+      // files, so no post-job upload is needed here.
 
-      if (failedFiles.length > 0) {
-        setCreatedJobId(job.id);
-        setRequestError(`${failedFiles.length} file(s) failed to upload: ${failedFiles.join(", ")}. The job was created — go to your dashboard to retry.`);
-      } else {
-        setRequested(true);
-        setTimeout(() => { window.location.href = "/dashboard"; }, 2000);
-      }
+      setRequested(true);
+      setTimeout(() => { window.location.href = "/dashboard"; }, 2000);
     } catch (err: unknown) {
       setRequestError((err as { message?: string }).message || "Failed to request service");
     } finally {
@@ -320,26 +234,17 @@ export default function ListingDetail({ id, walletAddress, signer }: Props) {
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold">Request this service</h4>
 
-                {hasSchema ? (
-                  /* Dynamic form from input_schema */
-                  listing.input_schema!.map((field) => (
-                    <div key={field.name}>
-                      <label className="text-xs text-weavrn-muted block mb-1">
-                        {field.label}{field.required && <span className="text-red-400 ml-0.5">*</span>}
-                      </label>
-                      {field.description && (
-                        <p className="text-[10px] text-weavrn-muted/60 mb-1">{field.description}</p>
-                      )}
-                      <DynamicField
-                        field={field}
-                        value={formValues[field.name]}
-                        onChange={(val) => setFieldValue(field.name, val)}
-                        fileRef={field.type === "file" ? getFileRef(field.name) : undefined}
-                      />
-                    </div>
-                  ))
+                {formFields ? (
+                  <SchemaForm
+                    fields={formFields}
+                    value={formState}
+                    onChange={setFormState}
+                    errors={fieldErrors}
+                    disabled={requesting}
+                    onFileUpload={handleToolInputUpload}
+                  />
                 ) : (
-                  /* Generic fallback */
+                  /* Generic fallback — no input_schema on this listing */
                   <>
                     <div>
                       <label className="text-xs text-weavrn-muted block mb-1">What do you need?</label>

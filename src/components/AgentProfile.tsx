@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { getAgent, getAgentPayments, getAgentProfile, getAgentListings } from "@/lib/api";
-import type { AgentDetail, PaymentRecord, AgentProfile as AgentProfileType, ServiceListing, AgentCapability } from "@/lib/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getAgent, getAgentPayments, getAgentProfile, getAgentListings, listTools } from "@/lib/api";
+import type { AgentDetail, PaymentRecord, AgentProfile as AgentProfileType, ServiceListing, AgentCapability, ToolSummary } from "@/lib/api";
 import ReviewList from "./ReviewList";
+import ToolCard from "./ToolCard";
+
+type ProfileTab = "overview" | "tools";
 
 interface Props {
   wallet: string;
@@ -20,6 +23,11 @@ export default function AgentProfile({ wallet }: Props) {
   const [listings, setListings] = useState<ServiceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [tools, setTools] = useState<ToolSummary[]>([]);
+  const [toolsLoading, setToolsLoading] = useState(false);
+  const [toolsError, setToolsError] = useState<string | null>(null);
+  const toolsFetchedRef = useRef(false);
 
   const fetchProfile = useCallback(async () => {
     setLoading(true);
@@ -46,6 +54,36 @@ export default function AgentProfile({ wallet }: Props) {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  // Reset tools cache when wallet changes
+  useEffect(() => {
+    toolsFetchedRef.current = false;
+    setTools([]);
+    setToolsError(null);
+  }, [wallet]);
+
+  const fetchTools = useCallback(async () => {
+    if (toolsFetchedRef.current) return;
+    toolsFetchedRef.current = true;
+    setToolsLoading(true);
+    setToolsError(null);
+    try {
+      const res = await listTools({ provider: wallet, limit: 50 });
+      setTools(res.tools);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setToolsError(e.message || "Failed to load tools");
+      toolsFetchedRef.current = false;
+    } finally {
+      setToolsLoading(false);
+    }
+  }, [wallet]);
+
+  useEffect(() => {
+    if (activeTab === "tools") {
+      fetchTools();
+    }
+  }, [activeTab, fetchTools]);
 
   if (loading) {
     return (
@@ -130,6 +168,60 @@ export default function AgentProfile({ wallet }: Props) {
         )}
       </div>
 
+      {/* Tabs */}
+      <div role="tablist" aria-label="Agent profile sections" className="flex items-center gap-2 border-b border-weavrn-border/50">
+        <button
+          role="tab"
+          aria-selected={activeTab === "overview"}
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2 -mb-px text-sm transition-colors border-b-2 ${
+            activeTab === "overview"
+              ? "border-weavrn-accent text-weavrn-accent"
+              : "border-transparent text-weavrn-muted hover:text-white"
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === "tools"}
+          onClick={() => setActiveTab("tools")}
+          className={`px-4 py-2 -mb-px text-sm transition-colors border-b-2 ${
+            activeTab === "tools"
+              ? "border-weavrn-accent text-weavrn-accent"
+              : "border-transparent text-weavrn-muted hover:text-white"
+          }`}
+        >
+          Tools
+        </button>
+      </div>
+
+      {activeTab === "tools" ? (
+        <div className="space-y-4">
+          {toolsLoading ? (
+            <p className="text-sm text-weavrn-muted py-8 text-center">Loading tools...</p>
+          ) : toolsError ? (
+            <p className="text-sm text-red-400 py-8 text-center">{toolsError}</p>
+          ) : tools.length === 0 ? (
+            <div className="glow-card rounded-xl p-10 text-center">
+              <p className="text-sm text-weavrn-muted">This agent hasn&apos;t published any tools yet.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {tools.map((t) => (
+                <ToolCard key={t.id} tool={t} />
+              ))}
+            </div>
+          )}
+
+          <div className="text-center">
+            <a href="/agents" className="text-sm text-weavrn-muted hover:text-weavrn-accent transition-colors">
+              Back to directory
+            </a>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Stats */}
       {agent.stats && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -241,6 +333,8 @@ export default function AgentProfile({ wallet }: Props) {
           Back to directory
         </a>
       </div>
+        </>
+      )}
     </div>
   );
 }

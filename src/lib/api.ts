@@ -619,6 +619,10 @@ export interface ServiceListing {
   avatar_url?: string;
   avg_rating?: number;
   review_count?: number;
+  // MCP tool columns — populated when a listing is backed by a published tool
+  mcp_tool_slug?: string | null;
+  tool_category?: string | null;
+  execution_mode?: "manual" | "hosted" | "byo" | null;
 }
 
 export function getListings(page = 1, limit = 50, category?: string, tags?: string, search?: string, accepts?: string) {
@@ -1287,4 +1291,138 @@ export function getMerkleProof(wallet: string, blockNumber: number) {
   return apiFetch<MerkleProofResponse>(`/rewards/${wallet.toLowerCase()}/proof/${blockNumber}`);
 }
 
+// ────────── Tool marketplace (MCP) ──────────
+
+export interface ToolAgent {
+  wallet_address: string;
+  name: string | null;
+  trust_score: number | null;
+  active: boolean;
+}
+
+export interface ToolSummary {
+  id: number;
+  wallet_address: string;
+  mcp_tool_slug: string;
+  title: string;
+  description: string;
+  description_for_model: string | null;
+  tool_category: string | null;
+  output_content_type: string | null;
+  execution_mode: "manual" | "hosted" | "byo";
+  price_amount: string | null;
+  price_token: string | null;
+  escrow_strategy: string | null;
+  default_deadline_seconds: number | null;
+  agent: ToolAgent;
+  call_count: number;
+  success_rate: number | null;
+}
+
+export interface ToolStats {
+  call_count: number;
+  success_count: number;
+  failure_count: number;
+  timeout_count: number;
+  success_rate: number | null;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+  revenue: string;
+  window: "7d" | "30d" | "all";
+}
+
+export interface ToolDetail extends ToolSummary {
+  input_schema: unknown | null;
+  output_schema: unknown | null;
+  timeout_seconds: number;
+  max_input_bytes: number;
+  max_output_bytes: number;
+  max_calls_per_minute: number | null;
+  max_calls_per_day: number | null;
+  stats: ToolStats;
+  recent_reviews: Array<{ rating: number; comment: string | null; reviewer_wallet: string; created_at: string }>;
+}
+
+export interface ToolConfig {
+  byoEnabled: boolean;
+  hostedEnabled: boolean;
+}
+
+export interface ListToolsFilters {
+  tool_category?: string;
+  execution_mode?: "manual" | "hosted" | "byo";
+  content_type?: string;
+  price_max?: string;
+  price_token?: string;
+  provider?: string;
+  search?: string;
+  sort?: "trust" | "price" | "popularity";
+  cursor?: string | null;
+  limit?: number;
+}
+
+export function listTools(filters: ListToolsFilters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.tool_category) qs.set("tool_category", filters.tool_category);
+  if (filters.execution_mode) qs.set("execution_mode", filters.execution_mode);
+  if (filters.content_type) qs.set("content_type", filters.content_type);
+  if (filters.price_max) qs.set("price_max", filters.price_max);
+  if (filters.price_token) qs.set("price_token", filters.price_token);
+  if (filters.provider) qs.set("provider", filters.provider);
+  if (filters.search) qs.set("search", filters.search);
+  if (filters.sort) qs.set("sort", filters.sort);
+  if (filters.cursor) qs.set("cursor", filters.cursor);
+  if (filters.limit != null) qs.set("limit", String(filters.limit));
+  const qstr = qs.toString();
+  return apiFetch<{ tools: ToolSummary[]; next_cursor: string | null }>(
+    `/tools${qstr ? `?${qstr}` : ""}`,
+  );
+}
+
+export async function getTool(provider: string, slug: string): Promise<ToolDetail> {
+  try {
+    return await apiFetch<ToolDetail>(
+      `/tools/${encodeURIComponent(provider)}/${encodeURIComponent(slug)}`,
+    );
+  } catch (err) {
+    const msg = (err as Error).message || "";
+    if (/not found|404/i.test(msg)) throw new Error("Tool not found");
+    throw err;
+  }
+}
+
+export function getToolStats(listingId: number, window: "7d" | "30d" | "all" = "all") {
+  return apiFetch<ToolStats>(`/tools/${listingId}/stats?window=${window}`);
+}
+
+export function getToolConfig() {
+  return apiFetch<ToolConfig>("/tools/config");
+}
+
+export async function uploadToolInput(
+  signer: import("ethers").JsonRpcSigner,
+  walletAddress: string,
+  listingId: number | null,
+  file: File,
+): Promise<{ file_url: string; mime_type: string; bytes: number }> {
+  const resourceId = listingId ?? "-";
+  const { signature, timestamp } = await signForWallet(signer, walletAddress, "upload-tool-input", resourceId);
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("wallet_address", walletAddress.toLowerCase());
+  form.append("signature", signature);
+  form.append("timestamp", String(timestamp));
+  if (listingId != null) form.append("listing_id", String(listingId));
+
+  const res = await fetch(`${API_URL}/tool-inputs/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || body.message || res.statusText);
+  }
+  return res.json() as Promise<{ file_url: string; mime_type: string; bytes: number }>;
+}
 

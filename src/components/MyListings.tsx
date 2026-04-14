@@ -356,10 +356,26 @@ export default function MyListings({ walletAddress, signer }: Props) {
             <div key={l.id} className="p-3 rounded-lg bg-weavrn-dark border border-weavrn-border">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  {l.mcp_tool_slug && (
+                    <span
+                      data-testid="tool-badge"
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-weavrn-accent text-black font-semibold tracking-wider"
+                    >
+                      TOOL
+                    </span>
+                  )}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-weavrn-surface border border-weavrn-border text-weavrn-muted">
-                    {l.category}
+                    {l.category}{l.mcp_tool_slug && l.tool_category ? ` \u00b7 ${l.tool_category.replace(/_/g, " ")}` : ""}
                   </span>
+                  {l.mcp_tool_slug && l.execution_mode && (
+                    <span
+                      data-testid="tool-execution-mode"
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                    >
+                      {l.execution_mode === "byo" ? "BYO" : l.execution_mode.charAt(0).toUpperCase() + l.execution_mode.slice(1)}
+                    </span>
+                  )}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${l.active ? "bg-weavrn-accent/10 text-weavrn-accent" : "bg-red-500/10 text-red-400"}`}>
                     {l.active ? "Active" : "Inactive"}
                   </span>
