@@ -1,18 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { JsonRpcSigner } from "ethers";
 import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import { getTool, type ToolDetail } from "@/lib/api";
 import { ToolDetailView, errorMessage } from "./tool-detail";
 
-interface PageProps {
-  params: { provider: string; slug: string };
-}
+export default function ToolViewPage(): JSX.Element {
+  const searchParams = useSearchParams();
+  const provider = searchParams.get("provider");
+  const slug = searchParams.get("slug");
 
-export default function ToolDetailPage({ params }: PageProps): JSX.Element {
-  const { provider, slug } = params;
   const [tool, setTool] = useState<ToolDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -32,6 +32,11 @@ export default function ToolDetailPage({ params }: PageProps): JSX.Element {
   }, []);
 
   useEffect(() => {
+    if (!provider || !slug) {
+      setLoading(false);
+      setNotFound(true);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setNotFound(false);

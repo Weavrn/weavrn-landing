@@ -31,7 +31,7 @@ export default function ToolCard({ tool }: Props) {
   const providerName = tool.agent.name || truncAddr(tool.agent.wallet_address);
   const successPct =
     tool.success_rate != null ? `${(tool.success_rate * 100).toFixed(0)}%` : "—";
-  const href = `/tools/${encodeURIComponent(tool.agent.wallet_address)}/${encodeURIComponent(tool.mcp_tool_slug)}`;
+  const href = `/tools/view?provider=${encodeURIComponent(tool.agent.wallet_address)}&slug=${encodeURIComponent(tool.mcp_tool_slug)}`;
 
   return (
     <Link

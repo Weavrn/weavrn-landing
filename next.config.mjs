@@ -1,13 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "export",
   reactStrictMode: true,
-  // `output: "export"` was removed when the MCP tool detail route
-  // (`/tools/[provider]/[slug]`) landed — provider/slug tuples are created
-  // by the marketplace at runtime, so they can't be enumerated via
-  // `generateStaticParams()` at build time. Every page in this app is
-  // already wallet-connected and API-driven, so static export bought
-  // nothing beyond a deployment-shape convenience. Vercel auto-detects
-  // Next.js and serves this as a standard Next app without the flag.
   images: {
     unoptimized: true,
   },

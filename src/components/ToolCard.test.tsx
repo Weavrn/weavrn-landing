@@ -55,7 +55,7 @@ describe("ToolCard", () => {
     render(<ToolCard tool={baseTool} />);
     const link = screen.getByRole("link");
     expect(link.getAttribute("href")).toBe(
-      `/tools/${encodeURIComponent(baseTool.agent.wallet_address)}/${encodeURIComponent(baseTool.mcp_tool_slug)}`,
+      `/tools/view?provider=${encodeURIComponent(baseTool.agent.wallet_address)}&slug=${encodeURIComponent(baseTool.mcp_tool_slug)}`,
     );
   });
 

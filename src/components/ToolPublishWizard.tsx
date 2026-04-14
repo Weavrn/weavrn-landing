@@ -1729,9 +1729,9 @@ export default function ToolPublishWizard({
           // ignore
         }
       }
-      const destination = `/tools/${encodeURIComponent(
+      const destination = `/tools/view?provider=${encodeURIComponent(
         walletAddress,
-      )}/${encodeURIComponent(draft.mcp_tool_slug)}`;
+      )}&slug=${encodeURIComponent(draft.mcp_tool_slug)}`;
       if (typeof window !== "undefined") {
         window.location.href = destination;
       }
