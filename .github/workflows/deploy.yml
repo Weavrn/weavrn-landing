@@ -12,7 +12,8 @@ jobs:
         with:
           repository: Weavrn/weavrn-sdk
           ref: ${{ github.ref_name }}
-          path: ../weavrn-sdk
+          path: weavrn-sdk
+      - run: ln -s $GITHUB_WORKSPACE/weavrn-sdk ../weavrn-sdk
       - uses: actions/setup-node@v4
         with:
           node-version: 20
