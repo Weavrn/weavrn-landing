@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useCallback } from "react";
+import { useId, useState, useCallback, useRef } from "react";
 import type { KeyboardEvent, ChangeEvent } from "react";
 import type { FormField } from "../lib/schema-form";
 
@@ -352,6 +352,7 @@ function FileInput({
   onFileUpload,
 }: FieldRowProps): JSX.Element {
   const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const current = value[field.path];
@@ -362,6 +363,7 @@ function FileInput({
     async (file: File) => {
       setLocalError(null);
       if (!isFileAccepted(file, field.accept)) {
+        if (inputRef.current) inputRef.current.value = "";
         setLocalError(
           field.accept
             ? `File type not allowed. Accepted: ${field.accept}`
@@ -398,6 +400,7 @@ function FileInput({
   return (
     <FieldWrapper id={id} field={field} errorMsg={hasError ? errMsg : undefined}>
       <input
+        ref={inputRef}
         id={id}
         type="file"
         accept={field.accept}
