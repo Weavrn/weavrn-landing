@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { JsonRpcSigner } from "ethers";
 import {
   API_URL,
@@ -353,7 +361,11 @@ async function checkSlugTaken(wallet: string, slug: string): Promise<"taken" | "
 
 interface StepProps {
   draft: ToolDraft;
-  setDraft: (next: ToolDraft) => void;
+  // Accept both the value and updater forms of React's setState so child
+  // handlers that call setDraft twice in a row (e.g. mode + schema on a
+  // tab click, or rows + schema in updateRow) can use the updater form
+  // and avoid stale-closure overwrites when React batches updates.
+  setDraft: Dispatch<SetStateAction<ToolDraft>>;
 }
 
 interface BasicsStepProps extends StepProps {
@@ -1827,15 +1839,15 @@ export default function ToolPublishWizard({
           title="Input schema"
           category={draft.tool_category}
           mode={draft.input_schema_mode}
-          setMode={(m) => setDraft({ ...draft, input_schema_mode: m })}
+          setMode={(m) => setDraft((d) => ({ ...d, input_schema_mode: m }))}
           schema={draft.input_schema}
-          setSchema={(s) => setDraft({ ...draft, input_schema: s })}
+          setSchema={(s) => setDraft((d) => ({ ...d, input_schema: s }))}
           builderRows={draft.input_builder_rows}
           setBuilderRows={(rows) =>
-            setDraft({ ...draft, input_builder_rows: rows })
+            setDraft((d) => ({ ...d, input_builder_rows: rows }))
           }
           rawText={draft.input_raw_text}
-          setRawText={(s) => setDraft({ ...draft, input_raw_text: s })}
+          setRawText={(s) => setDraft((d) => ({ ...d, input_raw_text: s }))}
           presetFn={getPresetForCategory}
           testIdPrefix="input"
         />
@@ -1854,15 +1866,15 @@ export default function ToolPublishWizard({
             title="Output schema"
             category={draft.tool_category}
             mode={draft.output_schema_mode}
-            setMode={(m) => setDraft({ ...draft, output_schema_mode: m })}
+            setMode={(m) => setDraft((d) => ({ ...d, output_schema_mode: m }))}
             schema={draft.output_schema}
-            setSchema={(s) => setDraft({ ...draft, output_schema: s })}
+            setSchema={(s) => setDraft((d) => ({ ...d, output_schema: s }))}
             builderRows={draft.output_builder_rows}
             setBuilderRows={(rows) =>
-              setDraft({ ...draft, output_builder_rows: rows })
+              setDraft((d) => ({ ...d, output_builder_rows: rows }))
             }
             rawText={draft.output_raw_text}
-            setRawText={(s) => setDraft({ ...draft, output_raw_text: s })}
+            setRawText={(s) => setDraft((d) => ({ ...d, output_raw_text: s }))}
             presetFn={getOutputPresetForCategory}
             testIdPrefix="output"
           />
