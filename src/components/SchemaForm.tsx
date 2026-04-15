@@ -66,6 +66,24 @@ function readNumberDisplay(value: Record<string, unknown>, path: string): string
   return "";
 }
 
+/**
+ * Returns true when `file` matches at least one token in an `accept` string.
+ * Handles file extensions (.json), exact MIME types (application/json), and
+ * wildcard MIME types (image/*). An empty/missing accept string allows everything.
+ */
+function isFileAccepted(file: File, accept: string | undefined): boolean {
+  if (!accept || accept.trim() === "") return true;
+  const tokens = accept.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const ext = file.name.includes(".") ? `.${file.name.split(".").pop()!.toLowerCase()}` : "";
+  const mime = file.type.toLowerCase();
+  return tokens.some((token) => {
+    if (token.startsWith(".")) return ext === token;
+    if (token.endsWith("/*")) return mime.startsWith(token.slice(0, -1));
+    return mime === token;
+  });
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -343,6 +361,14 @@ function FileInput({
   const handleFile = useCallback(
     async (file: File) => {
       setLocalError(null);
+      if (!isFileAccepted(file, field.accept)) {
+        setLocalError(
+          field.accept
+            ? `File type not allowed. Accepted: ${field.accept}`
+            : "File type not allowed.",
+        );
+        return;
+      }
       if (onFileUpload) {
         setUploading(true);
         try {
