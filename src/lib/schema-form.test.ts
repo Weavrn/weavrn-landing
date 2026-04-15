@@ -433,6 +433,18 @@ describe("legacyToJsonSchema", () => {
     });
   });
 
+  it("joins accept string[] into a comma-separated contentMediaType for file fields", () => {
+    const schema = legacyToJsonSchema([
+      { name: "f", type: "file", accept: [".json", ".csv"] },
+    ]);
+    const props = schema.properties as Record<string, JSONSchema>;
+    expect(props.f).toEqual({
+      type: "string",
+      contentEncoding: "base64",
+      contentMediaType: ".json,.csv",
+    });
+  });
+
   it("produces empty enum array when select has no options", () => {
     const schema = legacyToJsonSchema([{ name: "s", type: "select" }]);
     const props = schema.properties as Record<string, JSONSchema>;
