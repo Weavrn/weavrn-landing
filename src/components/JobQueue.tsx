@@ -89,7 +89,7 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
   const [fundingDetails, setFundingDetails] = useState<{ price: string; fee: string; total: string; feeModel: string; providerFee: string } | null>(null);
   const fundingRef = useRef(false);
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   const fetchJobs = useCallback(async (p: number, silent = false) => {
     if (!silent) setLoading(true);
