@@ -1406,17 +1406,27 @@ export async function uploadToolInput(
   file: File,
 ): Promise<{ file_url: string; mime_type: string; bytes: number }> {
   const resourceId = listingId ?? "-";
-  const { signature, timestamp } = await signForWallet(signer, walletAddress, "upload-tool-input", resourceId);
 
   const form = new FormData();
   form.append("file", file);
   form.append("wallet_address", walletAddress.toLowerCase());
-  form.append("signature", signature);
-  form.append("timestamp", String(timestamp));
+
+  // Prefer session-token auth (same as apiFetch); fall back to per-request
+  // signature for callers that have no active session.
+  const headers: Record<string, string> = {};
+  if (hasSession()) {
+    headers["Authorization"] = `Bearer ${getSessionToken()}`;
+  } else {
+    const { signature, timestamp } = await signForWallet(signer, walletAddress, "upload-tool-input", resourceId);
+    form.append("signature", signature);
+    form.append("timestamp", String(timestamp));
+  }
+
   if (listingId != null) form.append("listing_id", String(listingId));
 
   const res = await fetch(`${API_URL}/tool-inputs/upload`, {
     method: "POST",
+    headers,
     body: form,
   });
   if (!res.ok) {
