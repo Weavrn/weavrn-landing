@@ -312,6 +312,88 @@ describe("SchemaForm", () => {
     });
   });
 
+  it("rejects a file whose extension is not in the accept list and shows an error", async () => {
+    const fields = fieldsFromSchema({
+      type: "object",
+      properties: {
+        upload: {
+          type: "string",
+          contentEncoding: "base64",
+          contentMediaType: ".json,.csv",
+        },
+      },
+    });
+    const onFileUpload = vi.fn(async () => "https://cdn.example.com/file");
+
+    render(<Harness fields={fields} onFileUpload={onFileUpload} />);
+
+    const input = screen.getByLabelText(/Upload/) as HTMLInputElement;
+    const file = new File(["x"], "malware.exe", { type: "application/octet-stream" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    expect(onFileUpload).not.toHaveBeenCalled();
+    expect(await screen.findByText(/File type not allowed/)).toBeTruthy();
+  });
+
+  it("accepts a file whose extension matches the accept list", async () => {
+    const fields = fieldsFromSchema({
+      type: "object",
+      properties: {
+        config: {
+          type: "string",
+          contentEncoding: "base64",
+          contentMediaType: ".json",
+        },
+      },
+    });
+    const onFileUpload = vi.fn(async () => "https://cdn.example.com/config.json");
+    const captured: Record<string, unknown>[] = [];
+
+    render(
+      <Harness
+        fields={fields}
+        onFileUpload={onFileUpload}
+        onStateChange={(next) => captured.push(next)}
+      />,
+    );
+
+    const input = screen.getByLabelText(/Config/) as HTMLInputElement;
+    const file = new File([`{"a":1}`], "config.json", { type: "application/json" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => expect(onFileUpload).toHaveBeenCalledTimes(1));
+    expect(captured[captured.length - 1]).toEqual({ config: "https://cdn.example.com/config.json" });
+  });
+
+  it("accepts a file whose MIME type matches an image/* wildcard", async () => {
+    const onFileUpload = vi.fn(async () => "https://cdn.example.com/img.png");
+    const fields = fieldsFromSchema({
+      type: "object",
+      properties: {
+        photo: {
+          type: "string",
+          contentEncoding: "base64",
+          contentMediaType: "image/*",
+        },
+      },
+    });
+    render(<Harness fields={fields} onFileUpload={onFileUpload} />);
+
+    const input = screen.getByLabelText(/Photo/) as HTMLInputElement;
+    const file = new File(["img"], "photo.png", { type: "image/png" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => expect(onFileUpload).toHaveBeenCalledTimes(1));
+    // No error visible
+    expect(screen.queryByText(/File type not allowed/)).toBeNull();
+  });
+
   it("writes a base64 data URL when onFileUpload is NOT provided", async () => {
     installFileReaderDataUrl("data:image/png;base64,AAAA");
 
