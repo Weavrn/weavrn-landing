@@ -1,16 +1,40 @@
 "use client";
 
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { JsonRpcSigner } from "ethers";
 import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import ToolPublishWizard from "@/components/ToolPublishWizard";
+import AgentRegistration from "@/components/AgentRegistration";
+import { getAgentOnChain } from "@/lib/contracts";
+
+interface AgentInfo {
+  agentId: number;
+  name: string;
+  metadataURI: string;
+  active: boolean;
+  isRegistered: boolean;
+}
 
 function PublishContent() {
   const searchParams = useSearchParams();
   const [address, setAddress] = useState<string | null>(null);
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
+  const [agent, setAgent] = useState<AgentInfo | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
+
+  const fetchAgent = useCallback(async (addr: string) => {
+    setAgentLoading(true);
+    try {
+      const info = await getAgentOnChain(addr);
+      setAgent(info);
+    } catch {
+      setAgent(null);
+    } finally {
+      setAgentLoading(false);
+    }
+  }, []);
 
   const handleConnect = useCallback(
     (addr: string, s: JsonRpcSigner) => {
@@ -22,10 +46,17 @@ function PublishContent() {
   const handleDisconnect = useCallback(() => {
     setAddress(null);
     setSigner(null);
+    setAgent(null);
   }, []);
+
+  useEffect(() => {
+    if (address) fetchAgent(address);
+  }, [address, fetchAgent]);
 
   const rawEdit = searchParams.get("edit");
   const editListingId = rawEdit && !Number.isNaN(Number(rawEdit)) ? Number(rawEdit) : null;
+
+  const isRegisteredAndActive = agent?.isRegistered && agent?.active;
 
   return (
     <main className="min-h-screen noise">
@@ -48,12 +79,33 @@ function PublishContent() {
         </div>
 
         <div className="max-w-5xl mx-auto">
-          <ToolPublishWizard
-            walletAddress={address}
-            signer={signer}
-            editListingId={editListingId}
-            searchParams={new URLSearchParams(searchParams.toString())}
-          />
+          {address && !agentLoading && !isRegisteredAndActive && (
+            <div className="mb-6">
+              <div className="border border-yellow-500/40 rounded-lg p-3 text-xs text-yellow-400 bg-yellow-500/5 mb-4">
+                Your wallet must be registered as an active agent before you can publish tools.
+              </div>
+              <AgentRegistration
+                agent={agent}
+                signer={signer}
+                onRegistered={() => fetchAgent(address)}
+              />
+            </div>
+          )}
+
+          {agentLoading && address && (
+            <div className="text-center text-sm text-weavrn-muted py-8">
+              Checking agent registration...
+            </div>
+          )}
+
+          {(!address || isRegisteredAndActive) && (
+            <ToolPublishWizard
+              walletAddress={address}
+              signer={signer}
+              editListingId={editListingId}
+              searchParams={new URLSearchParams(searchParams.toString())}
+            />
+          )}
         </div>
       </div>
 
