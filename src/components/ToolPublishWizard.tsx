@@ -118,6 +118,14 @@ interface Props {
   signer: JsonRpcSigner | null;
   editListingId?: number | null;
   searchParams?: URLSearchParams | null;
+  /**
+   * Wallet to publish under. Defaults to `walletAddress` (the connected owner).
+   * When set to a different address (a hosted agent wallet owned by the
+   * connected wallet), the server persists the listing under that wallet
+   * via `agent_wallet` and checks its on-chain registration instead of the
+   * owner's.
+   */
+  publishAsWallet?: string | null;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -1562,7 +1570,13 @@ export default function ToolPublishWizard({
   signer,
   editListingId,
   searchParams,
+  publishAsWallet,
 }: Props): JSX.Element {
+  const effectivePublishWallet = (publishAsWallet ?? walletAddress)?.toLowerCase() ?? null;
+  const isHostedAgentPublish =
+    !!effectivePublishWallet &&
+    !!walletAddress &&
+    effectivePublishWallet !== walletAddress.toLowerCase();
   const lsKey = walletAddress ? `${LS_PREFIX}${walletAddress.toLowerCase()}` : null;
 
   const [draft, setDraft] = useState<ToolDraft>(() => makeInitialDraft());
@@ -1716,12 +1730,15 @@ export default function ToolPublishWizard({
     setPublishError(null);
     try {
       const payload = buildPublishPayload(draft);
+      const payloadWithAgent = isHostedAgentPublish
+        ? { ...payload, agent_wallet: effectivePublishWallet }
+        : payload;
       if (isEdit && editIdRef.current) {
         await updateListing(
           signer,
           walletAddress,
           editIdRef.current,
-          payload as unknown as Partial<ServiceListing>,
+          payloadWithAgent as unknown as Partial<ServiceListing>,
         );
       } else {
         // createListing's declared shape omits many MCP keys. The server
@@ -1730,7 +1747,7 @@ export default function ToolPublishWizard({
         await createListing(
           signer,
           walletAddress,
-          payload as unknown as Parameters<typeof createListing>[2],
+          payloadWithAgent as unknown as Parameters<typeof createListing>[2],
         );
       }
       // Clear autosave and redirect.
@@ -1741,8 +1758,9 @@ export default function ToolPublishWizard({
           // ignore
         }
       }
+      const destinationWallet = effectivePublishWallet || walletAddress;
       const destination = `/tools/view?provider=${encodeURIComponent(
-        walletAddress,
+        destinationWallet,
       )}&slug=${encodeURIComponent(draft.mcp_tool_slug)}`;
       if (typeof window !== "undefined") {
         window.location.href = destination;
@@ -1754,7 +1772,7 @@ export default function ToolPublishWizard({
     } finally {
       setPublishing(false);
     }
-  }, [signer, walletAddress, draft, isEdit, lsKey]);
+  }, [signer, walletAddress, draft, isEdit, lsKey, isHostedAgentPublish, effectivePublishWallet]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -1828,7 +1846,7 @@ export default function ToolPublishWizard({
         <WizardBasicsStep
           draft={draft}
           setDraft={setDraft}
-          walletAddress={walletAddress}
+          walletAddress={effectivePublishWallet}
           slugState={slugState}
           setSlugState={setSlugState}
         />
