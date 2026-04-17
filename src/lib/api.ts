@@ -693,6 +693,36 @@ export async function deactivateListing(signer: import("ethers").JsonRpcSigner, 
   });
 }
 
+// ── Hosted Agents ──
+
+export interface HostedAgentSummary {
+  id: number;
+  wallet_address: string;
+  model_name: string;
+  system_prompt: string;
+  tier: "managed" | "byok";
+  active: boolean;
+  agent_name: string | null;
+  job_count: number;
+  created_at: string;
+}
+
+export async function getHostedAgents(
+  signer: import("ethers").JsonRpcSigner,
+  walletAddress: string,
+): Promise<HostedAgentSummary[]> {
+  if (!hasSession()) await createSession(signer, walletAddress);
+  const token = getSessionToken();
+  if (!token) throw new Error("No session token");
+  const res = await fetch(
+    `${API_URL}/hosted-agents?wallet_address=${walletAddress.toLowerCase()}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Failed to load hosted agents (${res.status})`);
+  const data = await res.json();
+  return data.agents || [];
+}
+
 // ── Jobs ──
 
 export interface Job {
