@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useCallback } from "react";
+import { useId, useState, useCallback, useRef } from "react";
 import type { KeyboardEvent, ChangeEvent } from "react";
 import type { FormField } from "../lib/schema-form";
 
@@ -64,6 +64,24 @@ function readNumberDisplay(value: Record<string, unknown>, path: string): string
   if (typeof v === "number" && Number.isFinite(v)) return String(v);
   if (typeof v === "string") return v;
   return "";
+}
+
+/**
+ * Returns true when `file` matches at least one token in an `accept` string.
+ * Handles file extensions (.json), exact MIME types (application/json), and
+ * wildcard MIME types (image/*). An empty/missing accept string allows everything.
+ */
+function isFileAccepted(file: File, accept: string | undefined): boolean {
+  if (!accept || accept.trim() === "") return true;
+  const tokens = accept.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const ext = file.name.includes(".") ? `.${file.name.split(".").pop()!.toLowerCase()}` : "";
+  const mime = file.type.toLowerCase();
+  return tokens.some((token) => {
+    if (token.startsWith(".")) return ext === token;
+    if (token.endsWith("/*")) return mime.startsWith(token.slice(0, -1));
+    return mime === token;
+  });
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -334,6 +352,7 @@ function FileInput({
   onFileUpload,
 }: FieldRowProps): JSX.Element {
   const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const current = value[field.path];
@@ -343,6 +362,15 @@ function FileInput({
   const handleFile = useCallback(
     async (file: File) => {
       setLocalError(null);
+      if (!isFileAccepted(file, field.accept)) {
+        if (inputRef.current) inputRef.current.value = "";
+        setLocalError(
+          field.accept
+            ? `File type not allowed. Accepted: ${field.accept}`
+            : "File type not allowed.",
+        );
+        return;
+      }
       if (onFileUpload) {
         setUploading(true);
         try {
@@ -372,6 +400,7 @@ function FileInput({
   return (
     <FieldWrapper id={id} field={field} errorMsg={hasError ? errMsg : undefined}>
       <input
+        ref={inputRef}
         id={id}
         type="file"
         accept={field.accept}

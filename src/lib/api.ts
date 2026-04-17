@@ -1405,18 +1405,18 @@ export async function uploadToolInput(
   listingId: number | null,
   file: File,
 ): Promise<{ file_url: string; mime_type: string; bytes: number }> {
-  const resourceId = listingId ?? "-";
-  const { signature, timestamp } = await signForWallet(signer, walletAddress, "upload-tool-input", resourceId);
+  // Ensure a session exists — the upload endpoint requires Bearer token auth.
+  // createSession is a no-op when a valid session is already present.
+  await createSession(signer, walletAddress);
 
   const form = new FormData();
   form.append("file", file);
   form.append("wallet_address", walletAddress.toLowerCase());
-  form.append("signature", signature);
-  form.append("timestamp", String(timestamp));
   if (listingId != null) form.append("listing_id", String(listingId));
 
   const res = await fetch(`${API_URL}/tool-inputs/upload`, {
     method: "POST",
+    headers: { Authorization: `Bearer ${getSessionToken()}` },
     body: form,
   });
   if (!res.ok) {

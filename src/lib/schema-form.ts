@@ -52,7 +52,7 @@ export interface LegacyInputField {
   label?: string;
   type: "text" | "textarea" | "select" | "code" | "url" | "git_url" | "file" | "number";
   required?: boolean;
-  accept?: string;
+  accept?: string | string[];
   options?: string[];
   description?: string;
 }
@@ -285,8 +285,13 @@ export function legacyToJsonSchema(legacy: LegacyInputField[]): JSONSchema {
         break;
       }
       case "file": {
+        const rawAccept = entry.accept;
         const accept =
-          typeof entry.accept === "string" ? entry.accept : "application/octet-stream";
+          typeof rawAccept === "string" && rawAccept.length > 0
+            ? rawAccept
+            : Array.isArray(rawAccept) && rawAccept.length > 0
+            ? rawAccept.join(",")
+            : "application/octet-stream";
         prop = {
           type: "string",
           contentEncoding: "base64",

@@ -416,12 +416,22 @@ const ESCROW_ROUTER_GETESCROW_ABI = [
   },
 ];
 
-// Known strategy addresses (Base mainnet)
-const STRATEGY_ADDRESSES: Record<string, string> = {
-  "0xf369e771135a694d60816d989cb9bb95549fb2de": "all_or_nothing",
-  "0x3e06daf736905848befd8cea982b08118b0efe87": "milestone",
-  "0x3a6c6712e7c01399808a2e56e39f3c8973b48f37": "trickle",
-};
+// Known strategy addresses. Prefer env vars (per-environment) with mainnet fallback.
+function buildStrategyAddresses(): Record<string, string> {
+  const result: Record<string, string> = {};
+  const envAllOrNothing = process.env.NEXT_PUBLIC_ALL_OR_NOTHING_STRATEGY_ADDRESS;
+  const envMilestone = process.env.NEXT_PUBLIC_MILESTONE_STRATEGY_ADDRESS;
+  const envTrickle = process.env.NEXT_PUBLIC_TRICKLE_STRATEGY_ADDRESS;
+  if (envAllOrNothing) result[envAllOrNothing.toLowerCase()] = "all_or_nothing";
+  if (envMilestone) result[envMilestone.toLowerCase()] = "milestone";
+  if (envTrickle) result[envTrickle.toLowerCase()] = "trickle";
+  // Mainnet addresses always included
+  result["0xf369e771135a694d60816d989cb9bb95549fb2de"] = "all_or_nothing";
+  result["0x3e06daf736905848befd8cea982b08118b0efe87"] = "milestone";
+  result["0x3a6c6712e7c01399808a2e56e39f3c8973b48f37"] = "trickle";
+  return result;
+}
+const STRATEGY_ADDRESSES = buildStrategyAddresses();
 
 export function getStrategyType(strategyAddress: string | null): "all_or_nothing" | "milestone" | "trickle" | "unknown" {
   if (!strategyAddress) return "unknown";
@@ -612,12 +622,21 @@ export async function claimRebateOnChain(signer: JsonRpcSigner, rebateId: number
   return receipt.hash;
 }
 
-// Strategy address resolved from listing data, validated against on-chain allowlist
+// Strategy address resolved from listing data, validated against on-chain allowlist.
+// On testnet (non-mainnet) without explicit strategy env vars, trusts the API address directly.
 export function getStrategyAddress(name: string, strategyAddress?: string | null): string {
   if (!strategyAddress) throw new Error(`No strategy address provided for ${name}. Listing data may be stale.`);
   if (!/^0x[a-fA-F0-9]{40}$/.test(strategyAddress)) throw new Error(`Invalid strategy address format`);
-  const known = STRATEGY_ADDRESSES[strategyAddress.toLowerCase()];
-  if (!known) throw new Error("Strategy address not in platform allowlist");
+  const isMainnet = CHAIN_ID === "8453";
+  const hasStrategyEnvVars = !!(
+    process.env.NEXT_PUBLIC_ALL_OR_NOTHING_STRATEGY_ADDRESS ||
+    process.env.NEXT_PUBLIC_MILESTONE_STRATEGY_ADDRESS ||
+    process.env.NEXT_PUBLIC_TRICKLE_STRATEGY_ADDRESS
+  );
+  if (isMainnet || hasStrategyEnvVars) {
+    const known = STRATEGY_ADDRESSES[strategyAddress.toLowerCase()];
+    if (!known) throw new Error("Strategy address not in platform allowlist");
+  }
   return strategyAddress;
 }
 
