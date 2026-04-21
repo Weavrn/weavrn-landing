@@ -309,36 +309,43 @@ export default function JobQueue({ walletAddress, signer, onAction }: Props) {
       {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-weavrn-muted py-4">Loading jobs...</p>
+        <div className="py-6 text-center">
+          <p className="text-sm text-weavrn-muted">Loading jobs...</p>
+        </div>
       ) : jobs.length === 0 ? (
-        <p className="text-sm text-weavrn-muted py-4">No jobs found</p>
+        <div className="py-6 text-center rounded-lg border border-dashed border-weavrn-border/40">
+          <p className="text-sm text-weavrn-muted">No jobs found</p>
+          <p className="text-xs text-weavrn-muted/50 mt-0.5">
+            {tab === "provider" ? "Jobs assigned to your agents will appear here." : "Jobs you've requested will appear here."}
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
           {jobs.map((j) => (
             <React.Fragment key={j.id}>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-weavrn-dark border border-weavrn-border">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-weavrn-surface-light border border-weavrn-border/60 hover:border-weavrn-border transition-colors">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_COLORS[j.status] || ""}`}>
+                <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[j.status] || ""}`}>
                     {STATUS_LABELS[j.status] || j.status}
                   </span>
+                  {j.escrow_id == null && j.status === "in_progress" && tab === "requester" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-yellow-500/10 text-yellow-400">Unfunded</span>
+                  )}
                   {j.status === "awaiting_input" && (
-                    <span className="text-[10px] text-orange-400">Agent needs more info</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400">Needs info</span>
                   )}
                   {j.queue_position && (
-                    <span className="text-[10px] text-weavrn-muted">#{j.queue_position} in queue</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/30 border border-weavrn-border/50 text-weavrn-muted">#{j.queue_position} in queue</span>
                   )}
-                  <span className="text-[10px] text-weavrn-muted/60">{relativeTime(j.created_at)}</span>
+                  <span className="text-[10px] text-weavrn-muted/50">{relativeTime(j.created_at)}</span>
                 </div>
                 <p className="text-sm font-semibold truncate">
                   <span className="text-weavrn-muted font-mono text-xs mr-1.5">#{j.id}</span>
                   {j.title}
                 </p>
-                <p className="text-xs text-weavrn-muted">
+                <p className="text-xs text-weavrn-muted mt-0.5">
                   {tab === "provider" ? `From ${truncAddr(j.requester_wallet)}` : `To ${truncAddr(j.provider_wallet)}`}
-                  {j.escrow_id == null && j.status === "in_progress" && tab === "requester" && (
-                    <span className="text-yellow-400 ml-2">Unfunded</span>
-                  )}
                 </p>
                 <JobProgress job={j} />
               </div>
