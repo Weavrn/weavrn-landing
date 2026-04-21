@@ -208,14 +208,20 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
   return (
     <div className="mt-4 border-t border-weavrn-border/30 pt-4">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Listings</span>
+        <span className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">
+          Listings{listings.length > 0 ? ` (${listings.length})` : ""}
+        </span>
         {!showCreate && (
-          <button onClick={() => setShowCreate(true)} className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-2.5 py-1 rounded text-[11px] bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 transition-colors cursor-pointer"
+          >
             + Add Listing
           </button>
         )}
       </div>
 
+      <div className="space-y-2">
       {listings.map(l => editingId === l.id ? (
         <div key={l.id} className="p-4 rounded-lg bg-weavrn-dark border border-weavrn-accent/30 space-y-3 mb-2">
           <div className="flex items-center justify-between">
@@ -287,39 +293,72 @@ function AgentListings({ agentWallet, ownerWallet, signer }: { agentWallet: stri
           </button>
         </div>
       ) : (
-        <div key={l.id} className="flex items-center justify-between py-2 border-b border-weavrn-border/20 last:border-0">
-          <div className="min-w-0">
-            <p className="text-sm truncate">{l.title}</p>
-            <p className="text-[10px] text-weavrn-muted">
-              {l.category} · {l.price_amount} {l.price_token} · {l.escrow_strategy.replace(/_/g, " ")}
-              {(() => { const s = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema; return Array.isArray(s) && s.length > 0 ? ` · ${s.length} fields` : ""; })()}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 ml-3">
-            <a href={`/marketplace?id=${l.id}`} className="text-[10px] text-weavrn-accent hover:underline">View</a>
-            {signer && (
-              <button onClick={() => {
-                setEditingId(l.id);
-                setEditTitle(l.title);
-                setEditDescription(l.description || "");
-                setEditPrice(l.price_amount || "");
-                setEditDuration(l.estimated_duration || "");
-                const schema = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema;
-                setEditInputFields(Array.isArray(schema) ? schema : []);
-              }} className="text-[10px] text-weavrn-muted hover:text-white">Edit</button>
-            )}
-            {l.active && signer && (
-              <button onClick={async () => { await deactivateListing(signer, ownerWallet, l.id); fetchListings(); }} className="text-[10px] text-red-400 hover:text-red-300">
-                Deactivate
-              </button>
-            )}
+        <div key={l.id} className="p-3 rounded-lg bg-weavrn-surface-light border border-weavrn-border/50 hover:border-weavrn-border transition-colors">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${l.active ? "bg-weavrn-accent/10 text-weavrn-accent" : "bg-red-500/10 text-red-400"}`}>
+                  {l.active ? "Active" : "Inactive"}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/30 border border-weavrn-border/50 text-weavrn-muted capitalize">
+                  {l.category}
+                </span>
+                {(() => {
+                  const s = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema;
+                  return Array.isArray(s) && s.length > 0
+                    ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">{s.length} fields</span>
+                    : null;
+                })()}
+              </div>
+              <p className="text-sm font-semibold truncate">{l.title}</p>
+              <p className="text-xs text-weavrn-muted mt-0.5">
+                {l.price_amount ? `${l.price_amount} ${l.price_token}` : "Custom pricing"}
+                {" · "}{l.escrow_strategy.replace(/_/g, " ")}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <a
+                href={`/marketplace?id=${l.id}`}
+                className="px-2.5 py-1 rounded text-[11px] border border-weavrn-border text-weavrn-muted hover:text-white hover:border-weavrn-accent/30 transition-colors cursor-pointer"
+              >
+                View
+              </a>
+              {signer && (
+                <button
+                  onClick={() => {
+                    setEditingId(l.id);
+                    setEditTitle(l.title);
+                    setEditDescription(l.description || "");
+                    setEditPrice(l.price_amount || "");
+                    setEditDuration(l.estimated_duration || "");
+                    const schema = typeof l.input_schema === "string" ? JSON.parse(l.input_schema) : l.input_schema;
+                    setEditInputFields(Array.isArray(schema) ? schema : []);
+                  }}
+                  className="px-2.5 py-1 rounded text-[11px] border border-weavrn-border text-weavrn-muted hover:text-white hover:border-weavrn-accent/30 transition-colors cursor-pointer"
+                >
+                  Edit
+                </button>
+              )}
+              {l.active && signer && (
+                <button
+                  onClick={async () => { await deactivateListing(signer, ownerWallet, l.id); fetchListings(); }}
+                  className="px-2.5 py-1 rounded text-[11px] bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+                >
+                  Deactivate
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
 
       {listings.length === 0 && !showCreate && (
-        <p className="text-xs text-weavrn-muted py-2">No listings yet. Add one so this agent can receive jobs.</p>
+        <div className="py-4 text-center rounded-lg border border-dashed border-weavrn-border/40">
+          <p className="text-xs text-weavrn-muted">No listings yet</p>
+          <p className="text-[11px] text-weavrn-muted/50 mt-0.5">Add a listing so this agent can receive jobs from the marketplace.</p>
+        </div>
       )}
+      </div>
 
       {showCreate && (
         <div className="space-y-3 mt-2 p-4 rounded-lg bg-weavrn-dark border border-weavrn-border">
@@ -438,7 +477,10 @@ function AgentJobs({ agentWallet }: { agentWallet: string }) {
   if (total === 0) return (
     <div className="mt-4 border-t border-weavrn-border/30 pt-4">
       <span className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Jobs</span>
-      <p className="text-xs text-weavrn-muted py-2">No jobs yet.</p>
+      <div className="mt-3 py-4 text-center rounded-lg border border-dashed border-weavrn-border/40">
+        <p className="text-xs text-weavrn-muted">No jobs yet.</p>
+        <p className="text-[11px] text-weavrn-muted/50 mt-0.5">Jobs will appear here once requesters hire this agent.</p>
+      </div>
     </div>
   );
 
@@ -446,33 +488,49 @@ function AgentJobs({ agentWallet }: { agentWallet: string }) {
     <div className="mt-4 border-t border-weavrn-border/30 pt-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-weavrn-muted uppercase tracking-wider">Recent Jobs ({total})</span>
-        <a href={`/dashboard/agent?wallet=${agentWallet}`} className="text-xs text-weavrn-accent hover:text-weavrn-accent-hover">
+        <a
+          href={`/dashboard/agent?wallet=${agentWallet}`}
+          className="px-2.5 py-1 rounded text-[11px] bg-weavrn-accent/10 text-weavrn-accent hover:bg-weavrn-accent/20 transition-colors cursor-pointer"
+        >
           View All
         </a>
       </div>
-      {jobs.map(j => {
-        const dd = (j.deliverable_data || {}) as { pr_url?: string };
-        const ps = j.processing_status;
-        const isActive = ps && ["preflight", "container"].includes(ps.stage);
-        return (
-          <div key={j.id} className="flex items-center justify-between py-1.5 border-b border-weavrn-border/10 last:border-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ${JOB_STATUS_COLORS[j.status] || ""}`}>
-                {JOB_STATUS_LABELS[j.status] || j.status}
-              </span>
-              <span className="text-xs truncate">{j.title}</span>
+      <div className="space-y-2">
+        {jobs.map(j => {
+          const dd = (j.deliverable_data || {}) as { pr_url?: string };
+          const ps = j.processing_status;
+          const isActive = ps && ["preflight", "container"].includes(ps.stage);
+          return (
+            <div key={j.id} className="p-3 rounded-lg bg-weavrn-surface-light border border-weavrn-border/50 hover:border-weavrn-border transition-colors">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${JOB_STATUS_COLORS[j.status] || ""}`}>
+                    {JOB_STATUS_LABELS[j.status] || j.status}
+                  </span>
+                  <span className="text-sm truncate">{j.title}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isActive && ps.turn ? (
+                    <span className="text-[10px] text-weavrn-muted font-mono bg-black/30 px-1.5 py-0.5 rounded">
+                      {ps.turn}/{ps.max_turns || 30}
+                    </span>
+                  ) : null}
+                  {dd.pr_url ? (
+                    <a
+                      href={dd.pr_url && /^https?:\/\//.test(dd.pr_url) ? dd.pr_url : '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded text-[11px] bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer"
+                    >
+                      PR
+                    </a>
+                  ) : null}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
-              {isActive && ps.turn ? (
-                <span className="text-[9px] text-weavrn-muted font-mono">{ps.turn}/{ps.max_turns || 30}</span>
-              ) : null}
-              {dd.pr_url ? (
-                <a href={dd.pr_url && /^https?:\/\//.test(dd.pr_url) ? dd.pr_url : '#'} target="_blank" rel="noopener noreferrer" className="text-[9px] text-green-400 hover:underline">PR</a>
-              ) : null}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
